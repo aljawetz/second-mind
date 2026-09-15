@@ -111,10 +111,9 @@ classroom recordings.
 - **FR7** — Generate at least one study-artifact type (mock test) from indexed material, cited to
   source.
 - **FR8** — Additional study-artifact types: mindmap, flashcards, slides.
-- **FR9** — Socratic-mode toggle for Q&A (guiding questions before the answer).
-- **FR10** — Assignment explainer: explain the prompt and cite relevant material, never draft the
+- **FR9** — Assignment explainer: explain the prompt and cite relevant material, never draft the
   submission.
-- **FR11** — Multi-course support in the sidebar, across at least two courses.
+- **FR10** — Multi-course support in the sidebar, across at least two courses.
 
 **Could have**
 
@@ -156,12 +155,11 @@ generation is a Should Have, layered on once this core flow is solid.
 
 By Sprint 6, the team commits to an end-to-end alpha where a Canvas-using student can: connect their own
 Canvas and LLM credentials; select and index at least two real courses; ask questions about
-indexed material and receive answer-first, cited responses with a Socratic toggle; and have at
-least one class session auto-captured, transcribed, and made note-taking-ready. Grades and
-deadlines are read live, never indexed. Recordings and notes stay private to the student, with no
-sharing path. Study-artifact generation, additional artifact types, the assignment explainer,
-pre-class prep briefs, and any capability that drafts submittable work are explicitly
-Should/Could/Out of Scope — not committed.
+indexed material and receive answer-first, cited responses; and have at least one class session
+auto-captured, transcribed, and made note-taking-ready. Grades and deadlines are read live, never
+indexed. Recordings and notes stay private to the student, with no sharing path. Study-artifact
+generation, additional artifact types, the assignment explainer, pre-class prep briefs, and any
+capability that drafts submittable work are explicitly Should/Could/Out of Scope — not committed.
 
 ## 3. Feasibility and success measures
 
