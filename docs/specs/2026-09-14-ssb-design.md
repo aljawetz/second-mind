@@ -357,11 +357,15 @@ flow.
 
 | Layer | Choice | Rationale |
 | --- | --- | --- |
-| Vector store | Embedded, on-disk, per-student (LanceDB or equivalent) | Hybrid BM25+vector, zero server processes, one directory per student maps exactly to §5.1 |
-| Canvas access | Canvas MCP server | Already working; live reads for personal data |
+| App shell | Tauri, macOS only for MVP | Reuses the existing HTML/CSS/JS mockup as the UI directly; native OS webview instead of bundled Chromium keeps footprint small, consistent with §5.5's no-background-daemon stance. Cross-platform is a stated future goal, not a Sprint 4–9 commitment |
+| Backend | Local Python process, loopback-only HTTP | RAG tooling (LanceDB, embeddings, Whisper) is Python-native; a process boundary isolates a backend crash from the UI. Bundled as a Tauri sidecar — the student installs one app, never a Python environment |
+| Vector store | Embedded, on-disk, per-student (LanceDB) | Native hybrid vector + full-text (BM25-style) search in one engine — no separate BM25 library or manual reranking step. Zero server processes; one directory per student maps exactly to §5.1 |
+| Embeddings | Local, open-source model (e.g. BGE-small class) | Anthropic has no public embeddings API, so "pluggable LLM" doesn't cover this layer regardless of provider — a local model avoids requiring a second provider account just to embed content, at some retrieval-quality cost versus the best hosted embedding APIs |
+| Canvas access | Canvas MCP server, embedded as the backend's Canvas client | Already working and directly validated (Sprint 3, §10.1); reuses a solved Canvas API integration — auth, endpoints, pagination — rather than writing a REST client from scratch. Invoked as a local library/subprocess, not through an LLM reasoning loop |
 | Transcription | Whisper, local | Open-source thesis; recordings never leave the machine. UniFlow uses hosted Deepgram |
-| LLM | Pluggable, default Claude | Swappable; local models possible for full self-hosting |
+| LLM | Pluggable, default Claude | Swappable per student's own key; local models possible for full self-hosting |
 | Web search | MCP, explicitly labeled | Never silently blended with course-grounded answers |
+| Credential storage | macOS Keychain | Never a plaintext config file; OS-encrypted at rest, scoped to the app |
 
 ### 10.1 PDF and slide ingestion — the Sprint 3 finding
 
