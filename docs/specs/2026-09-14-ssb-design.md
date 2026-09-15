@@ -311,18 +311,22 @@ groundedness.
 ### 9.1 Where the schedule comes from
 
 There's no Canvas API access to a course's meeting schedule — checked directly, no calendar
-endpoint is exposed to a student-scoped token, and a real pilot course's Syllabus tab turned out to
-be a link to a PDF, not structured text (the same tiered-extraction problem as §10.1, with no
-guarantee the PDF states meeting times cleanly even then). Auto-detection can't be the primary
-path, because there's nothing reliable to detect it from.
+endpoint is exposed to a student-scoped token. Syllabus text is not a reliable substitute either,
+though it's a better one than first assumed: checked against three real courses, the pilot course's
+Syllabus tab is just a link to a PDF with no inline text, but two of the other three have clean,
+directly parseable schedule lines ("Classes: Mondays and Wednesdays, 1:00 PM to 2:50 PM"). The
+pilot course turned out to be closer to the worst case than the typical one. Auto-detection still
+can't be the *primary* path — a PDF-only syllabus offers nothing to parse, and even a well-formatted
+one isn't guaranteed to state times cleanly — but it's a real assist worth attempting, not a token
+gesture.
 
-**Manual entry is the primary path.** During onboarding (§5.4), selecting a course includes setting
-its weekly meeting schedule — day, start/end time, and a session-type label for courses with more
-than one meeting pattern (lecture vs. recitation, most commonly). SSB attempts a best-effort
-pre-fill from syllabus text where extraction finds something schedule-shaped, always shown as an
-unconfirmed guess the student reviews, never as a confident answer. The schedule stays editable
-afterward from Settings — a professor moving one week's class, a added recitation, a schedule typo
-caught later.
+**Manual entry is the primary, confirmed path regardless.** During onboarding (§5.4), selecting a
+course includes setting its weekly meeting schedule — day, start/end time, and a session-type label
+for courses with more than one meeting pattern (lecture vs. recitation, most commonly). SSB attempts
+a best-effort pre-fill from syllabus text where extraction finds something schedule-shaped, always
+shown as an unconfirmed guess the student reviews, never as a confident answer. The schedule stays
+editable afterward from Settings — a professor moving one week's class, an added recitation, a
+schedule typo caught later.
 
 ### 9.2 Triggering a session
 
@@ -352,6 +356,12 @@ plausible later upgrade if this turns out to matter in practice — not committe
 The point: the artifact of attending class creates itself with one confirmation, and immediately
 becomes searchable alongside the official course material. That is the "second brain" claim in one
 flow.
+
+**Noted, not scoped in:** some courses already link professor-provided lecture recordings from a
+Canvas page (a Panopto link was found in a real course checked this sprint). That's a distinct
+content source from this section's own capture flow — ingesting an existing recording rather than
+producing one — and isn't part of the MVP, but it's a real pattern worth remembering rather than
+rediscovering later.
 
 ## 10. Technology choices
 

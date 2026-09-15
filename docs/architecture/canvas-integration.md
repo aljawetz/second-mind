@@ -27,7 +27,25 @@ access restriction in §2 below.
 | Privileged assignment fields (`assignment_visibility`, `overrides`) 403 | Original Sprint 3 Onyx-era finding | Don't request them; they're instructor-only fields with no student-facing equivalent needed |
 | Disabled Pages tabs 404 the whole course's page listing | Original Sprint 3 finding | Treat a 404 on one content type as "this course doesn't expose that type," not a fatal ingestion error — degrade to the content types that did resolve |
 | No calendar/schedule endpoint is exposed at all | Checked directly this sprint, course 56350 | Not worked around — this is why §9.1 makes manual schedule entry the primary path, not a fallback |
-| Syllabus tab is often just a link to a file, not inline structured text | Checked directly this sprint, course 56350 | Same tiered extraction as any other file ([rag-pipeline.md](rag-pipeline.md)) — no special-casing, and no guarantee it contains parseable meeting times even then |
+| `get_course_structure` itself can 403 for an entire course/section, not just the Files listing | Checked directly this sprint — one of two Canvas IDs for the same nominal course (18654-SV) 403'd on this call entirely, the other didn't | Degrade per-endpoint, not just per-item: a course whose module/file tree is blocked should still sync via its assignment and page listings, which are separate calls |
+
+**Syllabus text quality varies a lot by course — it's not universally unstructured.** Checked
+across three real courses: the pilot course (56350) links a PDF with no inline schedule text, but
+two of the other three have clean, directly parseable text (*"Classes: Mondays and Wednesdays,
+1:00 PM to 2:50 PM"*; *"Class Schedule: Monday and Wednesday 3:00PM - 4:50PM"*). §9.1's syllabus
+best-effort pre-fill is worth taking seriously as a real assist, not a token gesture — it just
+happens that our own primary pilot course is the worst case, not the typical one. Manual entry
+stays the primary, confirmed path regardless (§9.1) — this changes how often the assist actually
+helps, not whether confirmation is still required.
+
+**Real course pages lean heavily on links to things outside Canvas entirely** — Google Docs, Miro
+boards, YouTube videos, and, in one real case, a Panopto-hosted lecture recording linked from a
+course page. Two implications: it validates [sprint-02.md](../sprints/sprint-02.md)'s FR16
+(external reading scraper) as addressing a real, observed pattern rather than a hypothetical one;
+and it surfaces something not previously considered — **some professors already record and host
+their own lectures**, a distinct content source from the student's own capture (design spec §9).
+Not scoped in for the MVP, but worth naming rather than discovering later: if a course already
+provides recordings, ingesting those could matter as much as capturing new ones.
 
 The pattern across all of these: **a student-scoped token is not a lesser version of an admin
 token, it's a different access shape entirely**, with its own gaps that don't necessarily show up
