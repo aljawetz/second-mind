@@ -99,14 +99,16 @@ classroom recordings.
   corpus with query filters.
 - **FR7** — Fetch grades, deadlines, and submission status live per request; never persist or
   index them.
+- **FR8** — Assignment explainer: help the student understand a specific assignment using grounded
+  information — break down the prompt and cite relevant course material — and never draft any
+  part of the submission. (Not the deferred assignment *helper* in Out of Scope, which drafts
+  answers — see design spec §7.1 for the boundary between the two.)
 
 **Should have**
 
-- **FR8** — Generate at least one study-artifact type (mock test) from indexed material, cited to
+- **FR9** — Generate at least one study-artifact type (mock test) from indexed material, cited to
   source.
-- **FR9** — Additional study-artifact types: mindmap, flashcards, slides.
-- **FR10** — Assignment explainer: explain the prompt and cite relevant material, never draft the
-  submission.
+- **FR10** — Additional study-artifact types: mindmap, flashcards, slides.
 - **FR11** — Multi-course support in the sidebar, across at least two courses.
 
 **Could have**
@@ -133,8 +135,7 @@ classroom recordings.
 - **NFR3 (Onboarding)** — First run (connect credentials → select courses → index → land in app)
   completes without manual configuration files, so someone outside the development team can
   realistically install and use it.
-- **NFR4 (Deployment)** — Runs on a student's own machine without a multi-container server stack —
-  a direct response to the Sprint 3 Onyx finding.
+- **NFR4 (Deployment)** — Runs on a student's own machine without a multi-container server stack.
 - **NFR5 (Responsiveness)** — Retrieval and Q&A stay conversational — fast enough for a real-time
   study session, not a batch job.
 
@@ -149,20 +150,20 @@ generation is a Should Have, layered on once this core flow is solid.
 
 By Sprint 6, the team commits to an end-to-end alpha where a Canvas-using student can: connect their own
 Canvas and LLM credentials; select and index at least two real courses; ask questions about
-indexed material and receive answer-first, cited responses; and have at least one class session
-auto-captured, transcribed, and made note-taking-ready. Grades and deadlines are read live, never
-indexed. Recordings and notes stay private to the student, with no sharing path. Study-artifact
-generation, additional artifact types, the assignment explainer, pre-class prep briefs, and any
-capability that drafts submittable work are explicitly Should/Could/Out of Scope — not committed.
+indexed material and receive answer-first, cited responses; have at least one class session
+auto-captured, transcribed, and made note-taking-ready; and get a grounded explanation of a
+specific assignment's prompt. Grades and deadlines are read live, never indexed. Recordings and
+notes stay private to the student, with no sharing path. Study-artifact generation, additional
+artifact types, pre-class prep briefs, and any capability that drafts submittable work are
+explicitly Should/Could/Out of Scope — not committed.
 
 ## 3. Feasibility and success measures
 
 **Feasibility for one semester.** Sprint 3's finding (§ [sprint-03.md](sprint-03.md)) already
-tested the highest-risk technical assumption — RAG over real Canvas content — and validated it,
-while identifying that the *substrate* (Onyx) was the wrong shape for a self-hosted, per-student
-product. Scoping the committed MVP to two pillars (Q&A, lecture capture), with study artifacts and
-the assignment explainer as Should Have layered on top, across a 4–6 person team over a 9-sprint
-semester matches the rubric's own guidance: a smaller system that works end-to-end beats an
+tested the highest-risk technical assumption — RAG over real Canvas content — and validated it.
+Scoping the committed MVP to three pillars (Q&A, lecture capture, assignment explainer), with
+study artifacts as Should Have layered on top, across a 4–6 person team over a 9-sprint semester
+matches the rubric's own guidance: a smaller system that works end-to-end beats an
 ambitious one that doesn't.
 
 **Success measures**
