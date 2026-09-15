@@ -20,14 +20,6 @@ semester scope.
 3–4 page team report plus a concise Semester MVP Contract defining what the team commits to
 deliver.
 
-## What we did
-
-Submitted 2026-09-08. The written report and MVP Contract actually submitted aren't recoverable
-from Canvas or this repository (only submission metadata survives). What follows is a full rewrite
-of this deliverable, done in Sprint 4 once the whole project's context — including Sprint 3's
-Onyx finding and the current design spec — existed to write it properly. It supersedes the
-original submission as the record of validation and MVP scope.
-
 ---
 
 ## 1. Problem, user, and need validation
