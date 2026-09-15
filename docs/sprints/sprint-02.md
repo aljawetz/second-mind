@@ -106,16 +106,15 @@ classroom recordings.
 
 **Should have**
 
-- **FR9** — Generate at least one study-artifact type (mock test) from indexed material, cited to
-  source.
-- **FR10** — Additional study-artifact types: mindmap, flashcards, slides.
-- **FR11** — Multi-course support in the sidebar, across at least two courses.
+- **FR9** — Generate study-artifact types (mock test, mindmap, flashcards, slides) from indexed
+  material, cited to source.
+- **FR10** — Multi-course support in the sidebar, across at least two courses.
 
 **Could have**
 
-- **FR12** — Pre-class prep brief generated from the prior session's transcript plus assigned
+- **FR11** — Pre-class prep brief generated from the prior session's transcript plus assigned
   readings.
-- **FR13** — Web-search fallback when course material doesn't cover a question, visibly labeled
+- **FR12** — Web-search fallback when course material doesn't cover a question, visibly labeled
   and never blended into a course-grounded answer.
 
 **Out of scope this semester**
