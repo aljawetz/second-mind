@@ -85,27 +85,29 @@ classroom recordings.
 
 **Must have**
 
-- **FR1** — Ingest a student's Canvas course content (pages, assignments, announcements, modules,
+- **FR1** — Let the student paste their own Canvas API token and LLM API key during onboarding;
+  store both locally and never transmit them to any SSB-operated service (see NFR1).
+- **FR2** — Ingest a student's Canvas course content (pages, assignments, announcements, modules,
   files) using the student's own token.
-- **FR2** — Answer natural-language questions about indexed course material with inline citations
+- **FR3** — Answer natural-language questions about indexed course material with inline citations
   to source.
-- **FR3** — State explicitly when indexed material doesn't support an answer, rather than falling
+- **FR4** — State explicitly when indexed material doesn't support an answer, rather than falling
   back to open-domain knowledge.
-- **FR4** — Auto-create a session page at class time; record, transcribe locally, and provide a
+- **FR5** — Auto-create a session page at class time; record, transcribe locally, and provide a
   notes editor alongside the transcript.
-- **FR5** — Keep retrieval/index physically isolated per student (own directory), not a shared
+- **FR6** — Keep retrieval/index physically isolated per student (own directory), not a shared
   corpus with query filters.
-- **FR6** — Fetch grades, deadlines, and submission status live per request; never persist or
+- **FR7** — Fetch grades, deadlines, and submission status live per request; never persist or
   index them.
 
 **Should have**
 
-- **FR7** — Generate at least one study-artifact type (mock test) from indexed material, cited to
+- **FR8** — Generate at least one study-artifact type (mock test) from indexed material, cited to
   source.
-- **FR8** — Additional study-artifact types: mindmap, flashcards, slides.
-- **FR9** — Assignment explainer: explain the prompt and cite relevant material, never draft the
+- **FR9** — Additional study-artifact types: mindmap, flashcards, slides.
+- **FR10** — Assignment explainer: explain the prompt and cite relevant material, never draft the
   submission.
-- **FR10** — Multi-course support in the sidebar, across at least two courses.
+- **FR11** — Multi-course support in the sidebar, across at least two courses.
 
 **Could have**
 
