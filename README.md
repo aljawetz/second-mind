@@ -143,10 +143,6 @@ silently blends outside knowledge into a course-grounded answer.
 
 - [Design spec](docs/superpowers/specs/2026-09-14-ssb-design.md) — architecture, scope, privacy
   model, risks, metrics
-- [Sprint 3 feasibility plan](docs/superpowers/plans/2026-09-11-sprint3-onyx-poc.md) — the Onyx
-  baseline (historical)
-- [Original Canvas AI Tutor spec](docs/superpowers/specs/2026-09-11-canvas-ai-tutor-design.md) —
-  superseded, kept for history
 
 ## License
 
