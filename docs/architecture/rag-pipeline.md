@@ -117,4 +117,10 @@ Both reuse this same retrieval-then-generate shape, not a separate pipeline:
   (reading comprehension of the prompt itself, not course content) plus a course-content retrieval
   pass for the "where to start" pointers. The system prompt here is deliberately narrower: explain
   and cite, never draft — enforced by the interface contract itself having no draft-output field
-  ([overview.md](overview.md) §2), not just by prompt instruction.
+  ([overview.md](overview.md) §2), not just by prompt instruction. **Tested against a real coding
+  assignment (§7.1): the pointers step needs its own constraint, not just the interface-level one.**
+  The prompt must instruct the model to phrase pointers at the topic level ("this lecture covers
+  isolating stateful behavior") never at the per-task level ("this task needs a state flag, see
+  Lecture 6") — the latter is implementation guidance without being code. Worth a cheap post-hoc
+  check (does a pointer's text reference a specific task number or object/method name from the
+  prompt?) rather than trusting the system prompt alone, before Sprint 8 treats this as verified.

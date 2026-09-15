@@ -294,6 +294,18 @@ student back to the right lecture. Producing any part of the submission itself i
 entirely, and stays deferred until SSB can enforce that boundary technically, not just by
 instruction to the model.
 
+**Tested finding: the risk surface is "where to start," not "what's being asked."** Run against a
+real coding assignment (concrete method signatures, not a reading/report prompt), the breakdown
+step held up cleanly — restating the prompt's own structure in plain language stayed explanation,
+not implementation. The pointers step was harder to keep in bounds: connecting a course concept to
+a *specific numbered task* ("this task needs a state flag — see Lecture 6 on encapsulating
+stateful behavior") is implementation guidance wearing an explanation costume, even with zero code
+in it. Reading/report-style assignments never surfaced this; assignments with concrete technical
+specifications did. **Mitigation:** pointers stay at the topic level — naming what a lecture or
+reading covers conceptually — never phrased as relevant *to a specific task's* implementation.
+This needs to be an explicit constraint in the system prompt and, ideally, a cheap output check
+before Sprint 8's responsible-AI review treats this boundary as verified rather than asserted.
+
 ## 8. Study artifacts
 
 Generated from indexed material, each with citations back to source:
