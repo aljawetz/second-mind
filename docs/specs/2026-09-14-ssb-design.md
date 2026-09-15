@@ -240,6 +240,15 @@ hash-skip-if-unchanged idea, with SSB itself as the source of truth.
   onboarding (§5.4), live in the student's local environment, never in the repo, never transmitted
   to any SSB-operated service.
 
+**Accepted limitation: no cross-device access.** Physical, on-machine storage (§5.1) is what makes
+the recording-consent stance above defensible — but it means a student's index, recordings, and
+notes exist on exactly one machine. Studying from a second laptop or a phone means no access to
+any of it. This is a deliberate tradeoff, not an oversight: syncing any of this data off the
+originating device — even to a personal, encrypted store — reopens the same consent and blast-radius
+questions local-only storage exists to avoid. Not solved in the MVP; if it becomes a real pain
+point, the narrower fix is syncing non-sensitive state (settings, course selections) rather than
+recordings, transcripts, or notes.
+
 ## 7. Tutor behavior
 
 **Default: answer-first with citations.** A direct, useful answer, with every factual claim
