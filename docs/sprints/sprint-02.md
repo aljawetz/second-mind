@@ -22,8 +22,168 @@ deliver.
 
 ## What we did
 
-Submitted 2026-09-08. This is where SSB's scope took its current shape: Canvas-grounded Q&A with
-citations, lecture capture, and generated study artifacts, positioned against UniFlow Study. The
-written report and MVP Contract themselves aren't in this repository — the earliest surviving
-written artifact is the Sprint 3 feasibility work (§ below). The MVP scope this sprint defined is
-carried forward in [the design spec](../specs/2026-09-14-ssb-design.md), §4.
+Submitted 2026-09-08. The written report and MVP Contract actually submitted aren't recoverable
+from Canvas or this repository (only submission metadata survives). What follows is a full rewrite
+of this deliverable, done in Sprint 4 once the whole project's context — including Sprint 3's
+Onyx finding and the current design spec — existed to write it properly. It supersedes the
+original submission as the record of validation and MVP scope.
+
+---
+
+## 1. Problem, user, and need validation
+
+### Strengthened evidence
+
+Beyond the adoption, fragmentation, and market evidence gathered in [Sprint
+1](sprint-01.md), two findings specifically validate *how* SSB needs to solve the problem, not
+just that the problem exists:
+
+- **Citations aren't a nice-to-have — they're the #1 trust blocker.** Misinformation is students'
+  most prominent AI concern (73%), and students specifically cite "the absence of source
+  citations" as a source of wariness toward AI answers ([thematic analysis, AI Hallucination from
+  Students' Perspective](https://arxiv.org/html/2602.17671v1)). Perceived accuracy is what drives
+  willingness to actually use an AI tool ([MDPI, Trust in Generative AI
+  Tools](https://www.mdpi.com/2078-2489/16/7/622)). This validates answer-first-with-citations as
+  the core mechanic, not a differentiator layered on afterward.
+- **Recording privacy is a real, documented constraint, not overengineering.** Classroom
+  recordings that identify a student are protected educational records under FERPA, and
+  institutions maintain explicit consent processes for lecture capture because of it ([Cornell,
+  Classroom Privacy and Recording Guidelines](https://teaching.cornell.edu/teaching-resources/inclusion-accessibility/classroom-privacy-and-recording-guidelines);
+  [University of Michigan, Recording Privacy
+  Concerns](https://safecomputing.umich.edu/protect-privacy/privacy-u-m/videoconferencing/recording-privacy-concerns)).
+  A private-by-default, no-sharing-path stance is the only one defensible without building a
+  consent mechanism — validating the privacy model rather than assuming it.
+
+### Refined users and stakeholders
+
+- **User:** CMU graduate students, self-serve, one install per student.
+- **Customer:** the same students — no institutional gatekeeper, no professor approval, no IT
+  ticket.
+- **Beneficiary:** students directly; instructors indirectly, via fewer repeated questions in
+  office hours and on discussion boards.
+- **Additional stakeholders surfaced during validation:** instructors and classmates, whose
+  consent and privacy the recording feature touches even though they aren't SSB's user; CMU's
+  Canvas administration, whose API access policy bounds what a student token can request (directly
+  relevant after Sprint 3's finding that student-scoped tokens hit 403s on privileged fields).
+
+### Core use cases (validated)
+
+1. **Ask a grounded question about course material** and get an answer-first response with
+   citations back to the specific page, file, or lecture moment.
+2. **Attend a lecture** — capture, transcribe, and take notes in one place, indexed automatically
+   the moment class ends.
+3. **Generate a study artifact** (mock test, mindmap, flashcards, or slides) ahead of an exam,
+   from material actually covered in the course.
+4. **Get an assignment explained** — what a specific prompt is asking and which lecture material
+   it draws on — without it drafting any part of the submission.
+
+### Assumptions revised from the individual proposal
+
+The individual proposal's framing was aspirational about scope; validation narrowed it in two
+ways: (1) grounding and citations moved from "a feature" to *the* core mechanic, given how
+strongly students weight source-citation and accuracy; (2) the recording-privacy stance moved from
+implicit to an explicit, non-negotiable requirement, given FERPA's real bite on identifiable
+classroom recordings.
+
+## 2. Requirements and MVP definition
+
+### Functional requirements
+
+**Must have**
+
+- **FR1** — Ingest a student's Canvas course content (pages, assignments, announcements, modules,
+  files) using the student's own token.
+- **FR2** — Answer natural-language questions about indexed course material with inline citations
+  to source.
+- **FR3** — State explicitly when indexed material doesn't support an answer, rather than falling
+  back to open-domain knowledge.
+- **FR4** — Auto-create a session page at class time; record, transcribe locally, and provide a
+  notes editor alongside the transcript.
+- **FR5** — Generate at least one study-artifact type (mock test) from indexed material, cited to
+  source.
+- **FR6** — Keep retrieval/index physically isolated per student (own directory), not a shared
+  corpus with query filters.
+- **FR7** — Fetch grades, deadlines, and submission status live per request; never persist or
+  index them.
+
+**Should have**
+
+- **FR8** — Additional study-artifact types: mindmap, flashcards, slides.
+- **FR9** — Socratic-mode toggle for Q&A (guiding questions before the answer).
+- **FR10** — Assignment explainer: explain the prompt and cite relevant material, never draft the
+  submission.
+- **FR11** — Multi-course support in the sidebar, across at least two courses.
+
+**Could have**
+
+- **FR12** — Pre-class prep brief generated from the prior session's transcript plus assigned
+  readings.
+- **FR13** — Web-search fallback when course material doesn't cover a question, visibly labeled
+  and never blended into a course-grounded answer.
+
+**Out of scope this semester**
+
+- An assignment *helper* that drafts answers, code, or any submittable text.
+- Piazza as a source (no official public API).
+- A writing assistant.
+- Any cross-student or shared knowledge base.
+- Non-Canvas LMS support (Blackboard, Moodle).
+
+### Non-functional requirements
+
+- **NFR1 (Privacy)** — Recordings, notes, and documents never leave the student's machine; Canvas
+  token and LLM API key are stored locally and never transmitted to any SSB-operated service.
+- **NFR2 (Groundedness)** — Citation groundedness and artifact groundedness are tracked as
+  first-class, separately-evaluated metrics, not assumed from retrieval quality alone.
+- **NFR3 (Onboarding)** — First run (connect credentials → select courses → index → land in app)
+  completes without manual configuration files, so someone outside the development team can
+  realistically install and use it.
+- **NFR4 (Deployment)** — Runs on a student's own machine without a multi-container server stack —
+  a direct response to the Sprint 3 Onyx finding.
+- **NFR5 (Responsiveness)** — Retrieval and Q&A stay conversational — fast enough for a real-time
+  study session, not a batch job.
+
+### End-to-end MVP
+
+One integrated flow: connect Canvas and LLM credentials → select and index real courses → ask
+grounded, cited questions → attend a session (capture + notes) → generate at least one cited study
+artifact. Grades and deadlines are read live, never indexed; recordings and notes stay private
+with no sharing path.
+
+### Semester MVP Contract
+
+By Sprint 6, the team commits to an end-to-end alpha where a CMU student can: connect their own
+Canvas and LLM credentials; select and index at least two real courses; ask questions about
+indexed material and receive answer-first, cited responses with a Socratic toggle; have at least
+one class session auto-captured, transcribed, and made note-taking-ready; and generate at least
+one cited study artifact from indexed material. Grades and deadlines are read live, never indexed.
+Recordings and notes stay private to the student, with no sharing path. Additional artifact types,
+the assignment explainer, pre-class prep briefs, and any capability that drafts submittable work
+are explicitly Should/Could/Out of Scope — not committed.
+
+## 3. Feasibility and success measures
+
+**Feasibility for one semester.** Sprint 3's finding (§ [sprint-03.md](sprint-03.md)) already
+tested the highest-risk technical assumption — RAG over real Canvas content — and validated it,
+while identifying that the *substrate* (Onyx) was the wrong shape for a self-hosted, per-student
+product. Scoping the MVP to four pillars (Q&A, lecture capture, study artifacts, assignment
+explainer) across a 4–6 person team over a 9-sprint semester matches the rubric's own guidance: a
+smaller system that works end-to-end beats an ambitious one that doesn't.
+
+**Success measures**
+
+- **Citation groundedness rate** *(technical)* — % of answers where the cited source actually
+  supports the claim.
+- **Retrieval precision@k** *(technical)* — against a set of known expected sources.
+- **Artifact groundedness** *(technical)* — % of generated mock-test questions answerable from
+  their cited source, graded separately from answer groundedness.
+- **Return usage during exam weeks** *(user/social)* — whether generated artifacts are actually
+  used to study, not generated and abandoned.
+- **Pre/post self-reported confidence on the material** *(user/social)*.
+
+## References
+
+- arXiv, [AI Hallucination from Students' Perspective: A Thematic Analysis](https://arxiv.org/html/2602.17671v1)
+- MDPI, [Trust in Generative AI Tools: A Comparative Study of Higher Education Students, Teachers, and Researchers](https://www.mdpi.com/2078-2489/16/7/622)
+- Cornell Center for Teaching Innovation, [Classroom Privacy and Recording Guidelines](https://teaching.cornell.edu/teaching-resources/inclusion-accessibility/classroom-privacy-and-recording-guidelines)
+- University of Michigan Safe Computing, [Recording Class Activities: Privacy Concerns](https://safecomputing.umich.edu/protect-privacy/privacy-u-m/videoconferencing/recording-privacy-concerns)
