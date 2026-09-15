@@ -339,7 +339,6 @@ scaffolding is dropped.
 
 | Sprint | Due | Deliverable |
 | --- | --- | --- |
-| 3 | Sep 15 | Feasibility + baseline; Onyx finding; **Modify** decision (§10.1) |
 | 4 | Sep 22 | System architecture and implementation plan |
 | 5 | Sep 29 | Core prototype: ingestion + retrieval + grounded cited Q&A |
 | 6 | Oct 6 | End-to-end alpha: + session capture, + study artifacts |

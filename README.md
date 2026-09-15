@@ -102,7 +102,6 @@ Built as the group project for **49797 — Special Topics: Advanced AI for Indus
 
 | Sprint | Due | Deliverable |
 | --- | --- | --- |
-| 3 | Sep 15 | Feasibility and baseline — **complete** |
 | 4 | Sep 22 | System architecture and implementation plan |
 | 5 | Sep 29 | Core prototype: ingestion, retrieval, grounded Q&A |
 | 6 | Oct 6 | End-to-end alpha: session capture, study artifacts |
