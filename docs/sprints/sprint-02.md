@@ -116,11 +116,11 @@ classroom recordings.
   readings.
 - **FR12** — Web-search fallback when course material doesn't cover a question, visibly labeled
   and never blended into a course-grounded answer.
+- **FR13** — Piazza as a source, if an official public API becomes available.
 
 **Out of scope this semester**
 
 - An assignment *helper* that drafts answers, code, or any submittable text.
-- Piazza as a source (no official public API).
 - A writing assistant.
 - Any cross-student or shared knowledge base.
 - Non-Canvas LMS support (Blackboard, Moodle).
