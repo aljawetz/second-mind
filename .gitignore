@@ -1,0 +1,8 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+onyx-data/
+.conductor/settings.local.toml
+
+onyx-patch/

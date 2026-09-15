@@ -1,5 +1,14 @@
 # Canvas AI Tutor — Design Spec
 
+> **SUPERSEDED (2026-09-14).** This project is now **SSB — Student Second Brain**, an open-source
+> alternative to UniFlow Study. The current spec is
+> [`2026-09-14-ssb-design.md`](2026-09-14-ssb-design.md).
+>
+> What changed: the scope widened from a Socratic Canvas tutor to a three-pillar second brain
+> (grounded Q&A, lecture capture, study-artifact generation); Socratic became a toggle rather than
+> the default; and the Onyx substrate was dropped per the Sprint 3 **Modify** decision (see §10.1
+> of the new spec). Kept for history.
+
 Course: 49797, Special Topics: Advanced AI for Industry and Society (Fall 2026)
 Date: 2026-09-11
 
