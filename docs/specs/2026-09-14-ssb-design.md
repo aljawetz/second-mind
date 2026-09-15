@@ -339,13 +339,16 @@ scaffolding is dropped.
 
 | Sprint | Due | Deliverable |
 | --- | --- | --- |
-| 4 | Sep 22 | System architecture and implementation plan |
-| 5 | Sep 29 | Core prototype: ingestion + retrieval + grounded cited Q&A |
-| 6 | Oct 6 | End-to-end alpha: + session capture, + study artifacts |
-| 7 | Oct 20 | User/stakeholder and impact validation |
-| 8 | Oct 27 | Robustness and responsible AI (§4 integrity stance, §6 privacy model) |
-| 9 | Nov 17 | Beta and independent testing |
-| Final | Dec 1 | Product, impact, and defense |
+| [1](sprints/sprint-01.md) | Sep 1 | Individual problem discovery and solution proposal — **complete** |
+| [2](sprints/sprint-02.md) | Sep 8 | Problem validation, requirements, MVP scope — **complete** |
+| [3](sprints/sprint-03.md) | Sep 15 | Feasibility + baseline; Onyx finding; **Modify** decision (§10.1) — **complete** |
+| [4](sprints/sprint-04.md) | Sep 22 | System architecture and implementation plan |
+| [5](sprints/sprint-05.md) | Sep 29 | Core prototype: ingestion + retrieval + grounded cited Q&A |
+| [6](sprints/sprint-06.md) | Oct 6 | End-to-end alpha: + session capture, + study artifacts |
+| [7](sprints/sprint-07.md) | Oct 20 | User/stakeholder and impact validation |
+| [8](sprints/sprint-08.md) | Oct 27 | Robustness and responsible AI (§4 integrity stance, §6 privacy model) |
+| [9](sprints/sprint-09.md) | Nov 17 | Beta and independent testing |
+| [Final](sprints/final.md) | Dec 1 | Product, impact, and defense |
 
 **Pilot courses:** 49797 (Advanced AI for Industry and Society) as primary — already indexed, and
 the professor can see it working on their own material. 18654 (Software Testing and Operations) as

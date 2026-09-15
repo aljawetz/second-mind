@@ -102,13 +102,16 @@ Built as the group project for **49797 — Special Topics: Advanced AI for Indus
 
 | Sprint | Due | Deliverable |
 | --- | --- | --- |
-| 4 | Sep 22 | System architecture and implementation plan |
-| 5 | Sep 29 | Core prototype: ingestion, retrieval, grounded Q&A |
-| 6 | Oct 6 | End-to-end alpha: session capture, study artifacts |
-| 7 | Oct 20 | User and impact validation |
-| 8 | Oct 27 | Robustness and responsible AI |
-| 9 | Nov 17 | Beta and independent testing |
-| Final | Dec 1 | Product, impact, and defense |
+| [1](docs/sprints/sprint-01.md) | Sep 1 | Individual problem discovery and solution proposal — **complete** |
+| [2](docs/sprints/sprint-02.md) | Sep 8 | Problem validation, requirements, MVP scope — **complete** |
+| [3](docs/sprints/sprint-03.md) | Sep 15 | Feasibility and baseline; Onyx finding; **Modify** decision — **complete** |
+| [4](docs/sprints/sprint-04.md) | Sep 22 | System architecture and implementation plan |
+| [5](docs/sprints/sprint-05.md) | Sep 29 | Core prototype: ingestion, retrieval, grounded Q&A |
+| [6](docs/sprints/sprint-06.md) | Oct 6 | End-to-end alpha: session capture, study artifacts |
+| [7](docs/sprints/sprint-07.md) | Oct 20 | User and impact validation |
+| [8](docs/sprints/sprint-08.md) | Oct 27 | Robustness and responsible AI |
+| [9](docs/sprints/sprint-09.md) | Nov 17 | Beta and independent testing |
+| [Final](docs/sprints/final.md) | Dec 1 | Product, impact, and defense |
 
 Pilot courses: 49797 (primary) and 18654 Software Testing and Operations.
 
