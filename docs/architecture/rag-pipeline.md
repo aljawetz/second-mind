@@ -4,6 +4,14 @@ Ingestion through generation: chunking, embedding, hybrid retrieval, and where L
 (OpenAI, Anthropic, etc.) actually happen. See [overview.md](overview.md) for the system shape
 this sits inside and [canvas-integration.md](canvas-integration.md) for what feeds into it.
 
+**Built on [LlamaIndex](https://developers.llamaindex.ai/), not hand-rolled.** Chunking, embedding
+integration, vector storage, hybrid retrieval, and cited response synthesis all have mature,
+maintained implementations already — writing our own would mean re-solving problems a
+production-grade library has already solved, for no benefit specific to this project. This is a
+library used inside our own process, not a platform we deploy: no server, no license gate, no
+shared-corpus assumption, unlike Onyx (design spec §10.1). Every LlamaIndex component named below
+was checked against its actual current documentation, not assumed from memory.
+
 ## 1. Ingestion (front door)
 
 Every item that reaches this pipeline has already been fetched by
@@ -29,65 +37,63 @@ as-is. Files go through the tiered extraction validated in Sprint 3:
 
 ## 2. Chunking
 
-**Chunk boundaries respect the source's natural structure — a page or a slide is a chunk, not an
-arbitrary token window that can split a slide's content across two chunks.** For running prose
-(pages, the syllabus body, long assignment descriptions) that exceeds a reasonable chunk size,
-fall back to recursive splitting with overlap (target ~500–800 tokens, ~15% overlap) so a citation
-never lands mid-sentence. Transcripts chunk along natural speech-segment boundaries (Whisper's own
-segment timestamps), which is also what makes a citation like "Lecture 6 · 14:22" possible — the
-timestamp is the chunk's own metadata, not something reconstructed after the fact.
+A custom `NodeParser` (LlamaIndex's chunking abstraction) that respects the source's natural
+structure — a page or a slide is a node, not an arbitrary token window that can split a slide's
+content across two chunks. For running prose (pages, the syllabus body, long assignment
+descriptions) that exceeds a reasonable node size, LlamaIndex's standard `SentenceSplitter` handles
+recursive splitting with overlap (target ~500–800 tokens, ~15% overlap) so a citation never lands
+mid-sentence. Transcripts chunk along natural speech-segment boundaries (Whisper's own segment
+timestamps), which is also what makes a citation like "Lecture 6 · 14:22" possible — the timestamp
+is the node's own metadata, not something reconstructed after the fact.
 
-Every chunk carries its citation anchor as metadata at creation time: a page number for a file, a
-timestamp for a transcript segment, nothing extra for a page/assignment (the item itself is the
-citation). This is what lets the answer-generation step (§4) attach a citation without a separate
-lookup pass.
+Every node carries its citation anchor as LlamaIndex node metadata at creation time: a page number
+for a file, a timestamp for a transcript segment, nothing extra for a page/assignment (the item
+itself is the citation). Metadata travels with the node through retrieval and into the cited
+response automatically — no separate lookup pass needed at answer time.
 
 ## 3. Embedding
 
-**Local, not a hosted API.** Anthropic has no public embeddings endpoint, so "pluggable LLM,
-default Claude" (design spec §10) doesn't extend to embeddings regardless of provider choice — an
-embedding step is needed either way. Rather than requiring a second provider account just for
-embeddings, SSB runs a small open-source embedding model locally (e.g. a BGE-small or comparable
-compact sentence-embedding model, small enough to bundle and run on a laptop CPU without a GPU).
-This keeps the "self-hosted, your machine" thesis intact for the embedding layer specifically, at
-the cost of somewhat lower retrieval quality than the best hosted embedding APIs — a tradeoff
-worth revisiting only if retrieval quality turns out to be a real problem in practice, not assumed
-upfront.
+**Local, not a hosted API**, via LlamaIndex's `HuggingFaceEmbedding` integration — confirmed
+current documentation supports loading a compact model (e.g. `BAAI/bge-small-en-v1.5`) directly by
+name, fully offline once downloaded, no API key or network call at query time. Anthropic has no
+public embeddings endpoint, so "pluggable LLM, default Claude" (design spec §10) doesn't extend to
+embeddings regardless of provider choice — an embedding step is needed either way, and a local
+model avoids requiring a second provider account just for it. This keeps the "self-hosted, your
+machine" thesis intact for the embedding layer specifically, at the cost of somewhat lower
+retrieval quality than the best hosted embedding APIs — a tradeoff worth revisiting only if
+retrieval quality turns out to be a real problem in practice, not assumed upfront.
 
 ## 4. Storage and retrieval
 
-**LanceDB**, one database per student, one table per course (design spec §10;
-[data-model.md](data-model.md) §1). Each row: `chunk_id, source_item_id, source_type, citation_anchor,
-text, vector, full_text` (the last column indexed for BM25-style search). LanceDB's native hybrid
-query combines vector similarity and full-text search in one call — no separate BM25 library and
-no manual re-ranking step to build and maintain.
+**LanceDB**, via LlamaIndex's official `LanceDBVectorStore` integration (`llama-index-vector-stores-lancedb`,
+actively maintained), one database per student, one table per course (design spec §10;
+[data-model.md](data-model.md) §1). LanceDB's native hybrid search (vector + full-text) is exposed
+through this integration directly — no separate BM25 library and no manual reranking step to build
+and maintain.
 
-**Groundedness is enforced at the retrieval boundary, not left to the LLM's judgment alone.** A
-query returns its top-k results with similarity scores; if the top score falls below a set
-threshold, the pipeline treats that as "nothing relevant is indexed" and the answer step returns
-the not-covered response (design spec §7) without ever sending an unsupported context to the LLM.
-The threshold is a tunable constant, not a hard-coded assumption — it needs calibration against
-real queries before Sprint 5, the same way Sprint 3 flagged the density heuristic as needing
-tuning against more real course material.
+**Cited responses come from LlamaIndex's `CitationQueryEngine`**, not a hand-built citation
+mechanism — it retrieves, chunks sources at a configurable citation granularity, and returns a
+response whose `source_nodes` are the actual chunks the answer was built from, each carrying the
+citation-anchor metadata from §2.
+
+**Groundedness is enforced at the retrieval boundary via a `SimilarityPostprocessor`**
+(`similarity_cutoff`, a built-in LlamaIndex node postprocessor), not left to the LLM's judgment
+alone. Nodes below the cutoff are filtered out before response synthesis ever sees them; if nothing
+survives the filter, the pipeline treats that as "nothing relevant is indexed" and returns the
+not-covered response (design spec §7) without ever sending an unsupported context to the LLM. The
+cutoff value is a tunable constant, not a hard-coded assumption — it needs calibration against real
+queries before Sprint 5, the same way Sprint 3 flagged the density heuristic as needing tuning
+against more real course material.
 
 ## 5. Generation — where LLM provider calls happen
 
-A thin client interface, matching the same "own the interface, not the platform" principle as
-`Retriever` (design spec §5.3):
-
-```python
-class LLMClient:
-    def complete(self, system: str, messages: list[Message], stream: bool = True) -> Completion: ...
-```
-
-One implementation per supported provider (OpenAI, Anthropic, etc.), selected by
+LlamaIndex's own multi-provider LLM abstraction (`llama-index-llms-openai`,
+`llama-index-llms-anthropic`, etc.) wired into the `CitationQueryEngine` from §4, selected by
 `config.json`'s `llm_provider` ([data-model.md](data-model.md) §3) with the matching key pulled
-from Keychain. The system prompt is what actually encodes the grounding rules from design spec §7
-— answer-first by default, Socratic mode as a toggle, cite every factual claim, never blend in
-open-domain knowledge unless the (separately labeled) web-search path was explicitly used. The
-retrieved chunks from §4 are inserted as context with their citation anchors attached, so the
-model's job is to answer *from* them and cite which ones, not to decide on its own what counts as
-a source.
+from Keychain — not a hand-rolled provider-switch interface. The system prompt is what actually
+encodes the grounding rules from design spec §7 — answer-first by default, Socratic mode as a
+toggle, cite every factual claim, never blend in open-domain knowledge unless the (separately
+labeled) web-search path was explicitly used.
 
 **Streaming by default** (NFR5, design spec §5) — a Q&A response starts rendering as tokens arrive
 rather than waiting for the full completion, which is what makes retrieval-augmented generation

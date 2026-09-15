@@ -140,13 +140,16 @@ an embedding store are a liability with no corresponding benefit).
 
 ### 5.3 Retrieval behind an interface
 
-All retrieval sits behind a single `Retriever` interface — `index(documents)` and
-`search(query, k) -> list[Chunk]` with source metadata. The concrete store is an implementation
-detail.
+Retrieval is built on [LlamaIndex](https://developers.llamaindex.ai/) rather than a hand-rolled
+interface — its `VectorStoreIndex` and vector-store-integration layer already keep the concrete
+store swappable, which is the property this section exists to guarantee. LanceDB is the concrete
+choice (§10) via LlamaIndex's official `LanceDBVectorStore` integration; swapping stores later
+means changing which integration is plugged in, not rewriting retrieval logic. Full detail:
+[docs/architecture/rag-pipeline.md](../architecture/rag-pipeline.md).
 
 This keeps the concrete retrieval store swappable by design — the choice of vector store or
 search backend should never become a decision that puts the project at risk partway through the
-semester.
+semester, the same lesson §10.1 names directly.
 
 ### 5.4 Onboarding and first-run setup
 
@@ -368,12 +371,13 @@ rediscovering later.
 | Layer | Choice | Rationale |
 | --- | --- | --- |
 | App shell | Tauri, macOS only for MVP | Reuses the existing HTML/CSS/JS mockup as the UI directly; native OS webview instead of bundled Chromium keeps footprint small, consistent with §5.5's no-background-daemon stance. Cross-platform is a stated future goal, not a Sprint 4–9 commitment |
-| Backend | Local Python process, loopback-only HTTP | RAG tooling (LanceDB, embeddings, Whisper) is Python-native; a process boundary isolates a backend crash from the UI. Bundled as a Tauri sidecar — the student installs one app, never a Python environment |
-| Vector store | Embedded, on-disk, per-student (LanceDB) | Native hybrid vector + full-text (BM25-style) search in one engine — no separate BM25 library or manual reranking step. Zero server processes; one directory per student maps exactly to §5.1 |
-| Embeddings | Local, open-source model (e.g. BGE-small class) | Anthropic has no public embeddings API, so "pluggable LLM" doesn't cover this layer regardless of provider — a local model avoids requiring a second provider account just to embed content, at some retrieval-quality cost versus the best hosted embedding APIs |
+| Backend | Local Python process, loopback-only HTTP | RAG tooling (LlamaIndex, LanceDB, Whisper) is Python-native; a process boundary isolates a backend crash from the UI. Bundled as a Tauri sidecar — the student installs one app, never a Python environment |
+| RAG orchestration | [LlamaIndex](https://developers.llamaindex.ai/) | Chunking, embedding integration, retrieval, and cited response synthesis via a maintained library rather than hand-rolled — a library used inside our own process, not a platform, so none of the Onyx problems (§10.1) apply |
+| Vector store | Embedded, on-disk, per-student (LanceDB, via LlamaIndex's `LanceDBVectorStore`) | Native hybrid vector + full-text (BM25-style) search in one engine — no separate BM25 library or manual reranking step. Zero server processes; one directory per student maps exactly to §5.1 |
+| Embeddings | Local, open-source model (e.g. BGE-small class), via LlamaIndex's `HuggingFaceEmbedding` | Anthropic has no public embeddings API, so "pluggable LLM" doesn't cover this layer regardless of provider — a local model avoids requiring a second provider account just to embed content, at some retrieval-quality cost versus the best hosted embedding APIs |
 | Canvas access | Canvas MCP server, embedded as the backend's Canvas client | Already working and directly validated (Sprint 3, §10.1); reuses a solved Canvas API integration — auth, endpoints, pagination — rather than writing a REST client from scratch. Invoked as a local library/subprocess, not through an LLM reasoning loop |
 | Transcription | Whisper, local | Open-source thesis; recordings never leave the machine. UniFlow uses hosted Deepgram |
-| LLM | Pluggable, default Claude | Swappable per student's own key; local models possible for full self-hosting |
+| LLM | Pluggable, default Claude, via LlamaIndex's multi-provider LLM abstraction | Swappable per student's own key without a hand-rolled provider-switch layer; local models possible for full self-hosting |
 | Web search | MCP, explicitly labeled | Never silently blended with course-grounded answers |
 | Credential storage | macOS Keychain | Never a plaintext config file; OS-encrypted at rest, scoped to the app |
 

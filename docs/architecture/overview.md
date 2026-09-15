@@ -30,10 +30,10 @@ run on the student's machine:
 │                    ┌─────────────┬───────────────┼──────────┬─────┴──────┐
 │                    ▼             ▼               ▼          ▼            ▼
 │              ┌──────────┐ ┌────────────┐ ┌─────────────┐ ┌──────┐ ┌───────────┐
-│              │ Ingest + │ │ Retriever  │ │ Session      │ │ Sync │ │ LLM       │
-│              │ extract  │ │ (LanceDB)  │ │ capture      │ │engine│ │ client    │
-│              │ (Sprint 3│ │ hybrid     │ │ (mic, local  │ │(§5.5)│ │ (pluggable│
-│              │ tiering) │ │ vec+BM25   │ │  Whisper)    │ │      │ │  per §10) │
+│              │ Ingest + │ │ LlamaIndex │ │ Session      │ │ Sync │ │ LlamaIndex│
+│              │ extract  │ │ + LanceDB  │ │ capture      │ │engine│ │ LLM       │
+│              │ (Sprint 3│ │ hybrid     │ │ (mic, local  │ │(§5.5)│ │ abstraction│
+│              │ tiering) │ │ vec+BM25   │ │  Whisper)    │ │      │ │ (pluggable)│
 │              └──────────┘ └────────────┘ └─────────────┘ └──────┘ └───────────┘
 └───────────────────────────────────────────────────────────────────┘
          │                                                    │
@@ -105,16 +105,13 @@ Response: { "courses_synced": number, "items_new": number, "items_updated": numb
             "items_removed": number }
 ```
 
-### Internal: the `Retriever` interface (§5.3)
-Not exposed over HTTP — this is the seam inside the backend that keeps the vector store swappable:
-```python
-class Retriever:
-    def index(self, chunks: list[Chunk]) -> None: ...
-    def search(self, course_id: str, query: str, k: int) -> list[ScoredChunk]: ...
-    def delete(self, chunk_ids: list[str]) -> None: ...
-```
-LanceDB is the concrete implementation (§10, [rag-pipeline.md](rag-pipeline.md)); nothing above
-this interface knows that.
+### Internal: retrieval (§5.3)
+Not exposed over HTTP — this is the seam inside the backend that keeps the vector store swappable.
+Rather than a hand-rolled interface, this is LlamaIndex's own `VectorStoreIndex` over a
+`LanceDBVectorStore`, queried through a `CitationQueryEngine` with a `SimilarityPostprocessor` for
+the groundedness cutoff — full detail and verified library references in
+[rag-pipeline.md](rag-pipeline.md). Nothing above this layer (the HTTP endpoints in this section)
+knows or cares that LanceDB is the concrete store.
 
 ## 3. Deployment
 
