@@ -23,7 +23,7 @@ Working core prototype, repository update, demonstration, and concise evaluation
 
 Per [the design spec](../specs/2026-09-14-ssb-design.md) §4, this is where ingestion, hybrid
 retrieval (BM25 + vector, §5.3), and grounded cited Q&A (§7) get built for real, replacing the
-Onyx-based Sprint 3 baseline (§10.1). Retrieval precision@k and citation groundedness (§12) are
+[Sprint 3](sprint-03.md) baseline. Retrieval precision@k and citation groundedness (§12) are
 the metrics to evaluate against.
 
 ## What we did

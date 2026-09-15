@@ -104,7 +104,7 @@ Built as the group project for **49797 — Special Topics: Advanced AI for Indus
 | --- | --- | --- |
 | [1](docs/sprints/sprint-01.md) | Sep 1 | Individual problem discovery and solution proposal — **complete** |
 | [2](docs/sprints/sprint-02.md) | Sep 8 | Problem validation, requirements, MVP scope — **complete** |
-| [3](docs/sprints/sprint-03.md) | Sep 15 | Feasibility and baseline; Onyx finding; **Modify** decision — **complete** |
+| [3](docs/sprints/sprint-03.md) | Sep 15 | Feasibility and baseline — **complete** |
 | [4](docs/sprints/sprint-04.md) | Sep 22 | System architecture and implementation plan |
 | [5](docs/sprints/sprint-05.md) | Sep 29 | Core prototype: ingestion, retrieval, grounded Q&A |
 | [6](docs/sprints/sprint-06.md) | Oct 6 | End-to-end alpha: session capture, study artifacts |
@@ -114,17 +114,6 @@ Built as the group project for **49797 — Special Topics: Advanced AI for Indus
 | [Final](docs/sprints/final.md) | Dec 1 | Product, impact, and defense |
 
 Pilot courses: 49797 (primary) and 18654 Software Testing and Operations.
-
-### On Onyx
-
-Sprints 1–3 built on self-hosted [Onyx](https://github.com/onyx-dot-app/onyx), including a
-1,068-line native Canvas connector that indexed pages, assignments and announcements from a live
-CMU course — though never modules or files, where most course content lives. Sprint 3 concluded
-**Modify**: keep RAG, change the substrate.
-Onyx's permission sync resolves to a commercially-licensed tier, which an open-source product
-can't depend on; per-student isolation runs against its shared-corpus architecture; and its
-11-container deployment is the wrong shape for software a student installs. The reasoning is in
-[§10.1 of the spec](docs/specs/2026-09-14-ssb-design.md).
 
 ## Responsible AI
 

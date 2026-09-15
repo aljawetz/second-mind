@@ -345,7 +345,7 @@ scaffolding is dropped.
 | --- | --- | --- |
 | [1](sprints/sprint-01.md) | Sep 1 | Individual problem discovery and solution proposal — **complete** |
 | [2](sprints/sprint-02.md) | Sep 8 | Problem validation, requirements, MVP scope — **complete** |
-| [3](sprints/sprint-03.md) | Sep 15 | Feasibility + baseline; Onyx finding; **Modify** decision (§10.1) — **complete** |
+| [3](sprints/sprint-03.md) | Sep 15 | Feasibility + baseline — **complete** |
 | [4](sprints/sprint-04.md) | Sep 22 | System architecture and implementation plan |
 | [5](sprints/sprint-05.md) | Sep 29 | Core prototype: ingestion + retrieval + grounded cited Q&A |
 | [6](sprints/sprint-06.md) | Oct 6 | End-to-end alpha: + session capture, + study artifacts |
