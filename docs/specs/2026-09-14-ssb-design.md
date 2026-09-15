@@ -416,14 +416,22 @@ correct answer — the actual instructional content of the slide, and something 
 invisible to both plain-text extraction and OCR.
 
 **Decision: extraction should be tiered, not uniform.** Plain-text extraction first (free,
-instant, sufficient for native formats); a cheap density heuristic (characters extracted per page)
-flags pages likely to be image-heavy; flagged pages get OCR by default, with a vision-model pass
-reserved for pages where OCR quality is still poor or where structural understanding (diagrams,
-annotated screenshots) actually matters. Full method and results: [Sprint 3](sprints/sprint-03.md).
+instant, sufficient for native formats); a density heuristic flags pages likely to be image-heavy;
+flagged pages get OCR by default, with a vision-model pass reserved for pages where OCR quality is
+still poor or where structural understanding (diagrams, annotated screenshots) actually matters.
 
-This is one PDF and one deck from one course — a real result, not a comprehensive benchmark. The
-density heuristic's threshold needs tuning against more course material before Sprint 5, and the
-vision-tier's cost/latency at full-course scale is not yet measured.
+**Extended in Sprint 4 across 217 real pages from 8 files in 2 courses**, not just the original
+two examples: a flat character-count cutoff catches near-empty pages but misses pages that clear
+the cutoff on caption text alone while a paired screenshot still carries more content — one real
+page had OCR recover more than double its plain-text character count despite already reading as
+"enough" text. The refined rule: flag if under 100 chars, *or* under 400 chars with an embedded
+image present. Content type is also a useful prior — lecture-slide-style PDFs consistently need
+the fallback tiers for 8–29% of pages; academic-paper-style PDFs (reports, literature reviews)
+needed it for 0–10%. Full method and results: [Sprint 3](sprints/sprint-03.md) and
+[docs/architecture/rag-pipeline.md](../architecture/rag-pipeline.md).
+
+Still not a comprehensive benchmark — the exact cutoffs want revisiting once more courses are
+indexed in Sprint 5, and the vision-tier's cost/latency at full-course scale is not yet measured.
 
 ## 11. Risks
 

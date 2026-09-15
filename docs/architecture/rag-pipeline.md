@@ -21,15 +21,26 @@ as-is. Files go through the tiered extraction validated in Sprint 3:
 
 1. Plain-text extraction (pdfplumber/PyMuPDF for PDFs, `python-pptx` for native slide decks) —
    free, instant, sufficient for text-native formats per Sprint 3's PPTX result.
-2. A density heuristic (extracted characters per page) flags pages likely to be image-heavy. **The
-   signal is character count, not "does this page contain an image"** — a real 31-page lecture
-   deck tested this sprint has images on 25 of 31 pages but still averages ~265 chars/page of real
-   bullet-point text, because the images are decorative (icons, small diagrams), not load-bearing.
-   That's a different profile from Sprint 3's tutorial-style PDF (6–300 chars/page, where the
-   images *were* the content). A starting threshold around 100 chars/page correctly separates the
-   two real examples gathered so far — flagging most of the tutorial PDF's pages, leaving the
-   lecture deck's pages alone — though it still needs validation at real course scale before
-   Sprint 5, not treated as a settled constant.
+2. A density heuristic flags pages likely to be image-heavy, calibrated against 217 real pages
+   across 8 files from 2 real courses (lecture decks, a tutorial-style PDF, and academic-paper-style
+   PDFs) — not just the original two examples:
+   - **A flat character-count cutoff catches the worst cases but misses a real failure mode.**
+     15% of all pages tested fall under 100 chars, correctly catching near-empty title/divider
+     slides. But a page can clear 100 chars easily on caption text alone while a paired screenshot
+     still carries meaningfully more content — found directly on a real page where OCR recovered
+     more than double the plain-text character count despite the page already having 301 "real"
+     characters. **The actual rule: flag if `chars < 100`, or if `chars < 400` *and* the page
+     contains an embedded image** — a page with both some text and an image needs to clear a
+     higher bar before being trusted as complete, since the image is more likely to be
+     load-bearing when text alone is modest rather than absent.
+   - **Content type is a strong, cheap prior.** Every lecture-slide-deck-style PDF tested has a
+     real minority of sparse pages (8–29%) needing the OCR/vision fallback. Both academic-paper-
+     style PDFs tested (reports, literature reviews) came in at 0–10%. Worth using file/content
+     type as a first signal for how aggressively to expect the fallback tiers to matter, not just
+     a per-page character count in isolation.
+   - Still not a settled constant — 217 pages from 2 courses is a real sample, not a comprehensive
+     one, and the exact cutoffs (100, 400) want revisiting once more courses are indexed in
+     Sprint 5.
 3. Flagged pages get OCR (Tesseract) by default — free, fast, a real ~3x recovery per Sprint 3.
 4. A vision-model pass (the same pluggable LLM client as §3 below) is reserved for pages where OCR
    quality is still poor, or where structural understanding matters (a slide's visual callout, per
