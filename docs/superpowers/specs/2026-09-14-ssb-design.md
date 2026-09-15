@@ -1,7 +1,7 @@
 # SSB — Student Second Brain — Design Spec
 
 Course: 49797, Special Topics: Advanced AI for Industry and Society (Fall 2026)
-Date: 2026-09-14
+Date: 2026-09-15
 Supersedes: `2026-09-11-canvas-ai-tutor-design.md`
 
 ## 1. Thesis
@@ -58,16 +58,20 @@ parity and should not.
    and a notes editor embedded.
 3. **Study artifacts** — mock test, mindmap, slides, flashcards, generated from indexed material
    with citations.
+4. **Assignment explainer** — on request, breaks down what a specific assignment is asking and
+   points to the indexed lecture and reading material it draws on, cited the same way Q&A is. It
+   does not draft answers, code, or any submittable text — see §7.1 for exactly where that line
+   sits, and why it's distinct from the assignment *helper* below, which stays deferred.
 
 **Deliberately deferred, in priority order:**
 
 - **Pre-class prep brief** — before each session, generate "here's what to review" from the prior
   session's transcript plus assigned readings. Highest-value next feature; deferred only on time.
-- **Assignment helper.** Deferred on principle as much as time: a tool that helps with graded work
-  needs an academic-integrity stance before it needs an implementation. SSB's position is that
-  grounded explanation of *course material* is categorically different from producing *submittable
-  work*, and we are not shipping the second until we can enforce that line. This is the answer for
-  the Sprint 8 responsible-AI review.
+- **Assignment helper** — anything that drafts, completes, or substantially generates submittable
+  work: code, written answers, problem-set solutions. This is still deferred on principle, not
+  time: SSB explains the *prompt* and the *material* (§7.1), and does not produce the *submission*.
+  That line, and how we intend to enforce it technically rather than just by instruction to the
+  model, is the answer for the Sprint 8 responsible-AI review.
 - **Piazza as a source.** High-value content, but no official public API — an unofficial client is
   fragile and legally murky. Named as planned, not built.
 - **Writing assistant.** UniFlow parity feature, lowest marginal value for us.
@@ -77,9 +81,13 @@ parity and should not.
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ SSB app (our frontend)                                       │
-│   sidebar: SSB │ STO │ SRD │ 49797                           │
-│   course home: [mock test] [mindmap] [flashcards]            │
-│   ask-questions bar                                          │
+│   onboarding: connect Canvas + LLM keys → select courses     │
+│               → index (assignments, modules, files)          │
+│   sidebar: courses │ sessions                                │
+│   course home: chat column (Q&A)  │  next assignment,        │
+│                                    │  study artifacts,        │
+│                                    │  recent sessions          │
+│   assignment page: prompt → [explain this assignment]        │
 │   session pages: Class #N → [recording] + [notes]            │
 └─────────────────────────────┬────────────────────────────────┘
                               │ HTTP / JSON
@@ -135,6 +143,26 @@ detail.
 This is a direct response to §10: we have already changed retrieval substrate once. It should
 never again be a decision that puts the project at risk.
 
+### 5.4 Onboarding and first-run setup
+
+First run is a four-step flow, not a settings page buried after install: connect credentials,
+pick courses, watch them index, land in the app already populated with real content instead of an
+empty shell.
+
+1. **Connect accounts.** The student enters their Canvas API token and an LLM API key. Both stay
+   on the student's machine — read once, used to talk to Canvas and the model provider directly,
+   never transmitted to any SSB-operated service (§6).
+2. **Select courses.** SSB fetches the student's enrolled courses from Canvas and lists them for
+   selection — not every enrolled course needs indexing on day one.
+3. **Index.** For each selected course, SSB ingests assignments, modules, and files (the
+   image-heavy-PDF risk noted in §11 lives here) with visible per-course, per-content-type
+   progress. This is the one-time cost; after it completes, everything is local.
+4. **Land in the app**, populated with the student's own courses rather than an empty state.
+
+The point of making this a first-class flow rather than a wizard to get through: a screen showing
+indexing progress *is* the "your machine, your index" claim (§5.1) made visible, the first time a
+student sees the product.
+
 ## 6. Data and privacy model
 
 - **Course documents** — pulled from Canvas with the student's own token. Only material that
@@ -146,8 +174,9 @@ never again be a decision that puts the project at risk.
   else's."
 - **Notes** — private, same tier.
 - **Personal academic data** — never persisted by SSB at all (§5.2).
-- **Credentials** — the Canvas token lives in the student's local environment, never in the repo,
-  never transmitted to any SSB-operated service.
+- **Credentials** — the Canvas token and the student's LLM API key, both entered once during
+  onboarding (§5.4), live in the student's local environment, never in the repo, never transmitted
+  to any SSB-operated service.
 
 ## 7. Tutor behavior
 
@@ -162,6 +191,34 @@ the professor has seen since Sprint 1. Making it opt-in is the change.
 **Grounding is non-negotiable in both modes.** If indexed material does not support an answer, SSB
 says so rather than falling back to open-domain knowledge. Optional web search is a *separate,
 visibly-labeled* path — never silently blended into a course-grounded answer.
+
+### 7.1 Assignment explainer
+
+A narrow, principled carve-out from the "assignment helper" deferral in §4: SSB will explain what
+an assignment is asking, grounded in the student's own course material, and will not draft any
+part of the submission.
+
+**What it does.** From the course's assignment list, the student opens the next-due assignment —
+title, due date, weight, and the prompt as pulled from Canvas. An "Explain this assignment"
+action, on request, returns two things:
+
+1. **What's being asked** — the prompt broken into its actual sub-requirements, in plain language.
+   This is reading comprehension of the assignment text itself, not course content.
+2. **Where to start** — pointers into the student's own indexed material (lecture timestamps,
+   readings) relevant to the assignment, cited the same way Q&A citations work.
+
+**What it does not do.** It does not produce code, written answers, problem-set solutions, or any
+text a student could submit as their own work. There is no "generate a draft" action, and none is
+planned. The output is visibly labeled as an explanation, the same pattern used for web search
+above — the student always knows which kind of response they're looking at.
+
+**Why this is different from the deferred assignment helper.** Breaking down what a prompt is
+asking and citing relevant lecture material is grounded explanation of the student's own course
+content — the same category of behavior as Q&A above, just scoped to one assignment's prompt
+instead of an open question. It carries no more academic-integrity risk than a TA pointing a
+student back to the right lecture. Producing any part of the submission itself is a different act
+entirely, and stays deferred until SSB can enforce that boundary technically, not just by
+instruction to the model.
 
 ## 8. Study artifacts
 

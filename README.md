@@ -36,6 +36,11 @@ week's lecture is searchable alongside the official course material.
 **Generate study material.** Mock tests, mindmaps, slides, and flashcards built from what's
 actually in your courses — each traceable to its source.
 
+**Explain your assignments.** Breaks down what a prompt is actually asking and points to the
+lecture and reading material it draws on — never drafts the answer itself. See
+[§7.1 of the design spec](docs/superpowers/specs/2026-09-14-ssb-design.md) for exactly where that
+line sits.
+
 ## How it compares
 
 | | UniFlow Study | SSB |
@@ -59,8 +64,11 @@ not claiming parity.
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ SSB app                                                      │
-│   course sidebar · ask-questions bar                         │
-│   course home: [mock test] [mindmap] [flashcards]            │
+│   onboarding: connect Canvas + LLM keys → select courses     │
+│               → index (assignments, modules, files)          │
+│   course sidebar · course home: chat (Q&A) + assignment,     │
+│                     study artifacts, recent sessions          │
+│   assignment page: prompt → [explain this assignment]        │
 │   session pages: Class #N → [recording] + [notes]            │
 └─────────────────────────────┬────────────────────────────────┘
 ┌─────────────────────────────▼────────────────────────────────┐
@@ -118,9 +126,11 @@ can't depend on; per-student isolation runs against its shared-corpus architectu
 
 ## Responsible AI
 
-**No assignment helper.** Deferred on principle, not just on time. Grounded explanation of course
-material is categorically different from producing submittable work, and SSB won't ship the second
-until it can enforce that line.
+**Explains assignments, never drafts them.** SSB will break down what an assignment is asking and
+point to the course material it draws on — grounded explanation, the same category of behavior as
+Q&A. It will not produce code, written answers, or any part of a submission, and no such feature
+is planned; that line is deferred on principle, not just on time, until it can be enforced
+technically rather than by instruction to the model alone. See §7.1 of the design spec.
 
 **Recordings stay private.** Always, with no sharing path. Recording a lecture involves your
 instructor and your classmates, and private-by-default is the only stance defensible without a
