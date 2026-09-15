@@ -158,7 +158,9 @@ empty shell.
    on the student's machine — read once, used to talk to Canvas and the model provider directly,
    never transmitted to any SSB-operated service (§6).
 2. **Select courses.** SSB fetches the student's enrolled courses from Canvas and lists them for
-   selection — not every enrolled course needs indexing on day one.
+   selection — not every enrolled course needs indexing on day one. Each selected course also gets
+   a weekly meeting schedule set here (day, time, session type), the basis for session capture
+   (§9.1) — editable later from Settings.
 3. **Index.** For each selected course, SSB ingests assignments, modules, and files (the
    image-heavy-PDF risk noted in §11 lives here) with visible per-course, per-content-type
    progress. This is the one-time cost; after it completes, everything is local.
@@ -297,17 +299,50 @@ groundedness.
 
 ## 9. Session capture
 
-The scheduled flow from the design whiteboard:
+### 9.1 Where the schedule comes from
 
-1. SSB reads the course meeting schedule.
-2. At class time, it auto-creates a `Class #N` page for that course.
-3. It starts recording, transcribes, and embeds the transcript in the page.
-4. An empty notes editor sits alongside the recording on the same page.
-5. Transcript and notes are indexed into the student's private store, making them available to
+There's no Canvas API access to a course's meeting schedule — checked directly, no calendar
+endpoint is exposed to a student-scoped token, and a real pilot course's Syllabus tab turned out to
+be a link to a PDF, not structured text (the same tiered-extraction problem as §10.1, with no
+guarantee the PDF states meeting times cleanly even then). Auto-detection can't be the primary
+path, because there's nothing reliable to detect it from.
+
+**Manual entry is the primary path.** During onboarding (§5.4), selecting a course includes setting
+its weekly meeting schedule — day, start/end time, and a session-type label for courses with more
+than one meeting pattern (lecture vs. recitation, most commonly). SSB attempts a best-effort
+pre-fill from syllabus text where extraction finds something schedule-shaped, always shown as an
+unconfirmed guess the student reviews, never as a confident answer. The schedule stays editable
+afterward from Settings — a professor moving one week's class, a added recitation, a schedule typo
+caught later.
+
+### 9.2 Triggering a session
+
+No background service watches the clock for this. §5.5 accepted eventually-consistent freshness
+for content sync because staleness is recoverable by the next app launch; a missed recording is
+not recoverable at all — there's no "catch up later" for a lecture that already happened. That
+asymmetry would argue *for* background presence here even though §5.5 argued against it for
+sync, but for now the simpler path stands: **when the student opens the app and the current time
+falls inside a scheduled window for one of their courses, SSB recognizes the window and prompts to
+start the session** — page, recording, and notes editor together — rather than silently
+auto-starting. Recording is consent-sensitive (§6), so starting it is an explicit action, not an
+ambient one, and it only happens at all if the student opens the app during class.
+
+**Known limitation:** a class the student doesn't open the app for during its scheduled window
+isn't captured, with no way to recover it after the fact. A scheduled-wake background process is a
+plausible later upgrade if this turns out to matter in practice — not committed for the MVP.
+
+### 9.3 The capture flow
+
+1. The student opens the app inside a scheduled window; SSB prompts to start the session.
+2. On confirmation, SSB creates a `Class #N` page for that course, starts recording, and
+   transcribes locally.
+3. An empty notes editor sits alongside the recording on the same page.
+4. Transcript and notes are indexed into the student's private store, making them available to
    Q&A and artifact generation.
 
-The point: the artifact of attending class creates itself, and immediately becomes searchable
-alongside the official course material. That is the "second brain" claim in one flow.
+The point: the artifact of attending class creates itself with one confirmation, and immediately
+becomes searchable alongside the official course material. That is the "second brain" claim in one
+flow.
 
 ## 10. Technology choices
 

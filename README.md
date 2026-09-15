@@ -29,9 +29,10 @@ file, or lecture moment they came from. If your material doesn't support an answ
 instead of guessing. Answer-first by default; Socratic mode is a toggle for when you're studying
 rather than hunting.
 
-**Capture your lectures.** At class time SSB creates a page for that session, starts recording,
-transcribes locally, and puts a notes editor next to the transcript. Both get indexed, so this
-week's lecture is searchable alongside the official course material.
+**Capture your lectures.** Open SSB during class and it recognizes you're in a scheduled session,
+creates a page for it, starts recording, transcribes locally, and puts a notes editor next to the
+transcript. Both get indexed, so this week's lecture is searchable alongside the official course
+material.
 
 **Generate study material.** Mock tests, mindmaps, slides, and flashcards built from what's
 actually in your courses — each traceable to its source.
