@@ -17,15 +17,19 @@ Three differentiators:
 1. **Open source.** Self-hostable, no subscription. UniFlow charges $12.80–$39.20/month and meters
    AI conversations (30/month on free). More importantly: the student's index, recordings, and
    notes live on hardware the student controls.
-2. **Tailored to CMU.** Built against `canvas.cmu.edu` and real CMU course structure rather than a
-   lowest-common-denominator LMS abstraction.
+2. **Tailored to Canvas.** Built against real Canvas structure — modules, pages, assignments,
+   files — rather than a lowest-common-denominator LMS abstraction. Validated first against
+   `canvas.cmu.edu` as the pilot instance, but the target user is any Canvas-using student, not a
+   CMU-only product.
 3. **Study artifacts, not just answers.** UniFlow does Q&A, transcription, and writing polish. It
    does not generate mock tests, mindmaps, or flashcards from your indexed material. That is the
    part of "second brain" that actually changes how you study.
 
 ## 2. Users
 
-- **User**: CMU masters students, self-serve, one install per student.
+- **User**: any student whose courses run on Canvas, self-serve, one install per student. CMU is
+  the pilot install base (§13), not a scope limit — nothing in the architecture is CMU-specific
+  beyond the pilot Canvas instance used to validate it.
 - **Customer**: the same students — no institutional gatekeeper, no professor approval, no IT
   ticket. This is a deliberate go-to-market choice, not just an MVP shortcut.
 - **Beneficiary**: students directly. Instructors indirectly, via fewer repeated questions.

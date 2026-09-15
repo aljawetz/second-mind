@@ -56,15 +56,17 @@ just that the problem exists:
 
 ### Refined users and stakeholders
 
-- **User:** CMU graduate students, self-serve, one install per student.
+- **User:** any student whose courses run on Canvas, self-serve, one install per student. CMU is
+  the pilot install base, not a scope limit.
 - **Customer:** the same students — no institutional gatekeeper, no professor approval, no IT
   ticket.
 - **Beneficiary:** students directly; instructors indirectly, via fewer repeated questions in
   office hours and on discussion boards.
 - **Additional stakeholders surfaced during validation:** instructors and classmates, whose
-  consent and privacy the recording feature touches even though they aren't SSB's user; CMU's
-  Canvas administration, whose API access policy bounds what a student token can request (directly
-  relevant after Sprint 3's finding that student-scoped tokens hit 403s on privileged fields).
+  consent and privacy the recording feature touches even though they aren't SSB's user; the
+  student's institution's Canvas administration, whose API access policy bounds what a student
+  token can request (directly relevant after Sprint 3's finding that student-scoped tokens hit
+  403s on privileged fields).
 
 ### Core use cases (validated)
 
@@ -152,7 +154,7 @@ with no sharing path.
 
 ### Semester MVP Contract
 
-By Sprint 6, the team commits to an end-to-end alpha where a CMU student can: connect their own
+By Sprint 6, the team commits to an end-to-end alpha where a Canvas-using student can: connect their own
 Canvas and LLM credentials; select and index at least two real courses; ask questions about
 indexed material and receive answer-first, cited responses with a Socratic toggle; have at least
 one class session auto-captured, transcribed, and made note-taking-ready; and generate at least

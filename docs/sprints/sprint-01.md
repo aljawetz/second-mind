@@ -35,9 +35,9 @@ proposition, and 3–5 measurable success criteria (at least one technical, one 
 Course material for a given class is scattered across a syllabus PDF, dozens of slide decks,
 assignment pages, announcements, and whatever a student manually wrote down in lecture — with no
 single place to ask "what did the professor actually say about X" and get a trustworthy, sourced
-answer. Graduate students in fast-paced, content-heavy courses feel this most: multiple courses
-running in parallel, each with its own scattered material, on a compressed sprint-based semester.
-The problem occurs continuously, not just at exam time — every time a student needs to recall or
+answer. Students juggling multiple content-heavy courses in parallel feel this most — each course
+with its own scattered material and no shared place to search across them. The problem occurs
+continuously, not just at exam time — every time a student needs to recall or
 locate something from a past lecture or reading to move forward on current work.
 
 ### Prevalence and significance
@@ -76,7 +76,8 @@ locate something from a past lecture or reading to move forward on current work.
 
 ### Target users and stakeholders
 
-- **User:** CMU graduate students, self-serve, one install per student.
+- **User:** any student whose courses run on Canvas, self-serve, one install per student. CMU is
+  the pilot install base, not a scope limit.
 - **Customer:** the same students — no institutional gatekeeper, no professor approval, no IT
   ticket.
 - **Beneficiary:** students directly; instructors indirectly, via fewer repeated questions in
@@ -115,7 +116,7 @@ study artifact traceable the same way.
 
 ### Value proposition
 
-**For** a CMU graduate student juggling several content-heavy courses' worth of scattered
+**For** a Canvas-using student juggling several content-heavy courses' worth of scattered
 material, **who struggles with** finding the right slide, transcript, or reading exactly when they
 need it, **our proposed solution provides** grounded, cited answers and auto-generated study
 material **by** indexing each student's own Canvas content, lecture recordings, and notes into a
