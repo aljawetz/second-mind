@@ -168,6 +168,61 @@ The point of making this a first-class flow rather than a wizard to get through:
 indexing progress *is* the "your machine, your index" claim (§5.1) made visible, the first time a
 student sees the product.
 
+### 5.5 Keeping the index fresh
+
+Onboarding (§5.4) is a one-time cost. What happens after — when a professor edits a page, posts a
+new assignment, or uploads a slide deck mid-semester — is a separate, ongoing problem: the index
+has to stay current without turning into a background service.
+
+**Personal data stays out of this entirely.** Grades, deadlines, and submission status are already
+live-only per §5.2 and never touch the index — nothing about sync applies to them.
+
+**Trigger: sync on app launch, not a wall-clock schedule.** Canvas's push/webhook mechanisms are
+institution-admin-level, not available to a plain student-scoped token — the same access ceiling
+Sprint 3 hit with `list_course_files`. Polling is therefore the only realistic option, and running
+it as a background daemon (a launch agent keeping the app "alive" to fire on a schedule) is real
+engineering complexity for a desktop app that has no other reason to run as a service. Syncing
+whenever the app opens is cheaper, needs no OS-level scheduling, and matches how a study app
+actually gets used — opened when needed, not run passively in the background. A lightweight
+periodic re-check while the app stays open (every few hours) covers long sessions.
+
+**Mechanism: a full ID-and-timestamp diff, not a content re-pull.** Every sync, SSB fetches the
+current listing (ID + `updated_at`) for each content type from Canvas — cheap, metadata only, a
+handful of API calls even across several courses — and diffs it against a local sync manifest, one
+row per ingested item:
+
+| Field | Purpose |
+| --- | --- |
+| `canvas_item_id` | Stable ID from Canvas (page / assignment / announcement / file) |
+| `item_type` | page / assignment / announcement / file |
+| `canvas_updated_at` | Canvas's own timestamp, last time SSB saw it |
+| `content_hash` | Hash of the *extracted* text (post plain-text/OCR/vision pipeline, §10.1), not the raw bytes |
+| `chunk_ids` | Which vector-store chunks came from this item, so they can be deleted precisely on update or removal |
+
+The diff sorts every item into one of four buckets:
+
+- **New** (remote ID not in the manifest) — fetch, extract, chunk, embed, insert, write the
+  manifest row.
+- **Changed** (`remote updated_at` newer than the manifest's) — re-fetch and re-extract, then check
+  the content hash before doing anything expensive: unchanged hash means a metadata-only touch
+  (rename, permission change) — just bump the stored timestamp. A real hash difference means
+  delete the item's old chunks, embed the new content, update the manifest.
+- **Deleted** (manifest ID absent from the current remote listing) — delete its chunks, drop the
+  manifest row. Pulling the *complete* ID set every sync, rather than asking Canvas "what changed
+  since X," is what makes this fall out for free: an unpublish or removal doesn't register as a
+  "change" to a timestamp-only query, it just disappears from the listing.
+- **Unchanged** (same ID, same timestamp) — skip; no content fetch at all.
+
+**Two efficiency details worth keeping:** hash the raw file bytes as a fast pre-check before
+extraction (identical bytes skip extraction entirely) — extraction and embedding are the expensive
+steps, not the metadata diff. And write a manifest row only after its vector-store write succeeds,
+so a sync that crashes partway through leaves the unfinished item looking "still new" next run,
+with no separate crash-recovery path needed.
+
+Session recordings, transcripts, and notes sit outside this mechanism entirely — they aren't from
+Canvas, so there's nothing to diff against. They're re-embedded on save/edit using the same
+hash-skip-if-unchanged idea, with SSB itself as the source of truth.
+
 ## 6. Data and privacy model
 
 - **Course documents** — pulled from Canvas with the student's own token. Only material that
