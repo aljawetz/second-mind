@@ -144,8 +144,9 @@ All retrieval sits behind a single `Retriever` interface — `index(documents)` 
 `search(query, k) -> list[Chunk]` with source metadata. The concrete store is an implementation
 detail.
 
-This is a direct response to §10: we have already changed retrieval substrate once. It should
-never again be a decision that puts the project at risk.
+This keeps the concrete retrieval store swappable by design — the choice of vector store or
+search backend should never become a decision that puts the project at risk partway through the
+semester.
 
 ### 5.4 Onboarding and first-run setup
 
@@ -263,54 +264,44 @@ alongside the official course material. That is the "second brain" claim in one 
 | LLM | Pluggable, default Claude | Swappable; local models possible for full self-hosting |
 | Web search | MCP, explicitly labeled | Never silently blended with course-grounded answers |
 
-### 10.1 Why not Onyx — the Sprint 3 finding
+### 10.1 PDF and slide ingestion — the Sprint 3 finding
 
-Sprints 1–3 targeted self-hosted [Onyx](https://github.com/onyx-dot-app/onyx). We built a real
-integration: a 1,068-line native `CanvasConnector` implementing Onyx's
-`CheckpointedConnectorWithPermSync` and `SlimConnectorWithPermSync` interfaces — checkpointing,
-retry, pagination, HTML parsing, and document conversion for courses, pages, assignments, and
-announcements — running live in an Onyx v4.7.3 Standard deployment.
+Image-heavy PDFs and slide decks are the single most valuable content type in most courses and the
+hardest to ingest reliably. Sprint 3's proof of concept pulled two real files from a live course —
+an 11-page PDF exported from a tutorial-style slide deck, and a 15-slide native PowerPoint deck —
+and tested three extraction tiers against each: plain-text extraction, OCR, and a direct
+vision-model read.
 
-It ran. Against a live CMU course it indexed courses, pages, assignments, and announcements — but
-only after three separate fixes to survive a student-scoped token: 404s on disabled Pages tabs
-skipping the entire course, per-stage 403s marking the whole connector INVALID, and privileged
-assignment includes (`assignment_visibility`, `overrides`) that students cannot request. It never
-reached modules or files, **which is where most CMU course content actually lives.** Getting there
-needed a larger connector change we chose not to make.
+**Native formats are close to a non-issue.** The PPTX extracted well from plain text alone —
+47–664 real text characters per slide across 15 slides, with only 4 slides containing any embedded
+picture at all.
 
-We are moving off it, for three findings:
+**Exported, screenshot-heavy PDFs are the real case.** Plain-text extraction on the PDF returned
+6–300 characters per page (1,614 total across 11 pages) — mostly just slide titles. Every page had
+1–3 embedded screenshots, and that's where the actual instructional content lived. OCR on full
+rasterized pages recovered roughly 3x more text (4,980 characters total) in 4.6 seconds for all 11
+pages — fast, free, a real improvement — but noisy, mixing genuine content with UI-chrome garbage.
+A direct vision-model pass on one representative page produced a clean, structured read that
+correctly identified a red box around one option as a deliberate visual callout marking the
+correct answer — the actual instructional content of the slide, and something structurally
+invisible to both plain-text extraction and OCR.
 
-1. **The permission model requires a commercially-licensed tier.** Onyx CE is MIT, but permission
-   sync resolves through `fetch_versioned_implementation` to an enterprise implementation under a
-   separate commercial license. Our connector's entire ACL design — `ExternalAccess`, course /
-   section / group permission contexts — needs that tier. **An open-source product cannot have a
-   permission model that requires a commercial license.** This is a contradiction, not a tradeoff.
-2. **Per-student isolation runs against Onyx's architecture.** Onyx is designed as one shared
-   corpus with connectors, users, and document sets. Per-student isolation means either one Onyx
-   instance per student — 11 containers each — or document sets with no enforcement, which is the
-   filter-bug leak §5.1 exists to avoid.
-3. **The deployment shape is wrong for the user.** Onyx Standard runs 11 containers (OpenSearch,
-   Postgres, Redis, MinIO, two model servers, nginx, code-interpreter, web, api, background) and
-   wants 10–16GB of Docker RAM. Our competitor is a desktop app. "Install Docker and run eleven
-   containers" is not a student onboarding flow.
+**Decision: extraction should be tiered, not uniform.** Plain-text extraction first (free,
+instant, sufficient for native formats); a cheap density heuristic (characters extracted per page)
+flags pages likely to be image-heavy; flagged pages get OCR by default, with a vision-model pass
+reserved for pages where OCR quality is still poor or where structural understanding (diagrams,
+annotated screenshots) actually matters. Full method and results: [Sprint 3](sprints/sprint-03.md).
 
-Two things Onyx did **not** solve, which is why moving costs less than it appears: it does not
-fix image-heavy PDF ingestion (§11), the risk we named as largest; and we had already decided to
-build our own frontend, fetch personal data live rather than index it, and keep transcripts
-private — three decisions that independently discard most of what Onyx was providing. What
-remained was chunk / embed / retrieve, the most commoditized layer in the stack.
-
-**Sprint 3 decision: MODIFY.** Retrieval-augmented generation over real Canvas content remains the
-approach and is validated. The substrate changes. The Canvas API work in the connector — endpoints,
-pagination, HTML parsing, document conversion — ports to the new ingestion path; the Onyx interface
-scaffolding is dropped.
+This is one PDF and one deck from one course — a real result, not a comprehensive benchmark. The
+density heuristic's threshold needs tuning against more course material before Sprint 5, and the
+vision-tier's cost/latency at full-course scale is not yet measured.
 
 ## 11. Risks
 
-- **Image-heavy PDF ingestion.** Observed directly: `read_course_file` on a real course PDF
-  returned base64 bytes, not text, and the underlying content is images with text overlay. Slide
-  decks are the single most valuable content type and the hardest to ingest. Needs a VLM/OCR pass.
-  **Unchanged by the Onyx decision — no platform solves this for us.** Largest open risk.
+- **Image-heavy PDF ingestion.** Partially de-risked by the Sprint 3 finding (§10.1): a tiered
+  plain-text → OCR → vision-model strategy recovers real content, but the density-heuristic
+  threshold and the vision-tier's cost at full-course scale are still untuned. No longer the
+  largest *unknown* risk, but still the largest *unresolved* one going into Sprint 5.
 - **Artifact groundedness.** A hallucinated mock test actively harms the student (§8).
 - **Per-student storage cost.** Duplicate embeddings scale linearly with enrollment. Acceptable at
   pilot scale; a real constraint on any institutional deployment.
