@@ -26,14 +26,6 @@ semester team projects.
 stakeholders (user / customer / beneficiary), existing approaches, proposed solution and value
 proposition, and 3–5 measurable success criteria (at least one technical, one user/business/social).
 
-## What we did
-
-Submitted 2026-09-01. The specific individual proposal(s) that fed into the team selecting the SSB
-project aren't recoverable from Canvas or this repository (repo history starts after team
-formation). What follows is a full rewrite of this deliverable, done in Sprint 4 once the whole
-project's context existed to write it properly — backed by real research rather than reconstructed
-from memory. It supersedes the original submission as the record of the problem SSB solves and why.
-
 ---
 
 ## 1. Problem and current landscape
