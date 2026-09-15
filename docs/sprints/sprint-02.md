@@ -117,6 +117,18 @@ classroom recordings.
 - **FR12** — Web-search fallback when course material doesn't cover a question, visibly labeled
   and never blended into a course-grounded answer.
 - **FR13** — Piazza as a source, if an official public API becomes available.
+- **FR14** — Assignment gamifier: break an assignment into smaller guided blocks (Duolingo-style),
+  where the student answers or fills in simpler chunks with explanations, and the completed
+  assignment is assembled from those answers. **Flag:** this sits closer to the deferred
+  assignment *helper* than the explainer does — the guided answers could end up constituting the
+  submission itself, just built interactively rather than drafted outright. Needs a
+  responsible-AI review against the §7.1 boundary before any implementation, not just an
+  engineering design.
+- **FR15** — Calendar integration: connect to Google Calendar to fetch events.
+- **FR16** — External reading scraper: pull text from external reading websites (assigned links,
+  not indexed course files) to add to context-based answers. Must follow the same labeling rule as
+  FR12 — visibly marked as outside the course-grounded index, never silently blended in — and
+  needs a look at each source's terms of service before scraping it, not just a technical build.
 
 **Out of scope this semester**
 
