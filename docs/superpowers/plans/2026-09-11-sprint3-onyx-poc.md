@@ -1,5 +1,15 @@
 # Sprint 3 Feasibility PoC Implementation Plan
 
+> **HISTORICAL (2026-09-14).** This plan drove the Sprint 3 feasibility work and is kept as the
+> record of it. Two things diverged from the plan in execution: Onyx was installed in **Standard**
+> mode rather than Lite, and Canvas integration was built as a **native Onyx connector**
+> (`onyx-patch/connector.py`, 1,068 lines) rather than through the MCP data-source route described
+> in Task 2.
+>
+> Outcome: **Modify** — RAG over real Canvas content is validated, the Onyx substrate is not. See
+> [§10.1 of the SSB spec](../specs/2026-09-14-ssb-design.md) for the reasoning. Do not execute the
+> remaining tasks in this plan; they target the Onyx architecture.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Prove or disprove, on one real CMU course, that a self-hosted Onyx instance fed
