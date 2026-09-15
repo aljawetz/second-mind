@@ -28,8 +28,13 @@ proposition, and 3–5 measurable success criteria (at least one technical, one 
 
 ## What we did
 
-Submitted 2026-09-01. This was individual, pre-team-formation work — the specific proposal(s) that
-fed into the team selecting the SSB project aren't captured in this repository (repo history
-starts after team formation). The problem this repo addresses — course material scattered across
-Canvas, no grounded Q&A or generated study material, competing tools proprietary and cloud-hosted
-— is the one that survived into Sprint 2's team scope.
+Submitted 2026-09-01. The specific individual proposal(s) that fed into the team selecting the SSB
+project aren't recoverable from Canvas or this repository (repo history starts after team
+formation).
+
+**[sprint-01-deliverable.md](sprint-01-deliverable.md)** is a full rewrite of this deliverable,
+done in Sprint 4 once the whole project's context existed to write it properly: the problem
+definition, prevalence evidence, competitive landscape (UniFlow Study, DIY tool stacks, paid
+tutoring), value proposition, and measurable success criteria, backed by real research rather than
+reconstructed from memory. It supersedes this file as the record of the problem SSB solves and
+why — the original submission is what's now historical.
