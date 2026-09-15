@@ -9,7 +9,7 @@ build by hand — mock tests, mindmaps, slides, flashcards.
 Your index, your recordings, your notes, on your machine.
 
 > **Status: early development.** Sprint 3 (technical feasibility) is complete; see
-> [the design spec](docs/superpowers/specs/2026-09-14-ssb-design.md). Core implementation begins
+> [the design spec](docs/specs/2026-09-14-ssb-design.md). Core implementation begins
 > Sprint 5. There is no installable build yet.
 
 ---
@@ -38,7 +38,7 @@ actually in your courses — each traceable to its source.
 
 **Explain your assignments.** Breaks down what a prompt is actually asking and points to the
 lecture and reading material it draws on — never drafts the answer itself. See
-[§7.1 of the design spec](docs/superpowers/specs/2026-09-14-ssb-design.md) for exactly where that
+[§7.1 of the design spec](docs/specs/2026-09-14-ssb-design.md) for exactly where that
 line sits.
 
 ## How it compares
@@ -121,7 +121,7 @@ CMU course — though never modules or files, where most course content lives. S
 Onyx's permission sync resolves to a commercially-licensed tier, which an open-source product
 can't depend on; per-student isolation runs against its shared-corpus architecture; and its
 11-container deployment is the wrong shape for software a student installs. The reasoning is in
-[§10.1 of the spec](docs/superpowers/specs/2026-09-14-ssb-design.md).
+[§10.1 of the spec](docs/specs/2026-09-14-ssb-design.md).
 
 ## Responsible AI
 
@@ -140,7 +140,7 @@ silently blends outside knowledge into a course-grounded answer.
 
 ## Documentation
 
-- [Design spec](docs/superpowers/specs/2026-09-14-ssb-design.md) — architecture, scope, privacy
+- [Design spec](docs/specs/2026-09-14-ssb-design.md) — architecture, scope, privacy
   model, risks, metrics
 
 ## License
