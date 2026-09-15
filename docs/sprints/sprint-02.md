@@ -101,15 +101,15 @@ classroom recordings.
   back to open-domain knowledge.
 - **FR4** — Auto-create a session page at class time; record, transcribe locally, and provide a
   notes editor alongside the transcript.
-- **FR5** — Generate at least one study-artifact type (mock test) from indexed material, cited to
-  source.
-- **FR6** — Keep retrieval/index physically isolated per student (own directory), not a shared
+- **FR5** — Keep retrieval/index physically isolated per student (own directory), not a shared
   corpus with query filters.
-- **FR7** — Fetch grades, deadlines, and submission status live per request; never persist or
+- **FR6** — Fetch grades, deadlines, and submission status live per request; never persist or
   index them.
 
 **Should have**
 
+- **FR7** — Generate at least one study-artifact type (mock test) from indexed material, cited to
+  source.
 - **FR8** — Additional study-artifact types: mindmap, flashcards, slides.
 - **FR9** — Socratic-mode toggle for Q&A (guiding questions before the answer).
 - **FR10** — Assignment explainer: explain the prompt and cite relevant material, never draft the
@@ -148,29 +148,30 @@ classroom recordings.
 ### End-to-end MVP
 
 One integrated flow: connect Canvas and LLM credentials → select and index real courses → ask
-grounded, cited questions → attend a session (capture + notes) → generate at least one cited study
-artifact. Grades and deadlines are read live, never indexed; recordings and notes stay private
-with no sharing path.
+grounded, cited questions → attend a session (capture + notes). Grades and deadlines are read
+live, never indexed; recordings and notes stay private with no sharing path. Study-artifact
+generation is a Should Have, layered on once this core flow is solid.
 
 ### Semester MVP Contract
 
 By Sprint 6, the team commits to an end-to-end alpha where a Canvas-using student can: connect their own
 Canvas and LLM credentials; select and index at least two real courses; ask questions about
-indexed material and receive answer-first, cited responses with a Socratic toggle; have at least
-one class session auto-captured, transcribed, and made note-taking-ready; and generate at least
-one cited study artifact from indexed material. Grades and deadlines are read live, never indexed.
-Recordings and notes stay private to the student, with no sharing path. Additional artifact types,
-the assignment explainer, pre-class prep briefs, and any capability that drafts submittable work
-are explicitly Should/Could/Out of Scope — not committed.
+indexed material and receive answer-first, cited responses with a Socratic toggle; and have at
+least one class session auto-captured, transcribed, and made note-taking-ready. Grades and
+deadlines are read live, never indexed. Recordings and notes stay private to the student, with no
+sharing path. Study-artifact generation, additional artifact types, the assignment explainer,
+pre-class prep briefs, and any capability that drafts submittable work are explicitly
+Should/Could/Out of Scope — not committed.
 
 ## 3. Feasibility and success measures
 
 **Feasibility for one semester.** Sprint 3's finding (§ [sprint-03.md](sprint-03.md)) already
 tested the highest-risk technical assumption — RAG over real Canvas content — and validated it,
 while identifying that the *substrate* (Onyx) was the wrong shape for a self-hosted, per-student
-product. Scoping the MVP to four pillars (Q&A, lecture capture, study artifacts, assignment
-explainer) across a 4–6 person team over a 9-sprint semester matches the rubric's own guidance: a
-smaller system that works end-to-end beats an ambitious one that doesn't.
+product. Scoping the committed MVP to two pillars (Q&A, lecture capture), with study artifacts and
+the assignment explainer as Should Have layered on top, across a 4–6 person team over a 9-sprint
+semester matches the rubric's own guidance: a smaller system that works end-to-end beats an
+ambitious one that doesn't.
 
 **Success measures**
 
