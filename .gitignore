@@ -23,5 +23,6 @@ backend/dist/
 # Tauri bundle at build time, not committed — see backend/*.spec
 app/src-tauri/binaries/
 
-# Local model files (bundled at build time, not committed)
-*.onnx
+# Converted embedding model (~128MB, over GitHub's 100MB push limit anyway) —
+# regenerate with backend/scripts/convert_embedding_model.py
+backend/models/

@@ -84,13 +84,28 @@ static mock list with the student's real Canvas courses — confirmed working en
 running app.
 
 ### 4. Embedding layer (ONNX, torch-free)
-**Do:** One-time ONNX conversion of `bge-small-en-v1.5` via `optimum[exporters]` (dev machines
-only); a custom `BaseEmbedding` subclass wrapping `onnxruntime` directly, per the corrected design
-in [rag-pipeline.md](rag-pipeline.md) §3.
+**Do:** One-time ONNX conversion of `bge-small-en-v1.5` via `optimum[onnx]` (dev machines
+only — `optimum[exporters]` named in earlier drafts of this doc isn't a real extra in the
+current package); a custom `BaseEmbedding` subclass wrapping `onnxruntime` directly, per the
+corrected design in [rag-pipeline.md](rag-pipeline.md) §3.
 **Test:** Embed a known sentence, confirm the output vector's dimensionality is correct.
 Separately: run `pip list` inside the *frozen build's* dependency set and assert `torch` does not
 appear — the actual claim this whole design turns on, checked mechanically, not assumed.
 **Depends on:** 1. (Independent of Canvas — can run in parallel with 3.)
+**Verified:** 384-dim output confirmed; cross-checked against the sentence-transformers/torch
+reference for the same sentence — cosine similarity ~1.0000, the ONNX conversion is numerically
+faithful, not just correctly shaped. Confirmed the model's own packaged config has empty
+query/document prompts, so no instruction-prefix logic was needed to match what the earlier
+retrieval smoke test (4/4 hit rate) already validated. Model files (~128MB, `model.onnx` alone
+over GitHub's 100MB push limit) aren't committed — `backend/scripts/convert_embedding_model.py`
+regenerates them from the public checkpoint, same reasoning as the gitignored sidecar binary.
+**Real finding, caught by the frozen-build check this step explicitly asks for:** building
+`ssb-backend` from an environment with `optimum` (dev-only, needed for the ONNX conversion)
+installed alongside the runtime deps silently bundled real `torch` submodules into the shipped
+binary — PyInstaller bundles whatever's importable in the venv it runs from, not just what
+`main.py` actually reaches. Fixed by splitting `backend/pyproject.toml`'s dependency groups
+(`build` / `test` / `convert`) so the actual build only ever runs from `uv sync --group build`,
+which has no path to torch at all. Confirmed clean on a rebuild from that corrected environment.
 
 ### 5. Ingestion pipeline (tiered extraction)
 **Do:** Real code for Sprint 3's tiered extraction: plain-text → density heuristic

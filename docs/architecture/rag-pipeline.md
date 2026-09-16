@@ -80,7 +80,7 @@ same retrieval stack (LlamaIndex core, the LanceDB integration, `faster-whisper`
 to 874MB with zero torch anywhere.
 
 **What should actually ship: ONNX via `onnxruntime`, not LlamaIndex's `HuggingFaceEmbedding`.**
-`bge-small-en-v1.5` is converted to ONNX once, on a dev machine, using `optimum[exporters]` — torch
+`bge-small-en-v1.5` is converted to ONNX once, on a dev machine, using `optimum[onnx]` — torch
 touches only our own build environment, never a student's machine. The important correction found
 by actually checking rather than assuming: LlamaIndex's own ONNX wrapper
 (`llama-index-embeddings-huggingface-optimum`) is *not* the clean answer here — it depends on the

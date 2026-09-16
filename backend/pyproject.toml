@@ -6,13 +6,29 @@ requires-python = ">=3.13"
 dependencies = [
     "httpx>=0.28",
     "keyring>=25.7",
+    "llama-index-core>=0.12",
+    "onnxruntime>=1.20",
+    "tokenizers>=0.21",
 ]
 
 [dependency-groups]
-dev = [
+# Split deliberately: PyInstaller bundles whatever's importable in the venv
+# it runs from, not just what main.py actually needs — building from an
+# environment that also has `convert` installed silently bundled torch into
+# the frozen binary (confirmed by actually checking, implementation-plan.md
+# Step 4). `uv sync --group build` must never pull in `convert`.
+build = [
     "pyinstaller>=6.22",
+]
+test = [
     "pytest>=8.3",
     "respx>=0.22",
+]
+# Conversion-time only (scripts/convert_embedding_model.py). optimum[onnx]
+# pulls torch to run the export; onnxruntime here validates the result.
+convert = [
+    "optimum[onnx]",
+    "onnx>=1.17",
 ]
 
 [tool.pytest.ini_options]

@@ -5,6 +5,14 @@
 #
 # Output name matches Tauri's <name>-<target-triple> sidecar convention directly,
 # so no manual rename step is needed after building.
+#
+# BUILD FROM `uv sync --group build`, NEVER a plain `uv sync`. PyInstaller
+# bundles whatever's importable in the venv it runs from, not just what
+# main.py needs — building from an environment that also has `convert`
+# installed (optimum, for the ONNX conversion script) silently pulled torch
+# into this exact binary, confirmed by checking, implementation-plan.md
+# Step 4. `pyinstaller ssb-backend.spec` must be run as
+# `uv run --group build pyinstaller ssb-backend.spec ...`.
 
 a = Analysis(
     ["main.py"],
