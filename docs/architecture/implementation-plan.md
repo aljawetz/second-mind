@@ -109,12 +109,28 @@ which has no path to torch at all. Confirmed clean on a rebuild from that correc
 
 ### 5. Ingestion pipeline (tiered extraction)
 **Do:** Real code for Sprint 3's tiered extraction: plain-text → density heuristic
-(`chars<100 OR (chars<400 AND has_image)`, [rag-pipeline.md](rag-pipeline.md) §1) → OCR → vision
-fallback.
-**Test:** Run against the real PDF/PPTX files already captured this session as fixtures (the
-Zotero tutorial, the lecture decks, the academic papers) and **assert the extraction character
-counts match the numbers already measured** — a real regression test against known-good results,
-not a fresh judgment call each time.
+(`chars<100 OR (chars<400 AND has_image)`, [rag-pipeline.md](rag-pipeline.md) §1) → OCR. Vision
+fallback deliberately deferred to step 8, where the pluggable LLM client actually gets built —
+`ingestion.needs_fallback()` marks which pages would need it, so the routing logic is real even
+though the call itself isn't yet.
+**Test:** Run against the real PDF/PPTX files this sprint's docs described but never actually
+saved — re-sourced via `canvas.get_file()` and confirmed to be Sprint 3's exact original files
+(page/slide counts and character ranges match almost exactly), then **assert the extraction
+character counts match the numbers already measured** — a real regression test against
+known-good historical results, not a fresh judgment call each time.
+**Verified:** `sprint3_zotero_tutorial.pdf` — 11 pages, 1609 total chars, range 6-299 (Sprint 3:
+1,614 total, range 6-300); OCR recovers 4925 chars, ~3.06x (Sprint 3: 4,980, "roughly 3x"), in
+3.3s for 11 pages. `sprint3_ai_research.pptx` — 15 slides, char range 47-664 (exact match to
+Sprint 3), exactly 4 slides with images (exact match). Two more real PDFs (a clean literature
+review, 0% flagged; a denser research paper, 20% flagged) extend the regression beyond the
+original two files. 15/15 tests pass.
+**Real finding:** the plan's fixtures were never actually saved as files — same gap as step 3's
+Canvas fixtures, now fixed differently: these are an instructor's real course materials in a
+*public* repo, not ours to redistribute, so they're fetched fresh via
+`scripts/fetch_ingestion_fixtures.py` (gitignored) rather than committed; only the measured
+numbers (`tests/fixtures/ingestion_baseline.json`) are committed, not the files or their
+extracted text. `pytesseract` only wraps the `tesseract` *binary* — it won't be bundled by
+PyInstaller and needs its own packaging story, deferred to step 14.
 **Depends on:** 3 (for new files going forward), but can start immediately against cached fixtures.
 
 ### 6. Chunking + indexing (LlamaIndex + LanceDB)

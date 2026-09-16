@@ -1,0 +1,133 @@
+{
+  "sprint3_zotero_tutorial.pdf": {
+    "pages": 11,
+    "char_counts": [
+      40,
+      6,
+      159,
+      128,
+      152,
+      299,
+      219,
+      113,
+      201,
+      286,
+      6
+    ],
+    "flagged": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "ocr_total_chars": 4925
+  },
+  "sprint3_ai_research.pptx": {
+    "slides": 15,
+    "char_counts": [
+      67,
+      156,
+      47,
+      573,
+      278,
+      375,
+      56,
+      239,
+      510,
+      262,
+      380,
+      497,
+      194,
+      288,
+      664
+    ],
+    "has_image": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "research_study.pdf": {
+    "pages": 10,
+    "char_counts": [
+      433,
+      485,
+      1734,
+      2162,
+      877,
+      1009,
+      972,
+      315,
+      413,
+      0
+    ],
+    "flagged": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "literature_review.pdf": {
+    "pages": 15,
+    "char_counts": [
+      3343,
+      3888,
+      3311,
+      3438,
+      2416,
+      2641,
+      3380,
+      4940,
+      4486,
+      3673,
+      4307,
+      3562,
+      4158,
+      4269,
+      3547
+    ],
+    "flagged": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  }
+}

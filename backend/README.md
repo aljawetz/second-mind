@@ -47,6 +47,23 @@ Produces `models/bge-small-en-v1.5-onnx/` (gitignored). See
 [docs/architecture/rag-pipeline.md §3](../docs/architecture/rag-pipeline.md) for why this exists —
 avoids bundling `torch` into the shipped app.
 
+## Fetching ingestion test fixtures (one-time)
+
+Not committed, and not regenerable from a public source — these are an instructor's actual course
+materials, not ours to redistribute in a public repo. Needs a Canvas token in Keychain
+(onboarding, or Step 2's flow) with access to course 56350.
+
+```bash
+uv run python3 scripts/fetch_ingestion_fixtures.py
+```
+
+Produces `tests/fixtures/ingestion/` (gitignored). The measured baseline derived from them —
+character counts, page/slide counts, which pages need OCR fallback — *is* committed
+(`tests/fixtures/ingestion_baseline.json`), since that's our own data, not the instructor's
+content. `tests/test_ingestion.py` skips cleanly if you haven't run this yet. Also needs Tesseract
+installed locally for the OCR tests (`brew install tesseract` on macOS) — not a Python package,
+`pytesseract` only wraps the binary.
+
 ## Building the sidecar binary
 
 ```bash

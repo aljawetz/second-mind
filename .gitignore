@@ -26,3 +26,8 @@ app/src-tauri/binaries/
 # Converted embedding model (~128MB, over GitHub's 100MB push limit anyway) —
 # regenerate with backend/scripts/convert_embedding_model.py
 backend/models/
+
+# Real course files (not ours to redistribute) — re-fetch with
+# backend/scripts/fetch_ingestion_fixtures.py. The measured baseline
+# derived from them (tests/fixtures/ingestion_baseline.json) is committed.
+backend/tests/fixtures/ingestion/
