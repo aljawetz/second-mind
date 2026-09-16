@@ -40,9 +40,14 @@ pipeline — lives in **[docs/architecture/](../architecture/overview.md)**, not
   restrictions found by testing, how sync maps to real API calls.
 - [RAG pipeline](../architecture/rag-pipeline.md) — ingestion, chunking, embedding, hybrid
   retrieval, and where LLM provider calls actually happen.
+- [Implementation plan](../architecture/implementation-plan.md) — a sequenced build order (15
+  steps, Sprint 5–6) with dependencies and a concrete test for each one.
 
-**Not yet covered — gap against this sprint's rubric:** the "Implementation and Integration Plan"
-requirement (20% of this sprint's score) asks for component ownership assignment, dependencies,
-integration points, and sprint-based milestones. This needs actual team member names and role
-assignments, which aren't something to fabricate into a graded deliverable — still open until that
-information is supplied.
+**Narrowed, not fully closed — gap against this sprint's rubric:** the "Implementation and
+Integration Plan" requirement (20% of this sprint's score) asks for component ownership,
+dependencies, integration points, and sprint-based milestones. Dependencies, integration points,
+and milestones are now written down in
+[docs/architecture/implementation-plan.md](../architecture/implementation-plan.md). **Component
+ownership is the one piece left** — it needs actual team member names and role assignments, which
+aren't something to fabricate into a graded deliverable. Still open until that information is
+supplied.

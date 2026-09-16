@@ -2,7 +2,7 @@
 
 Sprint 4 detail behind [the design spec](../specs/2026-09-14-ssb-design.md)'s §5 architecture.
 This document covers the end-to-end system shape, component interfaces, deployment, security, and
-reliability. Three companion documents go deeper on specific layers:
+reliability. Four companion documents go deeper on specific layers:
 
 - [Data model](data-model.md) — on-disk folder structure, what's stored where, how a course's
   weekly schedule is represented.
@@ -10,6 +10,8 @@ reliability. Three companion documents go deeper on specific layers:
   found in Sprint 3, and how §5.5's sync mechanism maps to real API calls.
 - [RAG pipeline](rag-pipeline.md) — ingestion, chunking, embedding, hybrid retrieval, and LLM
   calls, including where OpenAI/Anthropic/etc. actually get invoked.
+- [Implementation plan](implementation-plan.md) — the actual build order: 15 sequenced steps
+  across Sprint 5–6, each with its dependencies and a concrete test.
 
 ## 1. Shape of the system
 
