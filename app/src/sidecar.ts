@@ -24,3 +24,20 @@ export async function validateCredential(
   });
   return res.json();
 }
+
+export interface CanvasCourse {
+  id: number;
+  code: string | null;
+  name: string;
+}
+
+// Error shape per overview.md's documented contract:
+// { error: { code, message, detail? } }
+export async function listCourses(): Promise<CanvasCourse[]> {
+  const res = await fetch("http://127.0.0.1:8756/courses");
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `failed to list courses (${res.status})`);
+  }
+  return data.courses;
+}

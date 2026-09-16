@@ -1,11 +1,11 @@
-"""Sidecar backend — see docs/architecture/implementation-plan.md.
-
-Deliberately stdlib-only, zero dependencies, until a real feature (Step 4+:
-LlamaIndex, ONNX, faster-whisper) actually needs a package.
-"""
+"""Sidecar backend — see docs/architecture/implementation-plan.md."""
 
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
+
+import httpx
+
+import canvas
 
 HOST = "127.0.0.1"
 PORT = 8756
@@ -46,9 +46,35 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/ping":
             self._send_json(200, {"status": "ok", "source": "ssb-backend"})
+        elif self.path == "/courses":
+            self._handle_list_courses()
         else:
             self.send_response(404)
             self.end_headers()
+
+    def _handle_list_courses(self):
+        # Error shape/codes per overview.md's documented contract.
+        try:
+            raw = canvas.list_courses()
+        except canvas.CanvasError:
+            self._send_json(401, {"error": {"code": "canvas_auth_failed", "message": "no Canvas token stored"}})
+            return
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                self._send_json(401, {"error": {"code": "canvas_auth_failed", "message": "Canvas token invalid or expired"}})
+            else:
+                self._send_json(502, {"error": {"code": "canvas_error", "message": str(e)}})
+            return
+        except httpx.TransportError:
+            self._send_json(503, {"error": {"code": "canvas_unreachable", "message": "could not reach Canvas"}})
+            return
+
+        courses = [
+            {"id": c["id"], "code": c.get("course_code"), "name": c.get("name")}
+            for c in raw
+            if c.get("name")  # some real courses come back with no name/code — skip, not usefully selectable
+        ]
+        self._send_json(200, {"courses": courses})
 
     def do_POST(self):
         if self.path == "/credentials/validate":

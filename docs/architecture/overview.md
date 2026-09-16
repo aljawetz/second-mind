@@ -62,6 +62,13 @@ The frontend never talks to Canvas, the vector store, or an LLM directly — eve
 the local backend's HTTP API. Request/response shapes, not full OpenAPI, but enough to build
 against:
 
+### `GET /courses`
+```
+Response: { "courses": [ { "id": number, "code": string|null, "name": string } ] }
+```
+Lists the student's real Canvas courses for the onboarding course-picker (§5.4) — live, not
+synced/stored. Courses with no name (some real accounts have these) are filtered out server-side.
+
 ### `POST /courses/{course_id}/ask`
 ```
 Request:  { "question": string, "mode": "answer" | "socratic" }

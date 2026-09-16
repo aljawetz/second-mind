@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { AvailableCourse, OnboardStage } from "./types";
-import { AVAILABLE_COURSES } from "./data";
 import StartupGate from "./components/onboarding/StartupGate";
 import OnboardingKeys from "./components/onboarding/OnboardingKeys";
 import OnboardingCourses from "./components/onboarding/OnboardingCourses";
@@ -9,7 +8,7 @@ import AppShell from "./components/app/AppShell";
 
 export default function App() {
   const [stage, setStage] = useState<OnboardStage>("startup");
-  const [courses, setCourses] = useState<AvailableCourse[]>(AVAILABLE_COURSES);
+  const [courses, setCourses] = useState<AvailableCourse[]>([]);
 
   switch (stage) {
     case "startup":

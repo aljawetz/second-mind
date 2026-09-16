@@ -1,4 +1,4 @@
-import type { AvailableCourse, CourseData } from "./types";
+import type { CourseData } from "./types";
 
 export const DATA: CourseData = {
   "49797": {
@@ -134,14 +134,6 @@ export const DATA: CourseData = {
 };
 
 export const WAVE = [8,14,22,16,30,26,12,20,34,28,18,10,24,32,20,14,8,18,26,30,22,12,16,28,34,20,10,24,30,18,14,22,26,16,8,20,32,24,12,18,28,34,20,10,16,24,30,22];
-
-export const AVAILABLE_COURSES: AvailableCourse[] = [
-  { code: "49797", name: "Advanced AI for Industry and Society", checked: true },
-  { code: "18654", name: "Software Testing and Operations", checked: true },
-  { code: "15513", name: "Cost Models for Modern Architectures", checked: false },
-  { code: "05899", name: "Special Topics: Behavioral Economics", checked: false },
-  { code: "90717", name: "Financial Statement Analysis", checked: false }
-];
 
 export const ARTIFACT_TYPES: { key: "mocktest" | "mindmap" | "cards" | "slides"; lbl: string; sub: string }[] = [
   { key: "mocktest", lbl: "Mock Test", sub: "Q&A, cited" },

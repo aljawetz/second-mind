@@ -78,7 +78,10 @@ confirming these are real, current properties of the Canvas API under a student 
 findings. All six responses captured as fixtures (`backend/tests/fixtures/canvas/`) and replayed
 via `pytest` + `respx` with zero live calls (6 passed). PyInstaller freezing verified separately —
 `httpx`/`keyring` bundle cleanly with no missing hidden imports. Formalized `backend/pyproject.toml`
-+ `uv.lock` in the same step, closing a gap from step 0 (never actually done then).
++ `uv.lock` in the same step, closing a gap from step 0 (never actually done then). Also wired
+`GET /courses` (overview.md §2) into the onboarding course-picker (step 2's UI), replacing the
+static mock list with the student's real Canvas courses — confirmed working end-to-end in the
+running app.
 
 ### 4. Embedding layer (ONNX, torch-free)
 **Do:** One-time ONNX conversion of `bge-small-en-v1.5` via `optimum[exporters]` (dev machines
