@@ -8,3 +8,19 @@ export async function pingSidecar(): Promise<{ status: string; source: string }>
   const res = await fetch("http://127.0.0.1:8756/ping");
   return res.json();
 }
+
+export type CredentialKind = "canvas" | "openai";
+
+// Format check only (Step 2) — not a real Canvas/OpenAI call yet. Step 3
+// upgrades main.py's handler for this same endpoint to do that; the
+// frontend's interface here doesn't need to change when it does.
+export async function validateCredential(
+  kind: CredentialKind,
+  value: string
+): Promise<{ valid: boolean; reason: string }> {
+  const res = await fetch("http://127.0.0.1:8756/credentials/validate", {
+    method: "POST",
+    body: JSON.stringify({ kind, value }),
+  });
+  return res.json();
+}

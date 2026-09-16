@@ -1,7 +1,27 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+// Credential storage (implementation-plan.md Step 2): both Rust and Python
+// read/write the same macOS Keychain item directly via this service name —
+// no handoff between them, confirmed by a real cross-process test (an item
+// created by one process was read cleanly by a different one, no prompt).
+// Rust owns the onboarding UI's read/write; Python reads the same item
+// independently later when it needs the credential for a real API call.
+const CREDENTIAL_SERVICE: &str = "com.ssb.app";
+
 #[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+fn get_credential(key: String) -> Result<Option<String>, String> {
+    use keyring::v1::Entry;
+    let entry = Entry::new(CREDENTIAL_SERVICE, &key).map_err(|e| e.to_string())?;
+    match entry.get_password() {
+        Ok(value) => Ok(Some(value)),
+        Err(keyring::v1::Error::NoEntry) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+fn set_credential(key: String, value: String) -> Result<(), String> {
+    use keyring::v1::Entry;
+    let entry = Entry::new(CREDENTIAL_SERVICE, &key).map_err(|e| e.to_string())?;
+    entry.set_password(&value).map_err(|e| e.to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -41,7 +61,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![get_credential, set_credential])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

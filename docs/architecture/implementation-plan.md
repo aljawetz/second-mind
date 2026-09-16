@@ -48,6 +48,17 @@ failing fast.
 **Test:** Enter test credentials, restart the app, confirm they're still retrievable from Keychain
 — not from `config.json` ([data-model.md](data-model.md) §1).
 **Depends on:** 1.
+**Verified:** real credentials entered via onboarding persisted through a full app restart (fields
+came back pre-filled, `Connect →` enabled without retyping), independently confirmed via `security
+find-generic-password` and absent from any file on disk. Both Rust (`keyring` crate) and Python
+(`keyring` package) read the identical Keychain item directly — no handoff between them, confirmed
+by hashing the value read via each independently and getting a match.
+**Real finding:** the first-ever Keychain *write* from this ad-hoc-signed build prompted for the
+macOS login password — the OS can't recognize a stable app identity across ad-hoc rebuilds, so it
+asks for consent rather than silently trusting an unrecognized signer. This is the same root cause
+category as step 1's Gatekeeper delay. A real user on a properly signed, notarized build (step 14)
+should see this at most once ever, the first time they save a credential; subsequent *reads* did
+not re-prompt even after a full app restart on the same (unrebuilt) binary.
 
 ### 3. Canvas integration (real calls)
 **Do:** Embed the Canvas MCP server in the Python backend ([canvas-integration.md](canvas-integration.md));
