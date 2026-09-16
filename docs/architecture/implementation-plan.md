@@ -140,6 +140,31 @@ rag-pipeline.md); index into a per-student, per-course LanceDB table.
 script — 4 known-answer queries, expect the same 4/4 top-3 hit rate already measured, including
 the OCR-dependent one landing at rank 1.
 **Depends on:** 4, 5.
+**Verified:** the exact original 4 queries were never saved either (same gap as steps 3 and 5),
+except one preserved verbatim in rag-pipeline.md ("what citation style should I choose") — reused
+here, confirmed by OCR to land on the same real page (8) the original finding described. Three
+more queries constructed against real, verified fixture content, including a genuine near-duplicate
+pair (pages 3 and 4 are both titled "Installation" with near-identical text) that authentically
+reproduces the original's ranking-ambiguity nuance rather than a fabricated one. Result: 4/4 hit
+top-3, **all four at rank 1** (the original had one at rank 2) — indexed across all four Step 5
+fixtures together (68 nodes), not just the original two files. 19/19 backend tests pass.
+**Real findings, two genuine bugs caught only by testing against real dense content and a real
+frozen build:**
+- `OnnxBgeEmbedding` had no input truncation — a literature-review chunk tokenized past BGE's real
+  512-token limit (`max_position_embeddings` in its own config) and crashed onnxruntime outright.
+  Fixed with `tokenizer.enable_truncation()`.
+- `SentenceSplitter`'s default tokenizer is tiktoken (GPT-style), which (a) doesn't bundle cleanly
+  under PyInstaller — its encoding data isn't discoverable frozen — and (b) counts tokens
+  differently than BGE's own tokenizer, which is what actually caused the truncation crash above
+  (a "700-token" chunk by tiktoken's count isn't 700 tokens to BGE). Fixed at the source by passing
+  BGE's own tokenizer to `SentenceSplitter` instead of patching around either symptom.
+- Separately: `ssb-backend.spec`'s `datas` was empty — the ~128MB ONNX model was never actually
+  wired to be bundled into the shipped binary at all. `embeddings.py` resolves its model path
+  relative to `__file__`, which under a frozen build points into the bundle's internal extraction
+  path, not `backend/` on disk. This had gone undetected since step 4's own frozen-build check only
+  verified dependency imports, not actual model loading — `main.py` didn't import `embeddings.py`
+  yet at that point. Fixed by adding the model directory to `datas`; confirmed by actually running
+  inference (not just importing) in a frozen build with the fix applied.
 
 ### 7. Sync mechanism
 **Do:** The manifest diff (new/changed/deleted/unchanged, [design spec](../specs/2026-09-14-ssb-design.md)

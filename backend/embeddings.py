@@ -24,6 +24,7 @@ from tokenizers import Tokenizer
 
 MODEL_DIR = Path(__file__).parent / "models" / "bge-small-en-v1.5-onnx"
 EMBEDDING_DIM = 384
+MAX_SEQ_LENGTH = 512  # from the model's own config.json (max_position_embeddings)
 
 
 class OnnxBgeEmbedding(BaseEmbedding):
@@ -32,6 +33,11 @@ class OnnxBgeEmbedding(BaseEmbedding):
     def __init__(self, model_dir: Path = MODEL_DIR, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._tokenizer = Tokenizer.from_file(str(model_dir / "tokenizer.json"))
+        # Without this, a chunk that tokenizes past the model's 512-token
+        # limit crashes onnxruntime instead of truncating — found by
+        # actually indexing real, dense content (implementation-plan.md
+        # Step 6), not a hypothetical edge case.
+        self._tokenizer.enable_truncation(max_length=MAX_SEQ_LENGTH)
         self._session = ort.InferenceSession(str(model_dir / "model.onnx"))
 
     def _embed(self, text: str) -> list[float]:

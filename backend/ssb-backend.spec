@@ -18,7 +18,12 @@ a = Analysis(
     ["main.py"],
     pathex=[],
     binaries=[],
-    datas=[],
+    # embeddings.py resolves MODEL_DIR relative to __file__, which under a
+    # frozen build points into the bundle's internal extraction path, not
+    # backend/ on disk — the model has to actually be bundled as data, not
+    # just present on the build machine. Confirmed missing by actually
+    # running a frozen build that imports indexing.py, not assumed.
+    datas=[("models/bge-small-en-v1.5-onnx", "models/bge-small-en-v1.5-onnx")],
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],
