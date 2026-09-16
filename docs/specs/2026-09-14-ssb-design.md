@@ -202,7 +202,11 @@ row per ingested item:
 | `item_type` | page / assignment / announcement / file |
 | `canvas_updated_at` | Canvas's own timestamp, last time SSB saw it |
 | `content_hash` | Hash of the *extracted* text (post plain-text/OCR/vision pipeline, §10.1), not the raw bytes |
-| `chunk_ids` | Which vector-store chunks came from this item, so they can be deleted precisely on update or removal |
+
+No separate chunk-ID column: setting each chunk's document ID to `canvas_item_id` at ingestion
+lets LlamaIndex delete all of an item's chunks in one call (`delete_ref_doc`) instead of tracking
+them manually — see [docs/architecture/data-model.md](../architecture/data-model.md) §4 for the
+verification caveat.
 
 The diff sorts every item into one of four buckets:
 

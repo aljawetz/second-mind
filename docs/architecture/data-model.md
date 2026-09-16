@@ -38,6 +38,14 @@ the macOS Keychain (overview.md §4), never in `config.json` or anywhere under `
 or sync tool that copies this directory should never be able to exfiltrate either credential as a
 side effect.
 
+**Raw downloaded files are not persisted.** A PDF, PPTX, or DOCX fetched from Canvas during sync
+is hashed, extracted, embedded, and then discarded — not kept in this tree anywhere. Canvas remains
+the source of truth for course files (unlike recordings/notes, which SSB itself originates and
+must keep), so there's nothing to lose by not caching them: a re-extraction (a pipeline
+improvement, a corrupted index) just re-downloads from Canvas rather than reading a local copy.
+This also keeps disk usage bounded — one real course file seen this sprint was 36MB, and a
+semester's worth of slide decks across several courses would add up fast if kept indefinitely.
+
 ## 2. Representing a course and its schedule
 
 A course is identified by its Canvas course ID (stable, from the student's own enrollment) plus
@@ -96,7 +104,6 @@ CREATE TABLE manifest (
   item_type        TEXT NOT NULL,   -- 'page' | 'assignment' | 'announcement' | 'file'
   canvas_updated_at TEXT NOT NULL,
   content_hash     TEXT NOT NULL,   -- hash of extracted text, not raw bytes — see rag-pipeline.md
-  chunk_ids        TEXT NOT NULL,   -- JSON array of LanceDB row IDs from this item
   last_synced_at   TEXT NOT NULL,
   PRIMARY KEY (canvas_item_id, item_type)
 );
@@ -105,6 +112,14 @@ CREATE TABLE manifest (
 Kept separate from the vector store itself (rather than as extra columns on the LanceDB table) so
 the diff step (§5.5) never needs to touch the vector store at all for unchanged items — it's a
 plain SQLite query against a small table, independent of however large the index has grown.
+
+**No `chunk_ids` column** — an earlier version of this schema tracked each item's chunk IDs
+manually for deletion. LlamaIndex has a built-in mechanism for this: setting each `Document`'s
+`doc_id` to the same value as `canvas_item_id` at ingestion time means deleting all of an item's
+chunks on update or removal is a single `index.delete_ref_doc(canvas_item_id)` call, not a
+manually-tracked list. **Needs verification before relying on it in Sprint 5** — there's a real,
+open LlamaIndex issue reporting `delete_ref_doc` not working correctly in some configurations, so
+this should be confirmed against the actual LanceDB integration, not assumed from the docs alone.
 
 ## 5. Session directories
 
