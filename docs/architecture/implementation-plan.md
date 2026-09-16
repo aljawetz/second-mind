@@ -383,6 +383,9 @@ spec](../specs/2026-09-14-ssb-design.md) §7.1).
 assignment) as a scripted test, not a one-off manual exercise — assert the output contains no
 per-task-specific implementation language via the proposed cheap output check.
 **Depends on:** 8.
+**Verified:** real `npm run tauri dev` click-through — "Explain this assignment" against the
+bridged real assignment returned a real breakdown and real citation pointers through the actual
+app UI. Confirmed by the user directly in the running app, not simulated.
 
 **Design refinement made while implementing, not just following the spec literally:** design spec
 §7.1's "Tested finding" describes an earlier prototype generating free-text pointer guidance
