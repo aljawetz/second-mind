@@ -34,13 +34,17 @@ def retriever():
     for p in zotero_pages:
         if p["needs_fallback"]:
             p["text"] = ingestion.ocr_pdf_page(FIXTURES / "sprint3_zotero_tutorial.pdf", p["page"])
-    nodes += indexing.pages_to_nodes(zotero_pages, "zotero")
+    nodes += indexing.pages_to_nodes(zotero_pages, "zotero", "file_zotero")
 
     slides = ingestion.extract_pptx(FIXTURES / "sprint3_ai_research.pptx")
-    nodes += indexing.slides_to_nodes(slides, "ai_research")
+    nodes += indexing.slides_to_nodes(slides, "ai_research", "file_ai_research")
 
-    nodes += indexing.pages_to_nodes(ingestion.extract_pdf(FIXTURES / "research_study.pdf"), "research_study")
-    nodes += indexing.pages_to_nodes(ingestion.extract_pdf(FIXTURES / "literature_review.pdf"), "literature_review")
+    nodes += indexing.pages_to_nodes(
+        ingestion.extract_pdf(FIXTURES / "research_study.pdf"), "research_study", "file_research_study"
+    )
+    nodes += indexing.pages_to_nodes(
+        ingestion.extract_pdf(FIXTURES / "literature_review.pdf"), "literature_review", "file_literature_review"
+    )
 
     with tempfile.TemporaryDirectory() as tmp:
         index = indexing.build_index(nodes, Path(tmp), "smoke_test")

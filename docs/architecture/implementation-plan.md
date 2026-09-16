@@ -175,6 +175,25 @@ LlamaIndex issue about this not always working).
 manifest and LanceDB table end up in the correct state for both, and specifically confirm
 `delete_ref_doc` removed exactly that item's chunks and nothing else.
 **Depends on:** 3, 6.
+**Verified:** 25/25 backend tests pass. `manifest.db`'s diff logic tested against simulated Canvas
+listings (`sync.py`); the full changed+deleted flow tested end-to-end against a real LanceDB table
+— item_a's old content genuinely gone and replaced, item_b's row genuinely absent, manifest
+reflecting both correctly.
+**Real finding — the flagged caveat was right, but not for the reason expected.** The GitHub issue
+named in data-model.md §4 was filed against `llama-index-core` 0.10.65 (we're on 0.14.24) and
+closed via a fix; my first hypothesis was that an unpersisted in-memory docstore was the real risk
+for us instead (sync runs once per app launch — a fresh process every time). That hypothesis was
+wrong: `VectorStoreIndex.delete_ref_doc` doesn't use the docstore lookup at all — it calls the
+vector store's `delete()` directly. The *actual* bug, found by testing directly against a raw
+LanceDB table before assuming it was our code: `llama-index-vector-stores-lancedb` 0.6.0 (current
+latest, checked PyPI) builds its delete predicate with double quotes
+(`doc_id = "x"`), which LanceDB's DataFusion SQL dialect parses as a column reference, not a
+string literal — `delete_ref_doc` fails for every input, not just ours. Worked around with a small
+`_PatchedLanceDBVectorStore` subclass overriding just `delete()` with correctly-quoted (and
+escaped) SQL, everything else unchanged. Also: nothing was setting `ref_doc_id` on nodes at all
+before this step — `pages_to_nodes`/`slides_to_nodes` now take a required `canvas_item_id` and
+wire it via `NodeRelationship.SOURCE`, which is what both the LanceDB integration's `doc_id` column
+and `delete_ref_doc` actually depend on.
 
 ### 8. Generation (LLM calls + citations)
 **Do:** Wire `CitationQueryEngine` + `SimilarityPostprocessor` + a pluggable LLM client selected by

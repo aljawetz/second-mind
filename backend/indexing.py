@@ -12,10 +12,11 @@ actually points (a real student directory, or a scratch dir for tests).
 """
 
 from pathlib import Path
+from typing import Any
 
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.node_parser import SentenceSplitter
-from llama_index.core.schema import TextNode
+from llama_index.core.schema import NodeRelationship, RelatedNodeInfo, TextNode
 from llama_index.vector_stores.lancedb import LanceDBVectorStore
 from tokenizers import Tokenizer
 
@@ -40,7 +41,14 @@ _splitter = SentenceSplitter(
 )
 
 
-def pages_to_nodes(pages: list[dict], source: str) -> list[TextNode]:
+def _with_ref_doc(node: TextNode, canvas_item_id: str) -> TextNode:
+    """Sets the node's ref_doc_id to canvas_item_id (data-model.md §4) — what
+    both the LanceDB integration's doc_id column and delete_ref_doc rely on."""
+    node.relationships[NodeRelationship.SOURCE] = RelatedNodeInfo(node_id=canvas_item_id)
+    return node
+
+
+def pages_to_nodes(pages: list[dict], source: str, canvas_item_id: str) -> list[TextNode]:
     """One node per page, split further only if the page's prose actually
     exceeds the target chunk size — most extracted pages don't."""
     nodes = []
@@ -49,11 +57,12 @@ def pages_to_nodes(pages: list[dict], source: str) -> list[TextNode]:
         if not text.strip():
             continue
         for chunk in _splitter.split_text(text):
-            nodes.append(TextNode(text=chunk, metadata={"source": source, "page": page["page"]}))
+            node = TextNode(text=chunk, metadata={"source": source, "page": page["page"]})
+            nodes.append(_with_ref_doc(node, canvas_item_id))
     return nodes
 
 
-def slides_to_nodes(slides: list[dict], source: str) -> list[TextNode]:
+def slides_to_nodes(slides: list[dict], source: str, canvas_item_id: str) -> list[TextNode]:
     """One node per slide, not split — a slide is a citation unit
     (rag-pipeline.md §2), not something to fragment across chunks."""
     nodes = []
@@ -61,11 +70,27 @@ def slides_to_nodes(slides: list[dict], source: str) -> list[TextNode]:
         text = slide["text"]
         if not text.strip():
             continue
-        nodes.append(TextNode(text=text, metadata={"source": source, "slide": slide["slide"]}))
+        node = TextNode(text=text, metadata={"source": source, "slide": slide["slide"]})
+        nodes.append(_with_ref_doc(node, canvas_item_id))
     return nodes
 
 
+class _PatchedLanceDBVectorStore(LanceDBVectorStore):
+    """llama-index-vector-stores-lancedb 0.6.0's delete() builds its SQL
+    predicate with double quotes (`doc_id = "x"`), which LanceDB's
+    DataFusion-based SQL dialect parses as an identifier reference, not a
+    string literal — delete_ref_doc() fails for every input, not just
+    ours. Confirmed directly against a raw LanceDB table before assuming
+    it was our bug, not theirs (implementation-plan.md Step 7). No newer
+    package version exists yet (checked PyPI). Single quotes, escaped,
+    fixes it; remove this once upstream does."""
+
+    def delete(self, ref_doc_id: str, **delete_kwargs: Any) -> None:
+        escaped = ref_doc_id.replace("'", "''")
+        self.table.delete(f"{self.doc_id_key} = '{escaped}'")
+
+
 def build_index(nodes: list[TextNode], db_path: Path, table_name: str) -> VectorStoreIndex:
-    vector_store = LanceDBVectorStore(uri=str(db_path), table_name=table_name)
+    vector_store = _PatchedLanceDBVectorStore(uri=str(db_path), table_name=table_name)
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
     return VectorStoreIndex(nodes, storage_context=storage_context, embed_model=OnnxBgeEmbedding())
