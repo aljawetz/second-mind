@@ -2,7 +2,25 @@
 .venv/
 __pycache__/
 *.pyc
-onyx-data/
 .conductor/settings.local.toml
+.DS_Store
 
-onyx-patch/
+# Node
+node_modules/
+dist/
+
+# Rust / Tauri
+target/
+app/src-tauri/target/
+
+# Python backend build artifacts
+backend/build/
+backend/dist/
+*.spec.bak
+
+# Sidecar binary: platform-specific PyInstaller output copied into the
+# Tauri bundle at build time, not committed — see backend/*.spec
+app/src-tauri/binaries/
+
+# Local model files (bundled at build time, not committed)
+*.onnx
