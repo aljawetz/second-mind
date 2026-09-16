@@ -82,6 +82,19 @@ point elsewhere. `EXCLUDE_FILE_IDS` is a deliberate denylist — a file this scr
 already turned out to be a real named individual's personal document, not course material; kept
 as an explicit guard rather than trusting "grab the first N files" not to pick it up again.
 
+## Running the generation smoke test
+
+Same real-data pattern as above, plus a real LLM call — verifies citations, the not-covered case
+(a deliberately off-topic query should return zero source nodes, not a hallucinated answer), and
+Socratic mode.
+
+```bash
+uv run python3 scripts/generation_smoke_test.py
+```
+
+Makes real, **billed** OpenAI API calls (a handful of cheap `gpt-4o-mini` queries, but real money,
+not simulated). Needs a real OpenAI key in Keychain.
+
 ## Building the sidecar binary
 
 ```bash

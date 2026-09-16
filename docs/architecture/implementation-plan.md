@@ -231,6 +231,28 @@ this is the one thing untested all sprint because no key was available in this e
 citations correctly reference the chunks they're attached to, and that a genuinely uncovered
 question returns the not-covered response rather than a hallucinated answer.
 **Depends on:** 6.
+**Verified:** all three real, with a live OpenAI key against the real indexed course from the
+integration check. An on-topic query returned a correct, cited answer, citations mapping to the
+actual right pages (scores 0.704/0.752, both above the calibrated cutoff). A deliberately
+off-topic query returned zero source nodes — the `SimilarityPostprocessor` filtered every node
+below cutoff, so `CitationQueryEngine` never called the LLM at all; not "the LLM declined to
+guess," structurally incapable of hallucinating since there was no context to synthesize from.
+Socratic mode correctly produced a guiding question instead of a direct answer, still cited.
+**Cutoff calibrated against real data, not guessed:** on-topic queries against confirmed-indexed
+content scored 0.6555-0.7524; deliberately off-topic queries scored 0.3077-0.3967 — a clean,
+non-overlapping gap. First attempt used topically-plausible-but-not-actually-indexed queries (e.g.
+"What is TDD?" against a course whose TDD readings weren't among the files this test actually
+pulled) and got a misleadingly narrow gap — corrected by verifying exactly which files were
+indexed before choosing on-topic queries. Set to 0.5: real margin on both sides, biased slightly
+toward rejecting borderline matches per design spec §7's "grounding is non-negotiable." 4 on-topic
++ 3 off-topic queries against one real course — a real data point, not an exhaustive sweep, same
+caveat as the density heuristic's own calibration.
+**Real finding:** `config.json` (data-model.md §3) doesn't exist as real code yet — nothing in
+this codebase reads/writes it. `generation.py` hardcodes the OpenAI model/provider rather than
+building config file I/O this step doesn't otherwise need. Also: "Empty Response" (the not-covered
+case's actual text) is LlamaIndex's own terse internal string, not real user-facing copy matching
+the design's tone — the *mechanism* is confirmed correct; formatting a proper message is Step 9's
+job, where the `/ask` HTTP response actually gets built.
 
 ### 9. Q&A frontend wiring
 **Do:** Wire the mockup's chat panel to the real `POST /courses/{id}/ask` endpoint
