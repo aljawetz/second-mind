@@ -40,7 +40,7 @@ run on the student's machine:
 └───────────────────────────────────────────────────────────────────┘
          │                                                    │
          ▼                                                    ▼
-   Canvas (via the MCP server)                        LLM provider API
+   Canvas (direct REST API)                       LLM provider API
    (student's own token)                          (student's own key — §10)
 ```
 

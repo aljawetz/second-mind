@@ -61,13 +61,14 @@ should see this at most once ever, the first time they save a credential; subseq
 not re-prompt even after a full app restart on the same (unrebuilt) binary.
 
 ### 3. Canvas integration (real calls)
-**Do:** Embed the Canvas MCP server in the Python backend ([canvas-integration.md](canvas-integration.md));
-implement course listing and content fetch for pages, assignments, announcements, and files (via
-the module-item workaround for the Files-tab 403).
+**Do:** A direct Canvas REST API client in the Python backend (`httpx`, sync) — bearer-token auth
+from Keychain, `Link`-header pagination — implementing course listing and content fetch for pages,
+assignments, announcements, and files (via the module-item workaround for the Files-tab 403), per
+[canvas-integration.md](canvas-integration.md).
 **Test:** Against a real test course, list courses, fetch a real page and a real assignment.
-Replay the known 403/404 cases found this sprint (`list_course_files`, `get_course_structure` on a
-restricted section) using the **real responses already captured this session as fixtures** —
-confirms graceful degradation without needing live Canvas access on every test run.
+Capture the known 403/404 cases (`list_course_files`, `get_course_structure` on a restricted
+section) as real fixture files, then replay them — confirms graceful degradation without needing
+live Canvas access on every future test run.
 **Depends on:** 2.
 
 ### 4. Embedding layer (ONNX, torch-free)

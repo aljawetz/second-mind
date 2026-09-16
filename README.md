@@ -77,7 +77,7 @@ not claiming parity.
 │   ingest · retrieve · answer · artifacts · sessions · live   │
 └──┬────────────────┬──────────────┬──────────────┬────────────┘
 ┌──▼─────────────┐ ┌▼───────────┐ ┌▼───────────┐ ┌▼───────────┐
-│ Per-student    │ │ Canvas MCP │ │ Whisper    │ │ LLM        │
+│ Per-student    │ │ Canvas API │ │ Whisper    │ │ LLM        │
 │ vector store   │ │ live reads │ │ local      │ │ pluggable  │
 │ ~/.ssb/<id>/   │ │ deadlines  │ │ transcribe │ │ default    │
 │  docs/         │ │ grades     │ └────────────┘ │ Claude     │

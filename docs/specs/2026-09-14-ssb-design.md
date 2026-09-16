@@ -106,7 +106,7 @@ parity and should not.
 └──┬────────────────┬──────────────┬──────────────┬────────────┘
    │                │              │              │
 ┌──▼─────────────┐ ┌▼───────────┐ ┌▼───────────┐ ┌▼───────────┐
-│ Per-student    │ │ Canvas MCP │ │ Whisper    │ │ LLM        │
+│ Per-student    │ │ Canvas API │ │ Whisper    │ │ LLM        │
 │ vector store   │ │ live reads │ │ local      │ │ pluggable  │
 │ ~/.ssb/<id>/   │ │ deadlines  │ │ transcribe │ │ default    │
 │   docs/        │ │ grades     │ └────────────┘ │ Claude     │
@@ -132,8 +132,8 @@ shared.
 
 ### 5.2 Personal Canvas data is never indexed
 
-Deadlines, grades, and submission status are fetched **live through the Canvas MCP server using
-the student's own token, per request**. They never enter a vector store.
+Deadlines, grades, and submission status are fetched **live via the Canvas REST API using the
+student's own token, per request**. They never enter a vector store.
 
 Two reasons: freshness (a grade indexed last Tuesday is wrong today) and blast radius (grades in
 an embedding store are a liability with no corresponding benefit).
@@ -397,7 +397,7 @@ rediscovering later.
 | RAG orchestration | [LlamaIndex](https://developers.llamaindex.ai/) | Chunking, embedding integration, retrieval, and cited response synthesis via a maintained library rather than hand-rolled — a library used inside our own process, not a platform, so none of the Onyx problems (§10.1) apply |
 | Vector store | Embedded, on-disk, per-student (LanceDB, via LlamaIndex's `LanceDBVectorStore`) | Native hybrid vector + full-text (BM25-style) search in one engine — no separate BM25 library or manual reranking step. Zero server processes; one directory per student maps exactly to §5.1 |
 | Embeddings | Local, open-source model (BGE-small class), converted to ONNX and run via `onnxruntime` — not LlamaIndex's `HuggingFaceEmbedding`/`sentence-transformers` path | Anthropic has no public embeddings API, so "pluggable LLM" doesn't cover this layer regardless of provider. The ONNX path specifically avoids bundling torch into the shipped app — a confirmed PyInstaller/macOS packaging problem (docs/architecture/rag-pipeline.md §3), not just a size preference |
-| Canvas access | Canvas MCP server, embedded as the backend's Canvas client | Already working and directly validated (Sprint 3, §10.1); reuses a solved Canvas API integration — auth, endpoints, pagination — rather than writing a REST client from scratch. Invoked as a local library/subprocess, not through an LLM reasoning loop |
+| Canvas access | Direct Canvas REST API calls (`httpx`, sync), backend-owned | A thin, purpose-built client — bearer-token auth, `Link`-header pagination, the specific endpoints in [canvas-integration.md](../architecture/canvas-integration.md) — scoped to exactly what SSB needs, nothing more |
 | Transcription | Whisper (`faster-whisper`), local | Open-source thesis; recordings never leave the machine. UniFlow uses hosted Deepgram. Speed validated: 0.04x real-time factor on CPU alone (base model) — comfortably fast on laptop-class hardware. Real classroom accuracy (noise, accents, room acoustics) still untested — validated on clean synthetic speech only |
 | LLM | Pluggable, default Claude, via LlamaIndex's multi-provider LLM abstraction | Swappable per student's own key without a hand-rolled provider-switch layer; local models possible for full self-hosting |
 | Web search | MCP, explicitly labeled | Never silently blended with course-grounded answers |

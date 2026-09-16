@@ -5,11 +5,10 @@ testing against a real course, and how §5.5's sync mechanism (design spec) maps
 calls. See [overview.md](overview.md) for where this sits in the system and
 [data-model.md](data-model.md) for what gets stored from it.
 
-**Via the Canvas MCP server, not a hand-rolled REST client** (design spec §10). The local backend
-embeds it as a library/subprocess and calls its tools directly — the same integration already
-validated through Sprint 3 and this sprint's PDF-ingestion PoC, including every access restriction
-in §2 below, which were found using exactly this tool. Reusing a working integration rather than
-rewriting Canvas auth, pagination, and endpoint coverage from scratch.
+**Via a direct Canvas REST API client, owned by the backend** (design spec §10) — bearer-token
+auth with the student's own Canvas API token, `Link`-header pagination, scoped to exactly the
+endpoints in §3 below. Every access restriction in §2 is a real, tested property of the Canvas API
+itself under a student-scoped token, independent of which client calls it.
 
 ## 1. Authentication
 
