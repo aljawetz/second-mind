@@ -14,6 +14,7 @@ actually points (a real student directory, or a scratch dir for tests).
 from pathlib import Path
 from typing import Any
 
+from lancedb.expr import col, lit
 from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import NodeRelationship, RelatedNodeInfo, TextNode
@@ -76,18 +77,24 @@ def slides_to_nodes(slides: list[dict], source: str, canvas_item_id: str) -> lis
 
 
 class _PatchedLanceDBVectorStore(LanceDBVectorStore):
-    """llama-index-vector-stores-lancedb 0.6.0's delete() builds its SQL
-    predicate with double quotes (`doc_id = "x"`), which LanceDB's
+    """llama-index-vector-stores-lancedb 0.6.0's delete(), delete_nodes(),
+    and get_nodes() all build SQL predicates by string-concatenating raw
+    values inside double quotes (e.g. `doc_id = "x"`), which LanceDB's
     DataFusion-based SQL dialect parses as an identifier reference, not a
     string literal — delete_ref_doc() fails for every input, not just
     ours. Confirmed directly against a raw LanceDB table before assuming
-    it was our bug, not theirs (implementation-plan.md Step 7). No newer
-    package version exists yet (checked PyPI). Single quotes, escaped,
-    fixes it; remove this once upstream does."""
+    it was our bug, not theirs, and confirmed still present on their
+    `main` branch, not just the release (implementation-plan.md Step 7).
+    Only delete() is overridden here — we don't call delete_nodes() or
+    get_nodes() ourselves (yet).
+
+    Fixed with LanceDB's own type-safe expression API (`col`/`lit`)
+    instead of hand-escaping a SQL string — no string interpolation left
+    to get wrong at all, not just correctly-quoted. Remove this override
+    once upstream fixes it."""
 
     def delete(self, ref_doc_id: str, **delete_kwargs: Any) -> None:
-        escaped = ref_doc_id.replace("'", "''")
-        self.table.delete(f"{self.doc_id_key} = '{escaped}'")
+        self.table.delete(col(self.doc_id_key) == lit(ref_doc_id))
 
 
 def build_index(nodes: list[TextNode], db_path: Path, table_name: str) -> VectorStoreIndex:

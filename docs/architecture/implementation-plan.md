@@ -188,12 +188,18 @@ vector store's `delete()` directly. The *actual* bug, found by testing directly 
 LanceDB table before assuming it was our code: `llama-index-vector-stores-lancedb` 0.6.0 (current
 latest, checked PyPI) builds its delete predicate with double quotes
 (`doc_id = "x"`), which LanceDB's DataFusion SQL dialect parses as a column reference, not a
-string literal — `delete_ref_doc` fails for every input, not just ours. Worked around with a small
-`_PatchedLanceDBVectorStore` subclass overriding just `delete()` with correctly-quoted (and
-escaped) SQL, everything else unchanged. Also: nothing was setting `ref_doc_id` on nodes at all
-before this step — `pages_to_nodes`/`slides_to_nodes` now take a required `canvas_item_id` and
-wire it via `NodeRelationship.SOURCE`, which is what both the LanceDB integration's `doc_id` column
-and `delete_ref_doc` actually depend on.
+string literal — `delete_ref_doc` fails for every input, not just ours. The same broken pattern
+(string-concatenated, unescaped double-quoted predicates) also affects `delete_nodes()` and
+`get_nodes()` in the same file — confirmed by testing each directly — and is still present on
+their `main` branch, not just the release. Worked around with a small
+`_PatchedLanceDBVectorStore` subclass overriding `delete()`, using LanceDB's own type-safe
+expression API (`lancedb.expr.col`/`lit`) rather than hand-escaping a SQL string — no string
+interpolation left to get wrong at all, not just correctly-quoted. Verified against normal IDs,
+an ID containing an embedded quote, and an injection-shaped ID (confirmed it matches nothing
+rather than matching everything). Also: nothing was setting `ref_doc_id` on nodes at all before
+this step — `pages_to_nodes`/`slides_to_nodes` now take a required `canvas_item_id` and wire it
+via `NodeRelationship.SOURCE`, which is what both the LanceDB integration's `doc_id` column and
+`delete_ref_doc` actually depend on. Not yet reported upstream — pending approval to file.
 
 ### 8. Generation (LLM calls + citations)
 **Do:** Wire `CitationQueryEngine` + `SimilarityPostprocessor` + a pluggable LLM client selected by
