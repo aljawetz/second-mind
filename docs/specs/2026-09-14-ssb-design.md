@@ -391,7 +391,8 @@ rediscovering later.
 
 | Layer | Choice | Rationale |
 | --- | --- | --- |
-| App shell | Tauri, macOS only for MVP | Reuses the existing HTML/CSS/JS mockup as the UI directly; native OS webview instead of bundled Chromium keeps footprint small, consistent with §5.5's no-background-daemon stance. Cross-platform is a stated future goal, not a Sprint 4–9 commitment |
+| App shell | Tauri, macOS only for MVP | Native OS webview instead of bundled Chromium keeps footprint small, consistent with §5.5's no-background-daemon stance. Cross-platform is a stated future goal, not a Sprint 4–9 commitment |
+| Frontend | React + TypeScript, via Vite | The original HTML/CSS/JS mockup was ported to components once the UI grew real state (onboarding, startup gate, per-view data) past what manual DOM re-rendering could carry cleanly. Not Next.js: SSR, API routes, and file-based routing don't apply to a static desktop webview backed by a separate Python sidecar |
 | Backend | Local Python process, loopback-only HTTP | RAG tooling (LlamaIndex, LanceDB, Whisper) is Python-native; a process boundary isolates a backend crash from the UI. Bundled as a Tauri sidecar — the student installs one app, never a Python environment |
 | RAG orchestration | [LlamaIndex](https://developers.llamaindex.ai/) | Chunking, embedding integration, retrieval, and cited response synthesis via a maintained library rather than hand-rolled — a library used inside our own process, not a platform, so none of the Onyx problems (§10.1) apply |
 | Vector store | Embedded, on-disk, per-student (LanceDB, via LlamaIndex's `LanceDBVectorStore`) | Native hybrid vector + full-text (BM25-style) search in one engine — no separate BM25 library or manual reranking step. Zero server processes; one directory per student maps exactly to §5.1 |

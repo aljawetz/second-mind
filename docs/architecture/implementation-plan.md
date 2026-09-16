@@ -16,6 +16,10 @@ team exists to run them in parallel.
 with `pyproject.toml` and a pinned lockfile.
 **Test:** `tauri dev` launches and shows the current mockup, unchanged, with no backend wired yet.
 **Depends on:** nothing — first task.
+**Later revised:** the mockup was ported from vanilla HTML/CSS/JS to React + TypeScript (via Vite)
+once step 1's startup gate added real state the manual DOM re-rendering approach didn't carry
+cleanly — see [the design spec](../specs/2026-09-14-ssb-design.md) §10. Same visual output, same
+Tauri/sidecar wiring underneath; only the frontend's own structure changed.
 
 ### 1. Sidecar proof of concept
 **Do:** A trivial Python HTTP server (one `/ping` endpoint), frozen via a hand-written PyInstaller
@@ -25,10 +29,22 @@ sidecar with the correct `<name>-<target-triple>` binary naming.
 interpreter) and a built `.app` (frozen binary) — proves the dev/frozen path-resolution split and
 sidecar wiring work before any real feature is built on top of it.
 **Depends on:** 0.
+**Real finding:** the webview's native `fetch()` cannot reach the sidecar at all — WKWebView
+blocks a plain `fetch()` to `http://127.0.0.1` from the app's custom-scheme origin regardless of
+CORS headers, since the request never reaches the webview's network stack. Fixed by using
+`tauri-plugin-http`'s `fetch` (routed through Rust via IPC) instead. Separately, an ad-hoc-signed
+`.app` (no Apple Developer ID, no notarization — see step 14) took **3.5 minutes** to become
+reachable on the very first launch of a freshly built binary, versus ~4 seconds on every launch
+after: macOS's Gatekeeper runs a slow scan the first time it sees a given binary hash, then caches
+the verdict. This will resolve itself once step 14 lands signing/notarization; until then, the
+onboarding startup gate (step 2) has to say so rather than time out.
 
 ### 2. Credential storage + onboarding shell
 **Do:** Keychain read/write for the Canvas token and LLM key; the 4-step onboarding UI wired to
-stub backend calls that validate format only, not real API calls yet.
+stub backend calls that validate format only, not real API calls yet. Precedes onboarding: a
+startup gate that polls `/ping` before showing any onboarding stage, with copy that escalates to
+"first launch can take a minute or two" past 5 seconds of waiting (step 1's finding) rather than
+failing fast.
 **Test:** Enter test credentials, restart the app, confirm they're still retrievable from Keychain
 — not from `config.json` ([data-model.md](data-model.md) §1).
 **Depends on:** 1.
