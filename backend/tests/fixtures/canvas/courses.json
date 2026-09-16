@@ -1,0 +1,413 @@
+{
+  "status": 200,
+  "body": [
+    {
+      "id": 51006,
+      "name": "CMU-SV - College of Engineering Masters Students Career Preparation Modules",
+      "course_code": "S26 Career & Professional Development for CMU-SV Students",
+      "account_id": 28,
+      "created_at": "2025-11-21T14:15:55Z",
+      "start_at": "2025-12-01T05:00:00Z",
+      "default_view": "wiki",
+      "enrollment_term_id": 494,
+      "is_public": false,
+      "grading_standard_id": null,
+      "root_account_id": 1,
+      "uuid": "xiYSO25wQ97Yjy7f9m8imhtYmLqNe5kyEHuvQ9ZJ",
+      "license": "private",
+      "grade_passback_setting": null,
+      "end_at": "2027-12-01T05:00:00Z",
+      "public_syllabus": false,
+      "public_syllabus_to_auth": true,
+      "storage_quota_mb": 26214,
+      "is_public_to_auth_users": false,
+      "homeroom_course": false,
+      "course_color": null,
+      "friendly_name": null,
+      "apply_assignment_group_weights": false,
+      "calendar": {
+        "ics": "https://canvas.cmu.edu/feeds/calendars/course_xiYSO25wQ97Yjy7f9m8imhtYmLqNe5kyEHuvQ9ZJ.ics"
+      },
+      "time_zone": "America/Los_Angeles",
+      "blueprint": false,
+      "template": false,
+      "enrollments": [
+        {
+          "type": "student",
+          "role": "StudentEnrollment",
+          "role_id": 3,
+          "user_id": 151152,
+          "enrollment_state": "active",
+          "limit_privileges_to_course_section": false
+        }
+      ],
+      "hide_final_grades": false,
+      "workflow_state": "available",
+      "restrict_enrollments_to_course_dates": true
+    },
+    {
+      "id": 53212,
+      "name": "CMU-SV - College of Engineering Masters Students Career Preparation Modules",
+      "course_code": "M26 Career & Professional Development for CMU-SV Students  ",
+      "account_id": 28,
+      "created_at": "2026-02-23T20:18:35Z",
+      "start_at": "2026-06-01T04:00:00Z",
+      "default_view": "wiki",
+      "enrollment_term_id": 497,
+      "is_public": false,
+      "grading_standard_id": null,
+      "root_account_id": 1,
+      "uuid": "4rN978fyd9yExaC5wrSNyp3cFVsGWwPtlC2GEfoj",
+      "license": "private",
+      "grade_passback_setting": null,
+      "end_at": "2028-06-01T04:00:00Z",
+      "public_syllabus": false,
+      "public_syllabus_to_auth": true,
+      "storage_quota_mb": 26214,
+      "is_public_to_auth_users": false,
+      "homeroom_course": false,
+      "course_color": null,
+      "friendly_name": null,
+      "apply_assignment_group_weights": false,
+      "calendar": {
+        "ics": "https://canvas.cmu.edu/feeds/calendars/course_4rN978fyd9yExaC5wrSNyp3cFVsGWwPtlC2GEfoj.ics"
+      },
+      "time_zone": "America/Los_Angeles",
+      "blueprint": false,
+      "template": false,
+      "enrollments": [
+        {
+          "type": "student",
+          "role": "StudentEnrollment",
+          "role_id": 3,
+          "user_id": 151152,
+          "enrollment_state": "active",
+          "limit_privileges_to_course_section": false
+        }
+      ],
+      "hide_final_grades": false,
+      "workflow_state": "available",
+      "restrict_enrollments_to_course_dates": true
+    },
+    {
+      "id": 52701,
+      "access_restricted_by_date": true
+    },
+    {
+      "id": 50597,
+      "name": "ECE Graduate Onboarding Spring 2026",
+      "course_code": "ECE Onboarding S26",
+      "account_id": 28,
+      "created_at": "2025-10-27T20:23:59Z",
+      "start_at": "2025-10-27T04:00:00Z",
+      "default_view": "modules",
+      "enrollment_term_id": 494,
+      "is_public": false,
+      "grading_standard_id": null,
+      "root_account_id": 1,
+      "uuid": "eRdYGbYKKUh1FHslVqqtFOX49gJw0ReSn4qDkQJE",
+      "license": "private",
+      "grade_passback_setting": null,
+      "end_at": null,
+      "public_syllabus": false,
+      "public_syllabus_to_auth": true,
+      "storage_quota_mb": 26214,
+      "is_public_to_auth_users": false,
+      "homeroom_course": false,
+      "course_color": null,
+      "friendly_name": null,
+      "apply_assignment_group_weights": false,
+      "calendar": {
+        "ics": "https://canvas.cmu.edu/feeds/calendars/course_eRdYGbYKKUh1FHslVqqtFOX49gJw0ReSn4qDkQJE.ics"
+      },
+      "time_zone": "America/New_York",
+      "blueprint": false,
+      "template": false,
+      "enrollments": [
+        {
+          "type": "student",
+          "role": "StudentEnrollment",
+          "role_id": 3,
+          "user_id": 151152,
+          "enrollment_state": "active",
+          "limit_privileges_to_course_section": false
+        }
+      ],
+      "hide_final_grades": false,
+      "workflow_state": "available",
+      "restrict_enrollments_to_course_dates": true
+    },
+    {
+      "id": 51555,
+      "access_restricted_by_date": true
+    },
+    {
+      "id": 51287,
+      "access_restricted_by_date": true
+    },
+    {
+      "id": 50727,
+      "name": "Introduction to Graduate Studies - S26 SV",
+      "course_code": "18989-S",
+      "account_id": 39,
+      "created_at": "2025-11-10T18:24:07Z",
+      "start_at": null,
+      "default_view": "syllabus",
+      "enrollment_term_id": 494,
+      "is_public": false,
+      "grading_standard_id": null,
+      "root_account_id": 1,
+      "uuid": "bhbLLxSzMfSnBMevfTFDQDr97j11zEbI7rGczDGK",
+      "license": "private",
+      "grade_passback_setting": null,
+      "end_at": null,
+      "public_syllabus": false,
+      "public_syllabus_to_auth": true,
+      "storage_quota_mb": 26214,
+      "is_public_to_auth_users": false,
+      "homeroom_course": false,
+      "course_color": null,
+      "friendly_name": null,
+      "apply_assignment_group_weights": false,
+      "calendar": {
+        "ics": "https://canvas.cmu.edu/feeds/calendars/course_bhbLLxSzMfSnBMevfTFDQDr97j11zEbI7rGczDGK.ics"
+      },
+      "time_zone": "America/Los_Angeles",
+      "blueprint": false,
+      "template": false,
+      "enrollments": [
+        {
+          "type": "student",
+          "role": "StudentEnrollment",
+          "role_id": 3,
+          "user_id": 151152,
+          "enrollment_state": "active",
+          "limit_privileges_to_course_section": false
+        }
+      ],
+      "hide_final_grades": false,
+      "workflow_state": "available",
+      "restrict_enrollments_to_course_dates": false
+    },
+    {
+      "id": 51113,
+      "name": "Launching Your CMU-SV Student Experience Spring 2026",
+      "course_code": "S26 CMU-SV Student Experience",
+      "account_id": 28,
+      "created_at": "2025-12-05T17:03:45Z",
+      "start_at": null,
+      "default_view": "modules",
+      "enrollment_term_id": 1,
+      "is_public": false,
+      "grading_standard_id": null,
+      "root_account_id": 1,
+      "uuid": "xYVdv2uGUSYlWGqWm9t1tJdGXEc4QesL45H0Ip7o",
+      "license": "private",
+      "grade_passback_setting": null,
+      "end_at": null,
+      "public_syllabus": false,
+      "public_syllabus_to_auth": true,
+      "storage_quota_mb": 26214,
+      "is_public_to_auth_users": false,
+      "homeroom_course": false,
+      "course_color": null,
+      "friendly_name": null,
+      "apply_assignment_group_weights": false,
+      "calendar": {
+        "ics": "https://canvas.cmu.edu/feeds/calendars/course_xYVdv2uGUSYlWGqWm9t1tJdGXEc4QesL45H0Ip7o.ics"
+      },
+      "time_zone": "America/Los_Angeles",
+      "blueprint": false,
+      "template": false,
+      "enrollments": [
+        {
+          "type": "student",
+          "role": "StudentEnrollment",
+          "role_id": 3,
+          "user_id": 151152,
+          "enrollment_state": "active",
+          "limit_privileges_to_course_section": false
+        }
+      ],
+      "hide_final_grades": true,
+      "workflow_state": "available",
+      "restrict_enrollments_to_course_dates": true
+    },
+    {
+      "id": 55016,
+      "name": "Software Requirements and Interaction Design",
+      "course_code": "18658-SV",
+      "account_id": 39,
+      "created_at": "2026-08-04T09:52:25Z",
+      "start_at": "2026-08-19T07:00:00Z",
+      "default_view": "wiki",
+      "enrollment_term_id": 518,
+      "is_public": false,
+      "grading_standard_id": 6112,
+      "root_account_id": 1,
+      "uuid": "gvzPycA2T5uykKfrtYWq30SNwFuIEyXfCw4GlWGe",
+      "license": "private",
+      "grade_passback_setting": null,
+      "end_at": "2026-12-20T08:00:00Z",
+      "public_syllabus": false,
+      "public_syllabus_to_auth": true,
+      "storage_quota_mb": 26214,
+      "is_public_to_auth_users": false,
+      "homeroom_course": false,
+      "course_color": null,
+      "friendly_name": null,
+      "apply_assignment_group_weights": true,
+      "calendar": {
+        "ics": "https://canvas.cmu.edu/feeds/calendars/course_gvzPycA2T5uykKfrtYWq30SNwFuIEyXfCw4GlWGe.ics"
+      },
+      "time_zone": "America/Los_Angeles",
+      "blueprint": false,
+      "template": false,
+      "enrollments": [
+        {
+          "type": "student",
+          "role": "StudentEnrollment",
+          "role_id": 3,
+          "user_id": 151152,
+          "enrollment_state": "active",
+          "limit_privileges_to_course_section": false
+        }
+      ],
+      "hide_final_grades": false,
+      "workflow_state": "available",
+      "restrict_enrollments_to_course_dates": true
+    },
+    {
+      "id": 55710,
+      "name": "Software Testing and Operations",
+      "course_code": "18654-SV",
+      "account_id": 39,
+      "created_at": "2026-08-17T07:09:49Z",
+      "start_at": null,
+      "default_view": "wiki",
+      "enrollment_term_id": 518,
+      "is_public": false,
+      "grading_standard_id": 6185,
+      "root_account_id": 1,
+      "uuid": "91307f71-e386-49e7-a115-520819cfd01d",
+      "license": "private",
+      "grade_passback_setting": null,
+      "end_at": null,
+      "public_syllabus": false,
+      "public_syllabus_to_auth": true,
+      "storage_quota_mb": 26214,
+      "is_public_to_auth_users": false,
+      "homeroom_course": false,
+      "course_color": null,
+      "friendly_name": null,
+      "apply_assignment_group_weights": true,
+      "calendar": {
+        "ics": "https://canvas.cmu.edu/feeds/calendars/course_91307f71-e386-49e7-a115-520819cfd01d.ics"
+      },
+      "time_zone": "America/Los_Angeles",
+      "blueprint": false,
+      "template": false,
+      "enrollments": [
+        {
+          "type": "student",
+          "role": "StudentEnrollment",
+          "role_id": 3,
+          "user_id": 151152,
+          "enrollment_state": "active",
+          "limit_privileges_to_course_section": false
+        }
+      ],
+      "hide_final_grades": false,
+      "workflow_state": "available",
+      "restrict_enrollments_to_course_dates": true
+    },
+    {
+      "id": 56350,
+      "name": "Special Topics: Advanced AI for Industry and Society - Fall 2026",
+      "course_code": "49797",
+      "account_id": 19,
+      "created_at": "2026-08-22T20:08:52Z",
+      "start_at": null,
+      "default_view": "modules",
+      "enrollment_term_id": 518,
+      "is_public": false,
+      "grading_standard_id": null,
+      "root_account_id": 1,
+      "uuid": "0861b4b9-8a44-4d42-8a18-e592ac5c114d",
+      "license": "private",
+      "grade_passback_setting": null,
+      "end_at": null,
+      "public_syllabus": false,
+      "public_syllabus_to_auth": true,
+      "storage_quota_mb": 26214,
+      "is_public_to_auth_users": true,
+      "homeroom_course": false,
+      "course_color": null,
+      "friendly_name": null,
+      "apply_assignment_group_weights": false,
+      "calendar": {
+        "ics": "https://canvas.cmu.edu/feeds/calendars/course_0861b4b9-8a44-4d42-8a18-e592ac5c114d.ics"
+      },
+      "time_zone": "America/Los_Angeles",
+      "blueprint": false,
+      "template": false,
+      "enrollments": [
+        {
+          "type": "student",
+          "role": "StudentEnrollment",
+          "role_id": 3,
+          "user_id": 151152,
+          "enrollment_state": "active",
+          "limit_privileges_to_course_section": false
+        }
+      ],
+      "hide_final_grades": false,
+      "workflow_state": "available",
+      "restrict_enrollments_to_course_dates": false
+    },
+    {
+      "id": 50841,
+      "name": "Spring 2026 OIE Orientation and Immigration Information for New International Students",
+      "course_code": "OIE Spring 2026 Orientation",
+      "account_id": 28,
+      "created_at": "2025-11-20T01:21:50Z",
+      "start_at": null,
+      "default_view": "wiki",
+      "enrollment_term_id": 1,
+      "is_public": false,
+      "grading_standard_id": null,
+      "root_account_id": 1,
+      "uuid": "DsqINaXREtx8yPkwt2wwPh29AQJoVbbwdGaPfzi2",
+      "license": "private",
+      "grade_passback_setting": null,
+      "end_at": null,
+      "public_syllabus": false,
+      "public_syllabus_to_auth": true,
+      "storage_quota_mb": 26214,
+      "is_public_to_auth_users": false,
+      "homeroom_course": false,
+      "course_color": null,
+      "friendly_name": null,
+      "apply_assignment_group_weights": false,
+      "calendar": {
+        "ics": "https://canvas.cmu.edu/feeds/calendars/course_DsqINaXREtx8yPkwt2wwPh29AQJoVbbwdGaPfzi2.ics"
+      },
+      "time_zone": "America/New_York",
+      "blueprint": false,
+      "template": false,
+      "enrollments": [
+        {
+          "type": "student",
+          "role": "StudentEnrollment",
+          "role_id": 3,
+          "user_id": 151152,
+          "enrollment_state": "active",
+          "limit_privileges_to_course_section": false
+        }
+      ],
+      "hide_final_grades": false,
+      "workflow_state": "available",
+      "restrict_enrollments_to_course_dates": false
+    }
+  ]
+}

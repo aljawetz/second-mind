@@ -70,6 +70,15 @@ Capture the known 403/404 cases (`list_course_files`, `get_course_structure` on 
 section) as real fixture files, then replay them — confirms graceful degradation without needing
 live Canvas access on every future test run.
 **Depends on:** 2.
+**Verified:** live against the real pilot courses — `list_courses` (12 real courses, confirmed
+`StudentEnrollment` role, not elevated access), a real page (course 51113), a real assignment
+(course 56350). Both known restriction cases reproduced exactly as documented: `list_course_files`
+403s on 56350, `get_course_structure` 403s on 55709 (the other 18654-SV ID succeeds on 55710) —
+confirming these are real, current properties of the Canvas API under a student token, not stale
+findings. All six responses captured as fixtures (`backend/tests/fixtures/canvas/`) and replayed
+via `pytest` + `respx` with zero live calls (6 passed). PyInstaller freezing verified separately —
+`httpx`/`keyring` bundle cleanly with no missing hidden imports. Formalized `backend/pyproject.toml`
++ `uv.lock` in the same step, closing a gap from step 0 (never actually done then).
 
 ### 4. Embedding layer (ONNX, torch-free)
 **Do:** One-time ONNX conversion of `bge-small-en-v1.5` via `optimum[exporters]` (dev machines
