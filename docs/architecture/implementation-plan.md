@@ -199,7 +199,29 @@ an ID containing an embedded quote, and an injection-shaped ID (confirmed it mat
 rather than matching everything). Also: nothing was setting `ref_doc_id` on nodes at all before
 this step — `pages_to_nodes`/`slides_to_nodes` now take a required `canvas_item_id` and wire it
 via `NodeRelationship.SOURCE`, which is what both the LanceDB integration's `doc_id` column and
-`delete_ref_doc` actually depend on. Not yet reported upstream — pending approval to file.
+`delete_ref_doc` actually depend on. Reported upstream:
+[llama_index#23086](https://github.com/run-llama/llama_index/issues/23086) (issue) and
+[llama_index#23087](https://github.com/run-llama/llama_index/pull/23087) (fix PR) — the PR
+demonstrates the regression using the package's own existing test suite (bump its lockfile to
+current `lancedb`, 3 of 26 tests fail with no code change) before fixing it, and traces the root
+cause to [lancedb#3825](https://github.com/lancedb/lancedb/pull/3825), a deliberate breaking
+change on LanceDB's side.
+
+### Integration check — everything above, chained together against live data
+
+Every test through step 7 exercises one step in isolation: step 3 replays cached Canvas JSON,
+steps 5/6 use cached extraction fixtures, step 7's diff test uses a simulated listing. Nothing had
+gone Canvas → extract → embed → index → sync manifest → retrieve as one continuous, live chain.
+`backend/scripts/integration_smoke_test.py` does exactly that against a real course (18654-SV,
+Software Testing and Operations) — 8 real files, several 40-50 pages, ~150 pages needing OCR
+fallback, hundreds of indexed nodes. Result: no seam bugs — every real Canvas item correctly
+classified `new` on first sync and `unchanged` on a re-diff against the same live listing (real
+`updated_at` timestamps round-tripping through the manifest correctly), and a real retrieval query
+("What is a test double and how does Mockito help isolate components?") returned its top 3 results
+from the correct file, the top hit directly defining a Mock. Given that every other integration
+point checked this sprint (tiktoken bundling, the ONNX model never being wired into `datas`, the
+LanceDB delete bug) turned up a real bug, this clean run is itself informative — the seams between
+steps 3, 5, 6, and 7 hold.
 
 ### 8. Generation (LLM calls + citations)
 **Do:** Wire `CitationQueryEngine` + `SimilarityPostprocessor` + a pluggable LLM client selected by
