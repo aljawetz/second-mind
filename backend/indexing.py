@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from lancedb.expr import col, lit
-from llama_index.core import StorageContext, VectorStoreIndex
+from llama_index.core import StorageContext, VectorStoreIndex, set_global_tokenizer
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import NodeRelationship, RelatedNodeInfo, TextNode
 from llama_index.vector_stores.lancedb import LanceDBVectorStore
@@ -35,11 +35,21 @@ CHUNK_OVERLAP = 100  # ~15% of 700
 # originally crashed onnxruntime — embeddings.py's truncation stays as a
 # safety net, but this is the correct fix at the source).
 _bge_tokenizer = Tokenizer.from_file(str(MODEL_DIR / "tokenizer.json"))
-_splitter = SentenceSplitter(
-    chunk_size=CHUNK_SIZE,
-    chunk_overlap=CHUNK_OVERLAP,
-    tokenizer=lambda text: _bge_tokenizer.encode(text).tokens,
-)
+_tokenize = lambda text: _bge_tokenizer.encode(text).tokens
+
+# Real finding (Step 9, only caught by actually running the frozen binary,
+# not `uv run python3`): tiktoken isn't just SentenceSplitter's default —
+# llama_index's internal get_tokenizer() is called from multiple places
+# (PromptHelper's TokenCounter, used by every query engine, is a second,
+# separate one found here) and ALL of them fall back to the same
+# module-global `llama_index.core.global_tokenizer` when it's unset. Fixing
+# only the splitter above left this second path crashing with the exact
+# same "Unknown encoding cl100k_base" in the frozen build. Setting it once,
+# globally, covers every current and future call site instead of chasing
+# them one at a time.
+set_global_tokenizer(_tokenize)
+
+_splitter = SentenceSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP, tokenizer=_tokenize)
 
 
 def _with_ref_doc(node: TextNode, canvas_item_id: str) -> TextNode:
@@ -100,4 +110,27 @@ class _PatchedLanceDBVectorStore(LanceDBVectorStore):
 def build_index(nodes: list[TextNode], db_path: Path, table_name: str) -> VectorStoreIndex:
     vector_store = _PatchedLanceDBVectorStore(uri=str(db_path), table_name=table_name)
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
-    return VectorStoreIndex(nodes, storage_context=storage_context, embed_model=OnnxBgeEmbedding())
+    # transformations must be explicit here, not left to fall back to
+    # Settings.transformations' default: that default is a SentenceSplitter
+    # built with tiktoken, and just constructing it (even on nodes that are
+    # already pre-chunked and never actually re-split) crashed the frozen
+    # PyInstaller build with "Unknown encoding cl100k_base" — the same
+    # tiktoken-doesn't-bundle-cleanly problem the module docstring already
+    # notes for chunking, just a second, previously-undiscovered code path
+    # into the same default (implementation-plan.md Step 9 — only surfaced
+    # by actually running the frozen binary, not `uv run python3`).
+    return VectorStoreIndex(
+        nodes, storage_context=storage_context, embed_model=OnnxBgeEmbedding(), transformations=[_splitter]
+    )
+
+
+def load_index(db_path: Path, table_name: str) -> VectorStoreIndex:
+    """Opens a previously-built table for querying, without re-adding nodes
+    (main.py's /ask handler — the index was already populated by a sync,
+    not by this request). transformations=[_splitter] for the same reason
+    as build_index: avoids ever touching Settings' tiktoken-based default,
+    even though no transformation actually runs against an empty node list."""
+    vector_store = _PatchedLanceDBVectorStore(uri=str(db_path), table_name=table_name)
+    return VectorStoreIndex.from_vector_store(
+        vector_store, embed_model=OnnxBgeEmbedding(), transformations=[_splitter]
+    )

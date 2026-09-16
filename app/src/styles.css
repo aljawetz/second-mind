@@ -167,6 +167,10 @@ button{font:inherit;color:inherit}
   margin-top:.7rem;padding-top:.6rem;border-top:1px dashed var(--line);
   display:flex;flex-wrap:wrap;gap:.4rem;font-size:.72rem;color:var(--ink-faint);
 }
+.qa-empty{color:var(--ink-faint);font-size:.85rem;padding:.4rem .1rem}
+.qa-thinking{color:var(--ink-faint)}
+.qa-a-error{color:var(--danger);border-color:var(--danger)}
+.ask-bar input:disabled{color:var(--ink-faint)}
 
 /* ---------- artifact row ---------- */
 .section-label{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:600;margin-bottom:.75rem}

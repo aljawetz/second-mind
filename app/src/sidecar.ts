@@ -41,3 +41,49 @@ export async function listCourses(): Promise<CanvasCourse[]> {
   }
   return data.courses;
 }
+
+export interface Citation {
+  source_type: "page" | "file" | "transcript" | "notes";
+  label: string;
+  item_id: string;
+}
+
+export type AskMode = "answer" | "socratic";
+
+// main.py's /ask streams newline-delimited JSON over a chunked response:
+// one {citations, grounded} line first (known once retrieval finishes,
+// before the LLM starts), then one {delta} line per token, then {done}.
+// Verified against a real index and a real strict HTTP client (Node's
+// undici, close in rigor to Tauri's Rust reqwest) — chunked framing
+// parses correctly through the plugin-http IPC bridge's ReadableStream.
+export async function askQuestion(
+  courseId: number,
+  question: string,
+  mode: AskMode,
+  onEvent: (event: { citations?: Citation[]; grounded?: boolean; delta?: string; done?: boolean }) => void
+): Promise<void> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/ask`, {
+    method: "POST",
+    body: JSON.stringify({ question, mode }),
+  });
+
+  if (!res.ok || !res.body) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error?.message ?? `ask failed (${res.status})`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let newlineIndex;
+    while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+      if (line.trim()) onEvent(JSON.parse(line));
+    }
+  }
+}

@@ -95,6 +95,30 @@ uv run python3 scripts/generation_smoke_test.py
 Makes real, **billed** OpenAI API calls (a handful of cheap `gpt-4o-mini` queries, but real money,
 not simulated). Needs a real OpenAI key in Keychain.
 
+## Running the real `/ask` endpoint locally
+
+`POST /courses/{course_id}/ask` (`main.py`) queries whatever index already exists at
+`~/.ssb/default/index.lancedb/course_<id>` — there's no real onboarding→indexing pipeline wired up
+yet (`OnboardingIndexing.tsx` in the frontend is still a simulated progress UI), so nothing builds
+that index for you. To test the endpoint for real, populate it yourself first:
+
+```python
+# python3, from this directory
+import canvas, ingestion, indexing
+from pathlib import Path
+
+structure = canvas.get_course_structure(YOUR_COURSE_ID)
+# ...extract nodes the same way scripts/generation_smoke_test.py does...
+indexing.build_index(nodes, Path.home() / ".ssb" / "default" / "index.lancedb", f"course_{YOUR_COURSE_ID}")
+```
+
+Then `uv run python3 main.py` and `curl -N -X POST http://127.0.0.1:8756/courses/{id}/ask -d
+'{"question": "...", "mode": "answer"}'` — the response streams newline-delimited JSON (one
+`{citations, grounded}` line, then one `{delta}` line per token, then `{done: true}`), chunked over
+a `ThreadingHTTPServer` so it doesn't block other requests while streaming (implementation-plan.md
+Step 9). A course with no index yet doesn't error — it returns the same shape with
+`grounded: false` and the real not-covered copy, same as a genuinely off-topic query.
+
 ## Building the sidecar binary
 
 ```bash

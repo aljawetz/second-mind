@@ -10,9 +10,19 @@ import keyring
 from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.core.prompts import PromptTemplate
 from llama_index.core.query_engine import CitationQueryEngine
+from llama_index.core.schema import NodeRelationship, NodeWithScore
 from llama_index.llms.openai import OpenAI
 
 CREDENTIAL_SERVICE = "com.ssb.app"
+
+# Shown when grounded=False (design spec §7: "if indexed material does not
+# support an answer, SSB says so rather than falling back to open-domain
+# knowledge") — covers both "nothing indexed yet" and "nothing relevant
+# retrieved", which look identical from the student's side.
+NOT_COVERED_MESSAGE = (
+    "I couldn't find anything about that in your indexed course materials. "
+    "Try rephrasing, or check whether it's covered in a file that hasn't been synced yet."
+)
 
 # Calibrated against real retrieval scores, not guessed: on-topic queries
 # against real indexed content scored 0.6555-0.7524, deliberately
@@ -77,3 +87,30 @@ def build_query_engine(index, socratic: bool = False, streaming: bool = True) ->
         citation_qa_template=template,
         streaming=streaming,
     )
+
+
+def build_citations(source_nodes: list[NodeWithScore]) -> list[dict]:
+    """Maps CitationQueryEngine's source_nodes to overview.md §2's citation
+    shape. Verified against a real index (implementation-plan.md Step 9)
+    that a node's metadata and SOURCE relationship both survive the round
+    trip through LanceDB retrieval and CitationQueryEngine's own node
+    splitting (it model_dump/model_validate-copies the full node).
+
+    source_type is hardcoded "file": every node indexing.py currently
+    produces (pages_to_nodes, slides_to_nodes) comes from a Canvas File
+    item — "page"/"transcript"/"notes" aren't reachable until wiki-page
+    and transcript ingestion exist."""
+    citations = []
+    for node_with_score in source_nodes:
+        node = node_with_score.node
+        source = node.metadata.get("source", "")
+        if "page" in node.metadata:
+            label = f"{source} · p.{node.metadata['page']}"
+        elif "slide" in node.metadata:
+            label = f"{source} · slide {node.metadata['slide']}"
+        else:
+            label = source
+        source_rel = node.relationships.get(NodeRelationship.SOURCE)
+        item_id = source_rel.node_id if source_rel else ""
+        citations.append({"source_type": "file", "label": label, "item_id": item_id})
+    return citations

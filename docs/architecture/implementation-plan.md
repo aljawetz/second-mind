@@ -260,6 +260,118 @@ job, where the `/ask` HTTP response actually gets built.
 **Test:** Manual end-to-end click-through: ask a real question, see a real cited, streamed answer;
 force each error condition (bad key, Canvas unreachable) and confirm the UI shows the right state.
 **Depends on:** 8.
+**Verified:** real `npm run tauri dev` click-through against course 18654 (id 55710) — a grounded
+question returned a real streamed, cited answer through the actual app UI. Confirmed by the user
+directly in the running app, not simulated.
+
+**Concurrency was a real, separate blocker, found before writing `/ask` at all:** `http.server`'s
+plain `HTTPServer` is single-threaded — proved with a scratch server that a slow streaming response
+completely blocks every other request, including `/ping`, for the stream's whole duration (a
+5-second stream made a 3-second-timeout `/ping` fail outright). Fixed with
+`socketserver.ThreadingMixIn` (3 lines, zero new dependencies) rather than migrating to FastAPI —
+re-verified against the real server after the fix: `/ping` returned in 22ms (scratch test) / 0.5ms
+(real server) while a real `/ask` stream was active. Chunked transfer encoding itself (manual
+`f"{len(chunk):x}\r\n"` framing) was verified to deliver real incremental data, not buffer until
+close.
+
+**A second, related real finding:** `BaseHTTPRequestHandler` defaults to declaring `HTTP/1.0` in
+its status line, under which `Transfer-Encoding: chunked` is technically undefined. curl and
+Node's `undici` (a strict, spec-compliant client, comparably rigorous to the Rust `reqwest` that
+`@tauri-apps/plugin-http` actually uses) both tolerated it and decoded the chunks correctly, but
+this was leniency, not correctness — fixed properly by declaring `protocol_version = "HTTP/1.1"`
+on the handler. Re-verified after the fix: streaming, chunked framing (via `undici`), and
+keep-alive connection reuse (`curl`'s `num_connects: 0` on a second request) all still correct.
+
+**Citation mapping verified against a real index, not assumed:** built a real index from course
+55710's files and confirmed a node's `metadata` (`source`, `page`/`slide`) and its `SOURCE`
+relationship (→ the real Canvas file id) both survive the round trip through LanceDB retrieval
+*and* `CitationQueryEngine`'s internal node-splitting (its `_create_citation_nodes` does a full
+`model_dump`/`model_validate` copy, confirmed by reading the installed package's source).
+`source_type` is hardcoded `"file"` in `generation.build_citations()` — every node `indexing.py`
+currently produces comes from a Canvas File item; `"page"/"transcript"/"notes"` aren't reachable
+until wiki-page and transcript ingestion exist (not built yet).
+
+**Error mapping verified against the real `openai` 2.54.0 SDK,** including one real zero-cost call
+with a deliberately invalid key: `openai.AuthenticationError` → `llm_auth_failed` (401).
+`openai.RateLimitError` is overloaded by OpenAI for two distinct conditions, split on `e.code`:
+`"insufficient_quota"` → `llm_quota_exceeded` (402), anything else → `llm_rate_limited` (429). Also
+confirmed empirically (bad-key test against a real index): both retrieval (`TableNotFoundError`)
+and the LLM call raise synchronously inside `engine.query()`, before any streaming starts — so
+`main.py` can always send a clean HTTP status for these, never needing to embed an error inside an
+already-started NDJSON stream. The `canvas_*` errors in overview.md's table aren't reachable from
+`/ask` — it never calls Canvas directly.
+
+**Streaming wire format — undocumented anywhere, decided with the user:** NDJSON over the verified
+chunked mechanism. One `{citations, grounded}` line first (known as soon as retrieval finishes,
+before the LLM starts), then one `{delta}` line per token, then `{done: true}`. The "course not
+indexed yet" case (`TableNotFoundError`) was initially a one-off plain-JSON 200 response; refactored
+to stream through the same NDJSON path instead, so the frontend has exactly one success shape to
+parse rather than two.
+
+**Verified end-to-end against real data** (course 55710, real index at `~/.ssb/default/index.lancedb`,
+real server, real HTTP requests): a grounded question returns real citations + a real streamed
+answer; a deliberately off-topic question returns `grounded: false` and the real not-covered copy
+with no LLM call at all (confirmed free — `CitationQueryEngine` short-circuits before synthesis
+when every node fails the cutoff); a course with no index at all returns the same not-covered shape
+rather than a hard error; malformed JSON and a missing `question` both return `bad_request` (400);
+a `/ping` issued while a real `/ask` stream was in flight returned in 0.5ms.
+
+**Two real gaps found and worked around, not fixed (documented, not hidden):**
+1. No real onboarding→indexing pipeline exists yet — `OnboardingIndexing.tsx` is 100% a simulated
+   progress UI (`setTimeout`s against mock `DATA`), with no backend call at all. `/ask` therefore
+   assumes an index already exists on disk; for real end-to-end testing, a one-off script built one
+   at the real `~/.ssb/default/index.lancedb` path the same way `generation_smoke_test.py` does.
+   Wiring real Canvas sync + indexing into the app's actual onboarding flow is a real, separate
+   piece of future work, not covered by this step's scope.
+2. No real per-student directory derivation exists (data-model.md §1 calls for one generated at
+   onboarding) — Step 2 only built Keychain credentials. `main.py` hardcodes
+   `~/.ssb/default/`, same precedent as Step 8's `config.json` hardcoding. Similarly, `App.tsx`'s
+   onboarding step fetches a real `AvailableCourse[]` but never passes it into `AppShell` — real
+   course *selection* isn't wired end-to-end. Bridged with a small hardcoded map
+   (`REAL_COURSE_IDS` in `data.ts`) from the mock UI's course codes to real Canvas ids; only
+   `"18654"` (→ 55710) is populated, since that's the only course ever indexed against real data in
+   this project.
+
+**Frontend testing limitation, found while trying to verify in a browser:** the built React app
+cannot be exercised in a plain Chrome tab at all — `StartupGate` polls a real `pingSidecar()` call
+every 2s and never proceeds without it, and that call depends on `@tauri-apps/plugin-http`'s Tauri
+IPC bridge (`window.__TAURI_INTERNALS__`), which doesn't exist outside the actual Tauri shell.
+Confirmed `tsc --noEmit` and `npm run build` both succeed, and read `@tauri-apps/plugin-http`'s
+source directly to confirm `res.body` is a real, incrementally-`pull`-driven `ReadableStream`
+(not buffered whole before returning to JS) — so the NDJSON design should carry through the IPC
+bridge correctly.
+
+**Two more real bugs found — both only by actually running the frozen sidecar binary,** neither
+reachable via `uv run python3 main.py` (which is how every prior verification in this step and
+Step 8 ran):
+1. `VectorStoreIndex(...)` / `.from_vector_store(...)` fall back to `Settings.transformations`
+   whenever `transformations` isn't passed explicitly — and merely *constructing* that default
+   (a `SentenceSplitter` with tiktoken) crashed the frozen build with `Unknown encoding
+   cl100k_base`, even on `load_index()`'s empty-node path where no splitting ever actually runs.
+   Worse, this wasn't the only call site: `generation.build_query_engine()`'s
+   `CitationQueryEngine.from_args()` hits `PromptHelper`'s `TokenCounter`, a *second*, unrelated
+   place llama_index calls its internal `get_tokenizer()`. Root cause: every one of these routes
+   through a single module-level `llama_index.core.global_tokenizer`, unset by default. Fixed once,
+   globally, in `indexing.py` — `set_global_tokenizer()` with the same BGE tokenizer already used
+   for chunking — instead of chasing individual call sites (`transformations=[_splitter]` is kept
+   on both `build_index`/`load_index` too, belt-and-suspenders). Re-verified against the rebuilt
+   frozen binary: real citations, real streamed answer, real concurrency (0.5ms `/ping` while
+   `/ask` was streaming) all correct.
+2. Every sidecar rebuild is ad-hoc-signed with a new identity (implementation-plan.md Step 1's
+   known signing gap), so macOS re-prompts for Keychain access on the *first* request that reads a
+   credential after each rebuild — surfaced as the `/ask` request hanging with zero CPU usage and
+   no error, until the user noticed and approved a real Keychain dialog. Not a code bug; confirming
+   it required asking the user to check their own screen, since a background process's GUI prompts
+   aren't visible to this session. Resolved by properly signing the binary with a stable identity
+   (deferred to Step 14, packaging/signing) — until then, expect one Keychain prompt per rebuild.
+
+**Test binary was stale and had to be rebuilt before any of the above manual testing was possible:**
+`src-tauri/binaries/ssb-backend-aarch64-apple-darwin` predated this entire step. Rebuilt via
+`uv sync --group build && pyinstaller ssb-backend.spec` (torch-bundling re-checked: still 0), copied
+into place, and it's what both real bugs above were actually caught against.
+
+The actual manual click-through (real `npm run tauri dev`, forcing each error condition) is the
+user's own step, per the established pattern for anything requiring a native GUI — not done here.
 
 ## Sprint 6 — End-to-end alpha (session capture, study artifacts)
 

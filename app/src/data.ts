@@ -1,5 +1,17 @@
 import type { CourseData } from "./types";
 
+// Bridges this mock UI's course *codes* (DATA's keys) to real Canvas
+// numeric course ids for the real /ask backend call. Real course
+// selection isn't wired end-to-end yet (App.tsx's onboarding step fetches
+// real AvailableCourse[] but AppShell never receives it) — that's a
+// separate gap from Step 9's scope (implementation-plan.md). Only "18654"
+// has ever been indexed against real data in this project (Step 8/9's
+// smoke tests, course 55710, "18654-SV"); "49797" has no real indexed
+// course behind it yet even though it's this project's own class.
+export const REAL_COURSE_IDS: Record<string, number> = {
+  "18654": 55710,
+};
+
 export const DATA: CourseData = {
   "49797": {
     code: "49797 · Advanced AI for Industry and Society",

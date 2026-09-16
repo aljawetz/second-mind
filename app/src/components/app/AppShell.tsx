@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ArtifactType, ViewName } from "../../types";
-import { DATA } from "../../data";
+import { DATA, REAL_COURSE_IDS } from "../../data";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import HomeView from "./HomeView";
@@ -55,6 +55,8 @@ export default function AppShell() {
                 <HomeView
                   course={courseData}
                   courseCode={course}
+                  courseId={REAL_COURSE_IDS[course] ?? null}
+                  socratic={socratic}
                   onOpenSession={openSession}
                   onOpenArtifact={openArtifact}
                   onOpenAssignment={openAssignment}

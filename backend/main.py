@@ -1,14 +1,37 @@
 """Sidecar backend — see docs/architecture/implementation-plan.md."""
 
 import json
+import re
+import socketserver
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 
 import httpx
+import openai
+from llama_index.vector_stores.lancedb.base import TableNotFoundError
 
 import canvas
+import generation
+import indexing
 
 HOST = "127.0.0.1"
 PORT = 8756
+
+# data-model.md §1 puts everything under ~/.ssb/<student_id>/, with
+# <student_id> derived locally at onboarding. That derivation isn't built
+# yet (Step 2 only built Keychain credentials) — hardcoded single-student
+# directory for now, same precedent as Step 8's config.json hardcoding.
+SSB_HOME = Path.home() / ".ssb" / "default"
+
+ASK_PATH = re.compile(r"^/courses/(\d+)/ask$")
+
+
+class ThreadingHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
+    """Handle each request in its own thread. Needed once /ask streams a
+    response over several seconds — without this, a single-threaded server
+    blocks every other request (even /ping) for the whole stream duration."""
+
+    daemon_threads = True
 
 
 def validate_credential(kind: str, value: str) -> tuple[bool, str]:
@@ -31,6 +54,14 @@ def validate_credential(kind: str, value: str) -> tuple[bool, str]:
 
 
 class Handler(BaseHTTPRequestHandler):
+    # BaseHTTPRequestHandler defaults to declaring HTTP/1.0, under which
+    # Transfer-Encoding: chunked (/ask's streaming response) is technically
+    # undefined — real clients tolerated it (verified: curl, Node's
+    # undici), but declaring 1.1 is the actual correct fix rather than
+    # relying on that leniency. Every response here already sends either
+    # Content-Length or proper chunked framing, so 1.1 keep-alive is safe.
+    protocol_version = "HTTP/1.1"
+
     def _send_json(self, status: int, payload: dict):
         body = json.dumps(payload).encode()
         self.send_response(status)
@@ -87,14 +118,97 @@ class Handler(BaseHTTPRequestHandler):
                 return
             valid, reason = validate_credential(data.get("kind", ""), data.get("value", ""))
             self._send_json(200, {"valid": valid, "reason": reason})
+            return
+
+        ask_match = ASK_PATH.match(self.path)
+        if ask_match:
+            self._handle_ask(ask_match.group(1))
+            return
+
+        self.send_response(404)
+        self.end_headers()
+
+    def _write_chunk(self, payload: dict):
+        # Manual chunked transfer encoding — verified against a real client
+        # (implementation-plan.md Step 9) to deliver each line as soon as
+        # it's written, not buffered until the response closes.
+        line = (json.dumps(payload) + "\n").encode()
+        self.wfile.write(f"{len(line):x}\r\n".encode())
+        self.wfile.write(line)
+        self.wfile.write(b"\r\n")
+        self.wfile.flush()
+
+    def _handle_ask(self, course_id: str):
+        length = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(length)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            self._send_json(400, {"error": {"code": "bad_request", "message": "invalid JSON"}})
+            return
+        question = data.get("question", "").strip()
+        mode = data.get("mode", "answer")
+        if not question:
+            self._send_json(400, {"error": {"code": "bad_request", "message": "question is required"}})
+            return
+
+        # Errors here happen before any bytes are written — response.status
+        # can still be set cleanly. Retrieval (TableNotFoundError) and the
+        # LLM call (openai.*Error) both happen synchronously inside
+        # engine.query(), confirmed against a real index and a real,
+        # deliberately-invalid key (Step 9) — nothing here is deferred to
+        # response_gen, so no error can surface after streaming starts.
+        not_indexed = False
+        try:
+            db_path = SSB_HOME / "index.lancedb"
+            index = indexing.load_index(db_path, f"course_{course_id}")
+            engine = generation.build_query_engine(index, socratic=(mode == "socratic"), streaming=True)
+            response = engine.query(question)
+        except TableNotFoundError:
+            # Course not indexed yet — indistinguishable from "nothing
+            # relevant retrieved" at the response shape level (§7). Streamed
+            # the same way as every other 200, not a one-off plain-JSON
+            # shape, so the frontend has exactly one success format to parse.
+            not_indexed = True
+        except RuntimeError as e:
+            self._send_json(401, {"error": {"code": "llm_auth_failed", "message": str(e)}})
+            return
+        except openai.AuthenticationError:
+            self._send_json(401, {"error": {"code": "llm_auth_failed", "message": "OpenAI API key invalid or expired"}})
+            return
+        except openai.RateLimitError as e:
+            if e.code == "insufficient_quota":
+                self._send_json(402, {"error": {"code": "llm_quota_exceeded", "message": "OpenAI quota exceeded"}})
+            else:
+                self._send_json(429, {"error": {"code": "llm_rate_limited", "message": "OpenAI rate limit hit — try again shortly"}})
+            return
+
+        citations = [] if not_indexed else generation.build_citations(response.source_nodes)
+        grounded = bool(citations)
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self._write_chunk({"citations": citations, "grounded": grounded})
+        if grounded:
+            # Real tokens only when grounded — an ungrounded query never
+            # reaches the LLM at all (CitationQueryEngine short-circuits
+            # when every node fails the similarity cutoff), so response_gen
+            # would otherwise yield the framework's raw "Empty Response".
+            for token in response.response_gen:
+                self._write_chunk({"delta": token})
         else:
-            self.send_response(404)
-            self.end_headers()
+            self._write_chunk({"delta": generation.NOT_COVERED_MESSAGE})
+        self._write_chunk({"done": True})
+        self.wfile.write(b"0\r\n\r\n")
+        self.wfile.flush()
 
     def log_message(self, format, *args):
         pass  # keep stdout quiet; this is a sidecar, not a dev console
 
 
 if __name__ == "__main__":
-    server = HTTPServer((HOST, PORT), Handler)
+    server = ThreadingHTTPServer((HOST, PORT), Handler)
     server.serve_forever()
