@@ -64,15 +64,37 @@ response automatically — no separate lookup pass needed at answer time.
 
 ## 3. Embedding
 
-**Local, not a hosted API**, via LlamaIndex's `HuggingFaceEmbedding` integration — confirmed
-current documentation supports loading a compact model (e.g. `BAAI/bge-small-en-v1.5`) directly by
-name, fully offline once downloaded, no API key or network call at query time. Anthropic has no
-public embeddings endpoint, so "pluggable LLM, default Claude" (design spec §10) doesn't extend to
-embeddings regardless of provider choice — an embedding step is needed either way, and a local
-model avoids requiring a second provider account just for it. This keeps the "self-hosted, your
-machine" thesis intact for the embedding layer specifically, at the cost of somewhat lower
-retrieval quality than the best hosted embedding APIs — a tradeoff worth revisiting only if
-retrieval quality turns out to be a real problem in practice, not assumed upfront.
+**Local, not a hosted API.** Anthropic has no public embeddings endpoint, so "pluggable LLM,
+default Claude" (design spec §10) doesn't extend to embeddings regardless of provider choice — an
+embedding step is needed either way, and a local model avoids requiring a second provider account
+just for it.
+
+**How, specifically, matters for packaging — this is the one place the retrieval PoC (§4) used a
+path that shouldn't ship.** The PoC used LlamaIndex's `HuggingFaceEmbedding` integration directly
+(`BAAI/bge-small-en-v1.5` via `sentence-transformers`), which was the fastest way to validate
+retrieval quality. But `sentence-transformers` depends on `torch`, and bundling torch into a
+PyInstaller sidecar is a confirmed, well-documented problem — real reports of 3–5GB executables,
+worse specifically on macOS due to a shared-library duplication bug in that environment. Measured
+directly: a venv with `sentence-transformers` pulls in ~1.8GB including a 583MB torch install; the
+same retrieval stack (LlamaIndex core, the LanceDB integration, `faster-whisper`) without it comes
+to 874MB with zero torch anywhere.
+
+**What should actually ship: ONNX via `onnxruntime`, not LlamaIndex's `HuggingFaceEmbedding`.**
+`bge-small-en-v1.5` is converted to ONNX once, on a dev machine, using `optimum[exporters]` — torch
+touches only our own build environment, never a student's machine. The important correction found
+by actually checking rather than assuming: LlamaIndex's own ONNX wrapper
+(`llama-index-embeddings-huggingface-optimum`) is *not* the clean answer here — it depends on the
+`optimum` package, which pulls torch back in as a hard dependency even when only the ONNX/
+`onnxruntime` execution path is used. Verified directly by installing it. The actual fix is a small
+custom `BaseEmbedding` subclass (a thin wrapper LlamaIndex's interface is designed to support, not
+hand-rolling RAG logic) that loads the pre-converted ONNX file via a plain `onnxruntime.InferenceSession`
+and tokenizes with the lightweight `tokenizers` library — confirmed torch-free. The converted model
+files are small enough to bundle directly in the installer ([overview.md](overview.md) §3),
+rather than downloaded from Hugging Face on first run.
+
+This keeps the "self-hosted, your machine" thesis intact for the embedding layer, at the cost of
+somewhat lower retrieval quality than the best hosted embedding APIs — a tradeoff worth revisiting
+only if retrieval quality turns out to be a real problem in practice, not assumed upfront.
 
 ## 4. Storage and retrieval
 

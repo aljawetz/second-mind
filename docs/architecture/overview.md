@@ -119,6 +119,18 @@ knows or cares that LanceDB is the concrete store.
 standalone binary (e.g. PyInstaller) and bundled as a Tauri sidecar — the student installs one
 app, never a Python environment, never `pip install` anything themselves.
 
+**Keeping torch out of the shipped bundle is a real, verified constraint on this, not a nice-to-have.**
+PyInstaller bundling torch is a confirmed, widely-reported problem (3–5GB executables, a
+macOS-specific shared-library duplication bug making it worse on our exact platform) — see
+[rag-pipeline.md](rag-pipeline.md) §3 for the measured comparison (874MB torch-free vs. 1.8GB
+with it) and the embedding-layer decision that keeps torch confined to our own build environment,
+never the shipped app.
+
+**Model files ship bundled in the installer, not downloaded on first run.** The converted ONNX
+embedding model and the CTranslate2 Whisper model are both small enough to include directly —
+consistent with "self-hosted, works offline from first launch" rather than adding a hidden
+first-run network dependency that would quietly undercut that claim.
+
 **Scope: macOS only for the MVP.** Cross-platform (Windows/Linux via Tauri) is a stated future
 goal, not a Sprint 4–9 commitment — see the design spec's Technology Choices (§10) for the
 reasoning.
