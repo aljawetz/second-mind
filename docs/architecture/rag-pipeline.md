@@ -96,6 +96,22 @@ cutoff value is a tunable constant, not a hard-coded assumption — it needs cal
 queries before Sprint 5, the same way Sprint 3 flagged the density heuristic as needing tuning
 against more real course material.
 
+**Tested end-to-end (retrieval half) against the real tiered-extraction corpus from Sprint 3.**
+Indexed both real files (the Zotero PDF via the full plain-text/OCR pipeline, the lecture deck via
+plain text) into an actual `LanceDBVectorStore` with `bge-small-en-v1.5` embeddings, then ran four
+known-answer queries through the retriever. All four found the correct page within the top 3
+results. The most important result: the query whose answer only exists in OCR-recovered text
+("what citation style should I choose") retrieved that page as the **top** result — confirming
+that OCR output too noisy to display as a clean citation is still good enough as *embedding input*
+for correct retrieval. Those are different bars, and this clears the one retrieval actually needs.
+One ranking nuance, not a failure: a query about installation steps ranked an adjacent
+install-sequence page above the exact expected one (both topically valid, correct answer still
+rank 2 of 3) — worth watching for near-duplicate adjacent content once real courses are indexed at
+scale. **This is a 4-query smoke test proving the mechanism works, not a precision@k benchmark** —
+that needs many more real queries across more courses at Sprint 5. Generation (the LLM synthesizing
+a cited answer from these retrieved nodes) remains untested — no LLM API key was available in this
+environment to exercise `CitationQueryEngine`'s synthesis step.
+
 ## 5. Generation — where LLM provider calls happen
 
 LlamaIndex's own multi-provider LLM abstraction (`llama-index-llms-openai`,

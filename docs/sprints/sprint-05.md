@@ -28,4 +28,19 @@ the metrics to evaluate against.
 
 ## What we did
 
-TBD — fill in once this sprint is underway.
+Not started, but two pieces got a real pre-validation pass in Sprint 4 while designing the
+architecture, not just planned on paper:
+
+- **Retrieval smoke test.** Indexed real Sprint-3 tiered-extraction content into an actual
+  LanceDB table (via LlamaIndex, local `bge-small-en-v1.5` embeddings) and ran four known-answer
+  queries — all four retrieved the correct page in the top 3, including one whose answer only
+  existed in OCR-recovered text. A 4-query smoke test, not the real precision@k evaluation this
+  sprint requires at scale. Full method: [docs/architecture/rag-pipeline.md](../architecture/rag-pipeline.md).
+- **Whisper speed test.** `faster-whisper` (base model, CPU) transcribed a 55-second synthetic
+  speech sample in 2.5 seconds — a 0.04x real-time factor, confirming local transcription is
+  comfortably fast on laptop-class hardware. Accuracy on real classroom audio (background noise,
+  accents, room acoustics) is still untested — the synthetic sample was clean, single-voice
+  speech, which validates speed, not real-world accuracy.
+
+Generation (an LLM actually synthesizing a cited answer via `CitationQueryEngine`) is untested —
+no LLM API key was available to exercise it outside this sprint's own scope.
