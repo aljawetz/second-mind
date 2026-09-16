@@ -8,9 +8,11 @@ build by hand — mock tests, mindmaps, slides, flashcards.
 
 Your index, your recordings, your notes, on your machine.
 
-> **Status: early development.** Sprint 3 (technical feasibility) is complete; see
-> [the design spec](docs/specs/2026-09-14-ssb-design.md). Core implementation begins
-> Sprint 5. There is no installable build yet.
+> **Status: early development.** Sprint 5 (core prototype) is underway — the Tauri app shell,
+> Python sidecar, Keychain-backed credential storage, and Canvas integration are working
+> end-to-end against real data. RAG (ingestion, embeddings, retrieval) hasn't started yet; see
+> [the implementation plan](docs/architecture/implementation-plan.md) for exactly what's done.
+> There is no installable build yet.
 
 ---
 
@@ -135,6 +137,14 @@ silently blends outside knowledge into a course-grounded answer.
 
 - [Design spec](docs/specs/2026-09-14-ssb-design.md) — architecture, scope, privacy
   model, risks, metrics
+- [Architecture overview](docs/architecture/overview.md) — system diagram, HTTP API contract,
+  deployment and reliability
+- [Canvas integration](docs/architecture/canvas-integration.md) — real endpoints, access
+  restrictions found by testing, sync mapping
+- [Data model](docs/architecture/data-model.md) — on-disk layout, sync manifest schema
+- [RAG pipeline](docs/architecture/rag-pipeline.md) — ingestion, embedding, retrieval, generation
+- [Implementation plan](docs/architecture/implementation-plan.md) — the sequenced build order,
+  a concrete test per step, and what's actually verified so far
 
 ## License
 
