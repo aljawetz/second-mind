@@ -94,6 +94,12 @@ locally-owned metadata that Canvas doesn't provide — chiefly the weekly meetin
 `llm_provider` names *which* provider the Keychain-stored key belongs to (so the backend knows
 which API shape to call) — never the key itself.
 
+`selected_courses` is what `unselect`/`DELETE` ([overview.md](overview.md) §2) actually mutate.
+Unselecting a course removes its ID from this array only — `courses/<id>/` stays on disk
+untouched, so re-adding the course later just re-appends the ID and resumes from the existing
+manifest. Deleting a course removes the ID *and* recursively deletes `courses/<id>/` itself,
+including its sessions.
+
 ## 4. Sync manifest schema (§5.5)
 
 One `manifest.db` per course, one row per Canvas item ever seen for that course:

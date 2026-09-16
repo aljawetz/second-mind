@@ -157,9 +157,14 @@ First run is a four-step flow, not a settings page buried after install: connect
 pick courses, watch them index, land in the app already populated with real content instead of an
 empty shell.
 
-1. **Connect accounts.** The student enters their Canvas API token and an LLM API key. Both stay
-   on the student's machine — read once, used to talk to Canvas and the model provider directly,
-   never transmitted to any SSB-operated service (§6).
+1. **Connect accounts.** The student enters their Canvas API token and an LLM API key. Both are
+   validated immediately with a real call to each service before the flow proceeds — a bad token
+   or key fails fast here, not three days later as an unexplained "why isn't Q&A working." Both
+   stay on the student's machine — read once, used to talk to Canvas and the model provider
+   directly, never transmitted to any SSB-operated service (§6). The same failure codes
+   (`canvas_auth_failed`, `llm_auth_failed` — docs/architecture/overview.md §2) resurface later if
+   a token expires or a key gets revoked mid-semester, prompting reconnection rather than failing
+   silently.
 2. **Select courses.** SSB fetches the student's enrolled courses from Canvas and lists them for
    selection — not every enrolled course needs indexing on day one. Each selected course also gets
    a weekly meeting schedule set here (day, time, session type), the basis for session capture
