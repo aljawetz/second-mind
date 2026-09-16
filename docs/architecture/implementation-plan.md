@@ -384,6 +384,48 @@ assignment) as a scripted test, not a one-off manual exercise — assert the out
 per-task-specific implementation language via the proposed cheap output check.
 **Depends on:** 8.
 
+**Design refinement made while implementing, not just following the spec literally:** design spec
+§7.1's "Tested finding" describes an earlier prototype generating free-text pointer guidance
+("this task needs a state flag — see Lecture 6...") that read as implementation advice. But
+overview.md's already-written `/explain` contract has no free-text field for pointers at all —
+just `{label, item_id}`, the same bare shape `/ask`'s citations use. So `build_pointers()` has no
+LLM synthesis step whatsoever: it's retrieval-only (same index, same `SIMILARITY_CUTOFF` as `/ask`,
+via `SimilarityPostprocessor`), returning citation labels mechanically derived from metadata. This
+is stricter than "constrain the prompt" — there's no generation step left to guard, so the failure
+mode design spec §7.1 found can't recur structurally, not just by instruction. `build_breakdown()`
+stays a real LLM call (reading comprehension of the assignment's own prompt only, no course
+retrieval), since restating the prompt's own structure is explicitly fine per §7.1.
+
+**The "cheap output check" design (undocumented mechanism, decided here):** extract real
+class/method/interface names the assignment prompt names via `<code>` tags
+(`explain.extract_code_identifiers`), assert none of them appear in any pointer's label. Lexical,
+deterministic, free — no second LLM call. `breakdown` is allowed and expected to name them (it's
+restating the prompt's own structure); only `pointers` is checked.
+
+**HTML-to-text:** Canvas assignment descriptions are real rich-text HTML. No HTML-parsing
+dependency existed in this project — added none; `explain.html_to_text` is a small stdlib
+`html.parser.HTMLParser` subclass, consistent with this project's existing minimal-dependency
+pattern (custom BGE tokenizer instead of tiktoken, ONNX instead of torch, etc.).
+
+**Verified against the real "A1 - Test Doubles" assignment** (course 55710, id `1008907`) — the
+literal assignment design spec §7.1's manual test used, confirmed by re-fetching its real
+description and finding the exact class names (`AccountDAO`, `SocialNetwork`, `IAccountDAO`, etc.)
+the spec's narrative describes. `scripts/assignment_explain_test.py` (new, same real-data pattern
+as the other smoke tests) produced 28-30 real sub-requirements restating the prompt's actual
+structure, 5 real citation pointers into the correctly-matching indexed slide deck (`06 Isolating
+Components - Test Doubles part 1...pdf`), and the boundary check passed — zero identifier leakage,
+confirmed both as a scripted assertion and by reading the actual pointer labels (they're just
+`<filename> · p.N`, incapable of containing implementation language by construction). Also verified
+through the real `main.py` HTTP endpoint directly (not just the script calling `explain.py`
+functions in-process): identical output, plus the `not_found` (bad assignment id) and
+Canvas-error-mapping paths, mirroring `_handle_list_courses`'s existing pattern.
+
+**Real gap, not fixed:** same course/assignment-id bridge problem as Step 9 — `Assignment.id` in
+the mock frontend data is a fictional string ("b1"), not a real Canvas assignment id. Bridged with
+`REAL_ASSIGNMENT_IDS` in `data.ts` (mock id → real id `1008907`, same pattern as `REAL_COURSE_IDS`),
+so the mock assignment's displayed prompt text doesn't match the real explanation returned — an
+intentional, documented mismatch until assignment data itself comes from Canvas.
+
 ### 11. Study artifacts
 **Do:** The four artifact types (mock test, mindmap, flashcards, slides) with caching keyed by
 course + type + a hash of the content generated from, plus an explicit "regenerate" action.

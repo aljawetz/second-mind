@@ -12,6 +12,16 @@ export const REAL_COURSE_IDS: Record<string, number> = {
   "18654": 55710,
 };
 
+// Same bridge, for assignments (Step 10). The mock assignment "b1" ("Lab 2
+// — Flaky Test Triage") is fictional; this points it at a real, different
+// assignment (course 55710's "A1 - Test Doubles") so the real /explain
+// endpoint has something to fetch. The mock prompt shown in the UI won't
+// match the real explanation returned — a real, deliberate mismatch until
+// assignment data itself comes from Canvas instead of DATA.
+export const REAL_ASSIGNMENT_IDS: Record<string, number> = {
+  b1: 1008907,
+};
+
 export const DATA: CourseData = {
   "49797": {
     code: "49797 · Advanced AI for Industry and Society",

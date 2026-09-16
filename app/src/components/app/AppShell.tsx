@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ArtifactType, ViewName } from "../../types";
-import { DATA, REAL_COURSE_IDS } from "../../data";
+import { DATA, REAL_ASSIGNMENT_IDS, REAL_COURSE_IDS } from "../../data";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import HomeView from "./HomeView";
@@ -75,7 +75,13 @@ export default function AppShell() {
                 />
               )}
               {view === "assignment" && assignment && (
-                <AssignmentView course={courseData} assignmentId={assignment} onBack={goHome} />
+                <AssignmentView
+                  course={courseData}
+                  assignmentId={assignment}
+                  courseId={REAL_COURSE_IDS[course] ?? null}
+                  realAssignmentId={REAL_ASSIGNMENT_IDS[assignment] ?? null}
+                  onBack={goHome}
+                />
               )}
             </div>
           </div>

@@ -11,6 +11,7 @@ import openai
 from llama_index.vector_stores.lancedb.base import TableNotFoundError
 
 import canvas
+import explain
 import generation
 import indexing
 
@@ -24,6 +25,7 @@ PORT = 8756
 SSB_HOME = Path.home() / ".ssb" / "default"
 
 ASK_PATH = re.compile(r"^/courses/(\d+)/ask$")
+EXPLAIN_PATH = re.compile(r"^/courses/(\d+)/assignments/(\d+)/explain$")
 
 
 class ThreadingHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
@@ -125,6 +127,11 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_ask(ask_match.group(1))
             return
 
+        explain_match = EXPLAIN_PATH.match(self.path)
+        if explain_match:
+            self._handle_explain(explain_match.group(1), explain_match.group(2))
+            return
+
         self.send_response(404)
         self.end_headers()
 
@@ -204,6 +211,63 @@ class Handler(BaseHTTPRequestHandler):
         self._write_chunk({"done": True})
         self.wfile.write(b"0\r\n\r\n")
         self.wfile.flush()
+
+    def _handle_explain(self, course_id: str, assignment_id: str):
+        # Drain any request body (overview.md documents Request: {}) — not
+        # otherwise used.
+        length = int(self.headers.get("Content-Length", 0))
+        if length:
+            self.rfile.read(length)
+
+        try:
+            assignment = canvas.get_assignment(int(course_id), int(assignment_id))
+        except canvas.CanvasError:
+            self._send_json(401, {"error": {"code": "canvas_auth_failed", "message": "no Canvas token stored"}})
+            return
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                self._send_json(401, {"error": {"code": "canvas_auth_failed", "message": "Canvas token invalid or expired"}})
+            else:
+                self._send_json(502, {"error": {"code": "canvas_error", "message": str(e)}})
+            return
+        except httpx.TransportError:
+            self._send_json(503, {"error": {"code": "canvas_unreachable", "message": "could not reach Canvas"}})
+            return
+
+        if assignment is None:
+            # get_assignment() degrades both 403 and 404 to None
+            # (canvas.py's documented policy) — overview.md's not_found
+            # covers "bad or stale ID," which is the reachable case here.
+            self._send_json(404, {"error": {"code": "not_found", "message": "assignment not found"}})
+            return
+
+        name = assignment.get("name", "")
+        description_text = explain.html_to_text(assignment.get("description") or "")
+
+        try:
+            breakdown = explain.build_breakdown(name, description_text)
+        except RuntimeError as e:
+            self._send_json(401, {"error": {"code": "llm_auth_failed", "message": str(e)}})
+            return
+        except openai.AuthenticationError:
+            self._send_json(401, {"error": {"code": "llm_auth_failed", "message": "OpenAI API key invalid or expired"}})
+            return
+        except openai.RateLimitError as e:
+            if e.code == "insufficient_quota":
+                self._send_json(402, {"error": {"code": "llm_quota_exceeded", "message": "OpenAI quota exceeded"}})
+            else:
+                self._send_json(429, {"error": {"code": "llm_rate_limited", "message": "OpenAI rate limit hit — try again shortly"}})
+            return
+
+        try:
+            db_path = SSB_HOME / "index.lancedb"
+            index = indexing.load_index(db_path, f"course_{course_id}")
+            pointers = explain.build_pointers(index, name, description_text)
+        except TableNotFoundError:
+            # Course not indexed yet — same graceful degrade as /ask.
+            pointers = []
+
+        self._send_json(200, {"breakdown": breakdown, "pointers": pointers})
 
     def log_message(self, format, *args):
         pass  # keep stdout quiet; this is a sidecar, not a dev console

@@ -87,3 +87,29 @@ export async function askQuestion(
     }
   }
 }
+
+export interface Pointer {
+  label: string;
+  item_id: string;
+}
+
+export interface AssignmentExplanation {
+  breakdown: string[];
+  pointers: Pointer[];
+}
+
+// main.py's /explain — a single plain JSON response, not streamed like
+// /ask: the breakdown step is one LLM call and the pointers step is
+// retrieval-only (no synthesis), so there's nothing to render token by
+// token (implementation-plan.md Step 10).
+export async function explainAssignment(courseId: number, assignmentId: number): Promise<AssignmentExplanation> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/assignments/${assignmentId}/explain`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `explain failed (${res.status})`);
+  }
+  return data;
+}

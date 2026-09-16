@@ -95,6 +95,17 @@ uv run python3 scripts/generation_smoke_test.py
 Makes real, **billed** OpenAI API calls (a handful of cheap `gpt-4o-mini` queries, but real money,
 not simulated). Needs a real OpenAI key in Keychain.
 
+## Running the assignment explainer boundary test
+
+```bash
+uv run python3 scripts/assignment_explain_test.py
+```
+
+Real, billed. Re-runs design spec §7.1's manual boundary test as a scripted assertion against
+course 55710's real "A1 - Test Doubles" assignment (a real coding assignment with concrete
+class/method names) — asserts `explain.build_pointers()` never names any of them, only
+`explain.build_breakdown()` may.
+
 ## Running the real `/ask` endpoint locally
 
 `POST /courses/{course_id}/ask` (`main.py`) queries whatever index already exists at
