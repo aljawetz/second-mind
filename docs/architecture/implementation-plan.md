@@ -329,7 +329,9 @@ a `/ping` issued while a real `/ask` stream was in flight returned in 0.5ms.
    machine, never a shared multi-tenant backend) and the premise didn't hold — the per-student
    subdirectory added no real isolation over the OS user account boundary that already provides
    it. Fixed by simplifying, not by building student_id derivation: `SSB_HOME` is now `~/.ssb/`
-   directly, and data-model.md §1 / design spec §5.1 were updated to match.
+   directly, and data-model.md §1 / design spec §5.1 were updated to match. **Verified:** rebuilt
+   sidecar, real `npm run tauri dev` click-through against the migrated real index — the user
+   confirmed the app works end-to-end on the new path.
 
 **Update — real course/assignment selection wired, hardcoded bridges removed** (a user-requested
 hardcoding fixup done out of step sequence, between Steps 10 and 11): `App.tsx`'s onboarding step
