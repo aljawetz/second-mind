@@ -6,12 +6,17 @@ this fits into the running system.
 
 ## 1. On-disk layout
 
-Everything lives under `~/.ssb/<student_id>/` (§5.1 of the design spec — one directory per
-student, physical isolation, not a filter on a shared store). `<student_id>` is derived locally at
-onboarding, never a Canvas-issued identifier that could be reused to correlate across systems.
+Everything lives under `~/.ssb/` directly — no per-student subdirectory. §5.1 of the design spec's
+"physical isolation, not a filter on a shared store" is about a hypothetical shared multi-tenant
+backend (many students' data in one database, isolated only by a query filter that could have a
+bug); SSB is a local sidecar, one student per machine, one OS user account per student. The macOS
+home directory *is* that physical isolation boundary — a `<student_id>` subdirectory inside it
+would isolate against nothing real for this architecture. (Multiple students sharing one OS
+account, e.g. a public lab machine, would be the one scenario where it mattered — not a stated
+target for SSB today; revisit this layout if that ever becomes real.)
 
 ```
-~/.ssb/<student_id>/
+~/.ssb/
 ├── config.json                  # non-sensitive settings only — see §3
 ├── index.lancedb/                # one LanceDB database for this student
 │   ├── course_49797/             # one table per course (logical separation, not a security

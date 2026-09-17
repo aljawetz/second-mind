@@ -6,9 +6,9 @@ not an arbitrary token window — SentenceSplitter only kicks in for prose
 long enough to actually need it. Indexed into a LanceDB table via
 LlamaIndex's official integration (rag-pipeline.md §4).
 
-Path convention matches data-model.md §1 (~/.ssb/<id>/index.lancedb/course_<code>/)
+Path convention matches data-model.md §1 (~/.ssb/index.lancedb/course_<code>/)
 but this module takes db_path as a parameter — callers decide where that
-actually points (a real student directory, or a scratch dir for tests).
+actually points (the real ~/.ssb/, or a scratch dir for tests).
 """
 
 from pathlib import Path

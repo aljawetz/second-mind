@@ -109,7 +109,7 @@ class/method names) — asserts `explain.build_pointers()` never names any of th
 ## Running the real `/ask` endpoint locally
 
 `POST /courses/{course_id}/ask` (`main.py`) queries whatever index already exists at
-`~/.ssb/default/index.lancedb/course_<id>` — there's no real onboarding→indexing pipeline wired up
+`~/.ssb/index.lancedb/course_<id>` — there's no real onboarding→indexing pipeline wired up
 yet (`OnboardingIndexing.tsx` in the frontend is still a simulated progress UI), so nothing builds
 that index for you. To test the endpoint for real, populate it yourself first:
 
@@ -120,7 +120,7 @@ from pathlib import Path
 
 structure = canvas.get_course_structure(YOUR_COURSE_ID)
 # ...extract nodes the same way scripts/generation_smoke_test.py does...
-indexing.build_index(nodes, Path.home() / ".ssb" / "default" / "index.lancedb", f"course_{YOUR_COURSE_ID}")
+indexing.build_index(nodes, Path.home() / ".ssb" / "index.lancedb", f"course_{YOUR_COURSE_ID}")
 ```
 
 Then `uv run python3 main.py` and `curl -N -X POST http://127.0.0.1:8756/courses/{id}/ask -d

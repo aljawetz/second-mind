@@ -323,9 +323,13 @@ a `/ping` issued while a real `/ask` stream was in flight returned in 0.5ms.
    at the real `~/.ssb/default/index.lancedb` path the same way `generation_smoke_test.py` does.
    Wiring real Canvas sync + indexing into the app's actual onboarding flow is a real, separate
    piece of future work, not covered by this step's scope.
-2. No real per-student directory derivation exists (data-model.md §1 calls for one generated at
-   onboarding) — Step 2 only built Keychain credentials. `main.py` still hardcodes `~/.ssb/default/`,
-   same precedent as Step 8's `config.json` hardcoding — not yet fixed.
+2. ~~No real per-student directory derivation exists...~~ — turned out not to be a real gap.
+   `main.py` hardcoded `~/.ssb/default/` here, framed at the time as needing a real derived
+   student_id per data-model.md §1. Revisited later (user pushback: this app is single-user-per-
+   machine, never a shared multi-tenant backend) and the premise didn't hold — the per-student
+   subdirectory added no real isolation over the OS user account boundary that already provides
+   it. Fixed by simplifying, not by building student_id derivation: `SSB_HOME` is now `~/.ssb/`
+   directly, and data-model.md §1 / design spec §5.1 were updated to match.
 
 **Update — real course/assignment selection wired, hardcoded bridges removed** (a user-requested
 hardcoding fixup done out of step sequence, between Steps 10 and 11): `App.tsx`'s onboarding step

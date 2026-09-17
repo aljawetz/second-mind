@@ -18,11 +18,13 @@ import indexing
 HOST = "127.0.0.1"
 PORT = 8756
 
-# data-model.md §1 puts everything under ~/.ssb/<student_id>/, with
-# <student_id> derived locally at onboarding. That derivation isn't built
-# yet (Step 2 only built Keychain credentials) — hardcoded single-student
-# directory for now, same precedent as Step 8's config.json hardcoding.
-SSB_HOME = Path.home() / ".ssb" / "default"
+# data-model.md §1: no per-student subdirectory — SSB is a local sidecar,
+# one student per machine, one OS user account per student, so ~/.ssb/
+# itself is already the physical isolation boundary design spec §5.1 is
+# about. A <student_id> layer inside it would isolate against nothing real
+# for this architecture (revisited and deliberately simplified — not an
+# oversight).
+SSB_HOME = Path.home() / ".ssb"
 
 ASK_PATH = re.compile(r"^/courses/(\d+)/ask$")
 ASSIGNMENTS_PATH = re.compile(r"^/courses/(\d+)/assignments$")

@@ -120,10 +120,13 @@ parity and should not.
 Every student gets their own on-disk index containing their course documents, their recordings,
 and their notes. Nothing is shared between students.
 
-This is **physical** isolation — one directory per student — not a filter flag on a shared
-corpus. A query-filter bug in a shared store is a cross-student data leak; a missing directory is
-an empty result. For a system holding lecture recordings and personal academic data, that
-asymmetry is worth paying for.
+This is **physical** isolation — one local installation per student, on their own machine, under
+their own OS user account — not a filter flag on a shared corpus. A query-filter bug in a shared
+store is a cross-student data leak; a missing directory is an empty result. For a system holding
+lecture recordings and personal academic data, that asymmetry is worth paying for. SSB never runs
+as a shared multi-tenant backend, so there's no additional per-student subdirectory to layer inside
+`~/.ssb/` — the OS account boundary already provides the isolation this section is about
+(data-model.md §1).
 
 **The cost, stated plainly:** the same slide deck is embedded once per student, and the class gets
 no network effect from each other's recordings. We accept both. Storage is cheap relative to the
