@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { AvailableCourse } from "../../types";
-import { listCourses } from "../../sidecar";
+import { listCourses, writeConfig } from "../../sidecar";
 
 export default function OnboardingCourses({
   courses,
@@ -36,6 +36,17 @@ export default function OnboardingCourses({
     onChange(courses.map((c, i) => (i === idx ? { ...c, checked: !c.checked } : c)));
   }
 
+  function handleImport() {
+    // Persisted so a future launch can skip onboarding (App.tsx's
+    // returning-user check) — best-effort: if this write fails, onboarding
+    // just runs again next time, which is a safe fallback, not a blocker.
+    const selectedIds = courses.filter((c) => c.checked).map((c) => c.id);
+    writeConfig({ selected_courses: selectedIds, llm_provider: "openai", onboarding_complete: true }).catch(
+      (e) => console.error("failed to persist course selection", e)
+    );
+    onNext();
+  }
+
   return (
     <div className="onboard">
       <div className="onboard-card">
@@ -67,7 +78,7 @@ export default function OnboardingCourses({
           </div>
         )}
         <div className="course-count">{selectedCount} selected</div>
-        <button className="btn-primary" disabled={selectedCount === 0} onClick={onNext}>
+        <button className="btn-primary" disabled={selectedCount === 0} onClick={handleImport}>
           Import selected courses →
         </button>
       </div>

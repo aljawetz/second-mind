@@ -60,6 +60,32 @@ category as step 1's Gatekeeper delay. A real user on a properly signed, notariz
 should see this at most once ever, the first time they save a credential; subsequent *reads* did
 not re-prompt even after a full app restart on the same (unrebuilt) binary.
 
+**Update — real `config.json` written for the first time, onboarding skipped for returning
+users** (a user-requested fixup, out of step sequence): a fresh app launch always re-ran the full
+4-stage onboarding flow, even with real credentials already in Keychain, because nothing checked
+whether it had run before. `config.json` (data-model.md §3, Step 13's formal scope, but nothing
+stopped building its first real reader/writer here) now gets its first real code — a small
+`config.py` module (`read_config`/`write_config`/`credentials_status`) and three endpoints
+(`GET /credentials/status`, `GET`/`POST /config`). `App.tsx` checks both at startup: only when
+Keychain has both credentials *and* `config.json`'s remembered course selection still matches a
+real, currently-available Canvas course does it skip straight to `AppShell`; any failure (backend
+hiccup, corrupted config, a remembered course id that's gone) falls through to normal onboarding
+rather than blocking startup. `OnboardingCourses.tsx`'s "Import selected courses" now writes this
+config as a best-effort side effect, not a blocking one. Credentials themselves are still never
+written here — `credentials_status()` only reports Keychain presence as booleans, never values,
+consistent with this step's own already-verified "not from config.json" guarantee above.
+**Verified:** real two-run test via `npm run tauri dev` — first run showed the keys screen
+(pre-filled from existing Keychain entries) and completed onboarding normally, writing a real
+`config.json`; quitting and relaunching opened straight to the home screen, no onboarding shown.
+Confirmed by the user directly.
+
+**Second, unrelated real bug found while testing this:** the bare `send_response(404);
+end_headers()` fallback for an unmatched route sent no `Content-Length` and no chunked framing —
+under HTTP/1.1 keep-alive (Step 9's fix), a client had no way to know the (empty) body had ended
+and hung indefinitely. Only surfaced by accident, hitting a route that didn't exist yet on an old,
+still-running sidecar. Fixed by routing every 404 through `_send_json` instead, which also gives a
+consistent, parseable `{error: {code, message}}` body instead of an empty one.
+
 ### 3. Canvas integration (real calls)
 **Do:** A direct Canvas REST API client in the Python backend (`httpx`, sync) — bearer-token auth
 from Keychain, `Link`-header pagination — implementing course listing and content fetch for pages,

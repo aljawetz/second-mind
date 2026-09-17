@@ -11,6 +11,7 @@ import openai
 from llama_index.vector_stores.lancedb.base import TableNotFoundError
 
 import canvas
+import config
 import explain
 import generation
 import indexing
@@ -84,13 +85,16 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200, {"status": "ok", "source": "ssb-backend"})
         elif self.path == "/courses":
             self._handle_list_courses()
+        elif self.path == "/credentials/status":
+            self._send_json(200, config.credentials_status())
+        elif self.path == "/config":
+            self._send_json(200, config.read_config(SSB_HOME))
         else:
             assignments_match = ASSIGNMENTS_PATH.match(self.path)
             if assignments_match:
                 self._handle_list_assignments(assignments_match.group(1))
                 return
-            self.send_response(404)
-            self.end_headers()
+            self._send_json(404, {"error": {"code": "not_found", "message": "no such route"}})
 
     def _canvas_error(self, e: Exception) -> tuple[int, dict]:
         # Error shape/codes per overview.md's documented contract.
@@ -136,6 +140,19 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(200, {"assignments": assignments})
 
     def do_POST(self):
+        if self.path == "/config":
+            length = int(self.headers.get("Content-Length", 0))
+            raw = self.rfile.read(length)
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                self._send_json(400, {"error": {"code": "bad_request", "message": "invalid JSON"}})
+                return
+            merged = {**config.read_config(SSB_HOME), **data}
+            config.write_config(SSB_HOME, merged)
+            self._send_json(200, merged)
+            return
+
         if self.path == "/credentials/validate":
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length)
@@ -158,8 +175,7 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_explain(explain_match.group(1), explain_match.group(2))
             return
 
-        self.send_response(404)
-        self.end_headers()
+        self._send_json(404, {"error": {"code": "not_found", "message": "no such route"}})
 
     def _write_chunk(self, payload: dict):
         # Manual chunked transfer encoding — verified against a real client

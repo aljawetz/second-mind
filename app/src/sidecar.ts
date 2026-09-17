@@ -25,6 +25,39 @@ export async function validateCredential(
   return res.json();
 }
 
+export interface CredentialsStatus {
+  canvas: boolean;
+  openai: boolean;
+}
+
+export async function getCredentialsStatus(): Promise<CredentialsStatus> {
+  const res = await fetch("http://127.0.0.1:8756/credentials/status");
+  return res.json();
+}
+
+// config.json (data-model.md §3) — non-sensitive settings persisted by
+// main.py at ~/.ssb/config.json. Used at startup to skip onboarding for a
+// returning user (real credentials + a remembered course list already on
+// disk) instead of always starting fresh.
+export interface SsbConfig {
+  selected_courses?: number[];
+  llm_provider?: string;
+  onboarding_complete?: boolean;
+}
+
+export async function getConfig(): Promise<SsbConfig> {
+  const res = await fetch("http://127.0.0.1:8756/config");
+  return res.json();
+}
+
+export async function writeConfig(data: SsbConfig): Promise<SsbConfig> {
+  const res = await fetch("http://127.0.0.1:8756/config", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
 export interface CanvasCourse {
   id: number;
   code: string | null;

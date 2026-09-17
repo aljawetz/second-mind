@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AvailableCourse, OnboardStage } from "./types";
+import { getConfig, getCredentialsStatus, listCourses } from "./sidecar";
 import StartupGate from "./components/onboarding/StartupGate";
 import OnboardingKeys from "./components/onboarding/OnboardingKeys";
 import OnboardingCourses from "./components/onboarding/OnboardingCourses";
@@ -11,9 +12,39 @@ export default function App() {
   const [courses, setCourses] = useState<AvailableCourse[]>([]);
   const selectedCourses = courses.filter((c) => c.checked);
 
+  // Returning-user check (config.json, data-model.md §3): skip onboarding
+  // only when both credentials are in Keychain AND a remembered course
+  // selection still matches a real, currently-available course. Any
+  // failure here (backend hiccup, corrupted config, a remembered course
+  // id that no longer exists) just falls through to normal onboarding —
+  // never blocks startup on this being a returning user.
+  async function handleBackendReady() {
+    try {
+      const [status, cfg] = await Promise.all([getCredentialsStatus(), getConfig()]);
+      const remembered = cfg.selected_courses ?? [];
+      if (status.canvas && status.openai && cfg.onboarding_complete && remembered.length > 0) {
+        const allCourses = await listCourses();
+        const restored = allCourses.map((c) => ({
+          id: c.id,
+          code: c.code ?? String(c.id),
+          name: c.name,
+          checked: remembered.includes(c.id),
+        }));
+        if (restored.some((c) => c.checked)) {
+          setCourses(restored);
+          setStage("app");
+          return;
+        }
+      }
+    } catch {
+      // fall through to onboarding
+    }
+    setStage("keys");
+  }
+
   switch (stage) {
     case "startup":
-      return <StartupGate onReady={() => setStage("keys")} />;
+      return <StartupGate onReady={handleBackendReady} />;
     case "keys":
       return <OnboardingKeys onNext={() => setStage("courses")} />;
     case "courses":
