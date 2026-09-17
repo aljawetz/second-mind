@@ -1,6 +1,5 @@
 import { useState } from "react";
-import type { Course } from "../../types";
-import { explainAssignment, type AssignmentExplanation } from "../../sidecar";
+import { explainAssignment, type AssignmentExplanation, type CanvasAssignment } from "../../sidecar";
 
 type ExplainState =
   | { status: "closed" }
@@ -8,34 +7,30 @@ type ExplainState =
   | { status: "error"; message: string }
   | { status: "done"; data: AssignmentExplanation };
 
+function formatDue(dueAt: string | null): string {
+  if (!dueAt) return "No due date";
+  return new Date(dueAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 export default function AssignmentView({
-  course,
-  assignmentId,
   courseId,
-  realAssignmentId,
+  assignment,
   onBack,
 }: {
-  course: Course;
-  assignmentId: string;
-  courseId: number | null;
-  realAssignmentId: number | null;
+  courseId: number;
+  assignment: CanvasAssignment;
   onBack: () => void;
 }) {
   const [explain, setExplain] = useState<ExplainState>({ status: "closed" });
-  const a = course.assignments.find((x) => x.id === assignmentId)!;
 
   async function toggleExplain() {
     if (explain.status !== "closed") {
       setExplain({ status: "closed" });
       return;
     }
-    if (courseId == null || realAssignmentId == null) {
-      setExplain({ status: "error", message: "Real Q&A isn't wired up for this assignment yet in this build." });
-      return;
-    }
     setExplain({ status: "loading" });
     try {
-      const data = await explainAssignment(courseId, realAssignmentId);
+      const data = await explainAssignment(courseId, assignment.id);
       setExplain({ status: "done", data });
     } catch (err) {
       setExplain({ status: "error", message: err instanceof Error ? err.message : "Something went wrong" });
@@ -50,16 +45,17 @@ export default function AssignmentView({
         ‹ Course home
       </button>
       <div className="assign-head">
-        <h2>{a.title}</h2>
+        <h2>{assignment.name}</h2>
       </div>
       <div className="assign-pills">
-        <span className="pill pill-ochre">Due {a.due}</span>
-        <span className="pill pill-neutral">{a.weight}</span>
-        <span className="pill pill-neutral">{a.status}</span>
+        <span className="pill pill-ochre">Due {formatDue(assignment.due_at)}</span>
+        {assignment.points_possible != null && (
+          <span className="pill pill-neutral">{assignment.points_possible} pts</span>
+        )}
       </div>
       <div className="panel">
         <h3>Prompt</h3>
-        <div className="assign-prompt">{a.prompt}</div>
+        <div className="assign-prompt">{assignment.description || "No description provided."}</div>
       </div>
       <button className="explain-btn" onClick={toggleExplain}>
         {open ? "✦ Hide explanation" : "✦ Explain this assignment"}

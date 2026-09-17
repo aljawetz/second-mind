@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
-import { DATA } from "../../data";
+import type { AvailableCourse } from "../../types";
 
 type RowStatus = "pending" | "busy" | "done";
 const LABELS = ["Assignments", "Modules", "Slides & files"] as const;
 
-export default function OnboardingIndexing({ onNext }: { onNext: () => void }) {
-  const courseCodes = Object.keys(DATA);
+export default function OnboardingIndexing({
+  courses,
+  onNext,
+}: {
+  courses: AvailableCourse[];
+  onNext: () => void;
+}) {
   const [rows, setRows] = useState<RowStatus[]>(
-    Array(courseCodes.length * LABELS.length).fill("pending")
+    Array(courses.length * LABELS.length).fill("pending")
   );
   const done = rows.every((r) => r === "done");
 
@@ -42,9 +47,11 @@ export default function OnboardingIndexing({ onNext }: { onNext: () => void }) {
           <p className="onboard-sub">This runs once — after this, everything stays local.</p>
         </div>
         <div className="index-list">
-          {courseCodes.map((code, ci) => (
-            <div className="index-course" key={code}>
-              <div className="icname">{DATA[code].code}</div>
+          {courses.map((course, ci) => (
+            <div className="index-course" key={course.id}>
+              <div className="icname">
+                {course.code} · {course.name}
+              </div>
               {LABELS.map((label, li) => {
                 const status = rows[ci * LABELS.length + li];
                 return (

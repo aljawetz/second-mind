@@ -25,6 +25,7 @@ PORT = 8756
 SSB_HOME = Path.home() / ".ssb" / "default"
 
 ASK_PATH = re.compile(r"^/courses/(\d+)/ask$")
+ASSIGNMENTS_PATH = re.compile(r"^/courses/(\d+)/assignments$")
 EXPLAIN_PATH = re.compile(r"^/courses/(\d+)/assignments/(\d+)/explain$")
 
 
@@ -82,24 +83,28 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/courses":
             self._handle_list_courses()
         else:
+            assignments_match = ASSIGNMENTS_PATH.match(self.path)
+            if assignments_match:
+                self._handle_list_assignments(assignments_match.group(1))
+                return
             self.send_response(404)
             self.end_headers()
 
-    def _handle_list_courses(self):
+    def _canvas_error(self, e: Exception) -> tuple[int, dict]:
         # Error shape/codes per overview.md's documented contract.
+        if isinstance(e, canvas.CanvasError):
+            return 401, {"error": {"code": "canvas_auth_failed", "message": "no Canvas token stored"}}
+        if isinstance(e, httpx.HTTPStatusError):
+            if e.response.status_code == 401:
+                return 401, {"error": {"code": "canvas_auth_failed", "message": "Canvas token invalid or expired"}}
+            return 502, {"error": {"code": "canvas_error", "message": str(e)}}
+        return 503, {"error": {"code": "canvas_unreachable", "message": "could not reach Canvas"}}  # httpx.TransportError
+
+    def _handle_list_courses(self):
         try:
             raw = canvas.list_courses()
-        except canvas.CanvasError:
-            self._send_json(401, {"error": {"code": "canvas_auth_failed", "message": "no Canvas token stored"}})
-            return
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 401:
-                self._send_json(401, {"error": {"code": "canvas_auth_failed", "message": "Canvas token invalid or expired"}})
-            else:
-                self._send_json(502, {"error": {"code": "canvas_error", "message": str(e)}})
-            return
-        except httpx.TransportError:
-            self._send_json(503, {"error": {"code": "canvas_unreachable", "message": "could not reach Canvas"}})
+        except (canvas.CanvasError, httpx.HTTPStatusError, httpx.TransportError) as e:
+            self._send_json(*self._canvas_error(e))
             return
 
         courses = [
@@ -108,6 +113,25 @@ class Handler(BaseHTTPRequestHandler):
             if c.get("name")  # some real courses come back with no name/code — skip, not usefully selectable
         ]
         self._send_json(200, {"courses": courses})
+
+    def _handle_list_assignments(self, course_id: str):
+        try:
+            raw = canvas.list_assignments(int(course_id))
+        except (canvas.CanvasError, httpx.HTTPStatusError, httpx.TransportError) as e:
+            self._send_json(*self._canvas_error(e))
+            return
+
+        assignments = [
+            {
+                "id": a["id"],
+                "name": a.get("name", ""),
+                "due_at": a.get("due_at"),
+                "points_possible": a.get("points_possible"),
+                "description": explain.html_to_text(a.get("description") or ""),
+            }
+            for a in raw
+        ]
+        self._send_json(200, {"assignments": assignments})
 
     def do_POST(self):
         if self.path == "/credentials/validate":
@@ -221,17 +245,8 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             assignment = canvas.get_assignment(int(course_id), int(assignment_id))
-        except canvas.CanvasError:
-            self._send_json(401, {"error": {"code": "canvas_auth_failed", "message": "no Canvas token stored"}})
-            return
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 401:
-                self._send_json(401, {"error": {"code": "canvas_auth_failed", "message": "Canvas token invalid or expired"}})
-            else:
-                self._send_json(502, {"error": {"code": "canvas_error", "message": str(e)}})
-            return
-        except httpx.TransportError:
-            self._send_json(503, {"error": {"code": "canvas_unreachable", "message": "could not reach Canvas"}})
+        except (canvas.CanvasError, httpx.HTTPStatusError, httpx.TransportError) as e:
+            self._send_json(*self._canvas_error(e))
             return
 
         if assignment is None:

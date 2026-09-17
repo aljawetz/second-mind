@@ -324,13 +324,24 @@ a `/ping` issued while a real `/ask` stream was in flight returned in 0.5ms.
    Wiring real Canvas sync + indexing into the app's actual onboarding flow is a real, separate
    piece of future work, not covered by this step's scope.
 2. No real per-student directory derivation exists (data-model.md §1 calls for one generated at
-   onboarding) — Step 2 only built Keychain credentials. `main.py` hardcodes
-   `~/.ssb/default/`, same precedent as Step 8's `config.json` hardcoding. Similarly, `App.tsx`'s
-   onboarding step fetches a real `AvailableCourse[]` but never passes it into `AppShell` — real
-   course *selection* isn't wired end-to-end. Bridged with a small hardcoded map
-   (`REAL_COURSE_IDS` in `data.ts`) from the mock UI's course codes to real Canvas ids; only
-   `"18654"` (→ 55710) is populated, since that's the only course ever indexed against real data in
-   this project.
+   onboarding) — Step 2 only built Keychain credentials. `main.py` still hardcodes `~/.ssb/default/`,
+   same precedent as Step 8's `config.json` hardcoding — not yet fixed.
+
+**Update — real course/assignment selection wired, hardcoded bridges removed** (a user-requested
+hardcoding fixup done out of step sequence, between Steps 10 and 11): `App.tsx`'s onboarding step
+now passes its real, user-selected `AvailableCourse[]` into
+`AppShell`, which uses a real Canvas course id as the sole course identity throughout (`Sidebar`,
+`Topbar`, `HomeView`, `AssignmentView`) — the `REAL_COURSE_IDS`/`REAL_ASSIGNMENT_IDS` hardcoded
+bridges, the mock `DATA`/`Course`/`CourseData` types, and `SessionView.tsx` are all deleted, not
+left as dead code. A new `GET /courses/{id}/assignments` endpoint (`canvas.list_assignments()`,
+already-written, just not exposed before) supplies real assignment id/name/due date/points/
+description, replacing the fictional `Assignment` fields entirely (`status`/`weight` had no real
+Canvas equivalent without further new endpoints, so they were dropped rather than faked). Sessions
+and study artifacts have zero real backend (Steps 11/12, not built) — rather than keep showing
+fictional demo content for a real course, both now show an honest "not built yet" placeholder,
+for every real course, not just the ones this project happened to index. Verified by the user
+directly in the running app: selecting one real course during onboarding produced the correct real
+UI throughout.
 
 **Frontend testing limitation, found while trying to verify in a browser:** the built React app
 cannot be exercised in a plain Chrome tab at all — `StartupGate` polls a real `pingSidecar()` call
@@ -423,11 +434,12 @@ through the real `main.py` HTTP endpoint directly (not just the script calling `
 functions in-process): identical output, plus the `not_found` (bad assignment id) and
 Canvas-error-mapping paths, mirroring `_handle_list_courses`'s existing pattern.
 
-**Real gap, not fixed:** same course/assignment-id bridge problem as Step 9 — `Assignment.id` in
-the mock frontend data is a fictional string ("b1"), not a real Canvas assignment id. Bridged with
-`REAL_ASSIGNMENT_IDS` in `data.ts` (mock id → real id `1008907`, same pattern as `REAL_COURSE_IDS`),
-so the mock assignment's displayed prompt text doesn't match the real explanation returned — an
-intentional, documented mismatch until assignment data itself comes from Canvas.
+**Real gap at the time, since fixed:** same course/assignment-id bridge problem as Step 9 —
+`Assignment.id` in the mock frontend data was a fictional string ("b1"), bridged with a hardcoded
+`REAL_ASSIGNMENT_IDS` map to a real Canvas assignment id, so the displayed prompt didn't match the
+real explanation returned. Resolved in the real course/assignment selection wiring pass (see the
+"Update — real course/assignment selection wired" note at the end of Step 9's section) —
+assignments now come from Canvas directly, no bridge left.
 
 ### 11. Study artifacts
 **Do:** The four artifact types (mock test, mindmap, flashcards, slides) with caching keyed by

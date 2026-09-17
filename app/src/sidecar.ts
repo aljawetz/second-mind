@@ -42,6 +42,23 @@ export async function listCourses(): Promise<CanvasCourse[]> {
   return data.courses;
 }
 
+export interface CanvasAssignment {
+  id: number;
+  name: string;
+  due_at: string | null;
+  points_possible: number | null;
+  description: string;
+}
+
+export async function listAssignments(courseId: number): Promise<CanvasAssignment[]> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/assignments`);
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `failed to list assignments (${res.status})`);
+  }
+  return data.assignments;
+}
+
 export interface Citation {
   source_type: "page" | "file" | "transcript" | "notes";
   label: string;

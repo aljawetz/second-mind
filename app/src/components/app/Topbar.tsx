@@ -1,20 +1,18 @@
-import type { Course } from "../../types";
-
 export default function Topbar({
-  course,
   courseCode,
+  courseName,
   socratic,
   onToggleSocratic,
 }: {
-  course: Course;
   courseCode: string;
+  courseName: string;
   socratic: boolean;
   onToggleSocratic: () => void;
 }) {
   return (
     <div className="topbar">
       <h1>{courseCode}</h1>
-      <span className="code mono">{course.code}</span>
+      <span className="code mono">{courseName}</span>
       <div className="topbar-right">
         <span className="pill">◆ grounded</span>
         <div className="toggle-wrap">

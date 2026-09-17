@@ -9,6 +9,7 @@ import AppShell from "./components/app/AppShell";
 export default function App() {
   const [stage, setStage] = useState<OnboardStage>("startup");
   const [courses, setCourses] = useState<AvailableCourse[]>([]);
+  const selectedCourses = courses.filter((c) => c.checked);
 
   switch (stage) {
     case "startup":
@@ -25,8 +26,8 @@ export default function App() {
         />
       );
     case "indexing":
-      return <OnboardingIndexing onNext={() => setStage("app")} />;
+      return <OnboardingIndexing courses={selectedCourses} onNext={() => setStage("app")} />;
     case "app":
-      return <AppShell />;
+      return <AppShell courses={selectedCourses} />;
   }
 }

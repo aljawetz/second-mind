@@ -1,87 +1,87 @@
-import { useState } from "react";
-import type { ArtifactType, ViewName } from "../../types";
-import { DATA, REAL_ASSIGNMENT_IDS, REAL_COURSE_IDS } from "../../data";
+import { useEffect, useState } from "react";
+import type { ArtifactType, AvailableCourse, ViewName } from "../../types";
+import { listAssignments, type CanvasAssignment } from "../../sidecar";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import HomeView from "./HomeView";
-import SessionView from "./SessionView";
 import ArtifactView from "./ArtifactView";
 import AssignmentView from "./AssignmentView";
 
-export default function AppShell() {
-  const [course, setCourse] = useState<string>("49797");
+export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
+  const [courseId, setCourseId] = useState<number>(courses[0].id);
   const [view, setView] = useState<ViewName>("home");
-  const [session, setSession] = useState<string | null>(null);
   const [artifact, setArtifact] = useState<ArtifactType>("mocktest");
-  const [assignment, setAssignment] = useState<string | null>(null);
+  const [assignmentId, setAssignmentId] = useState<number | null>(null);
   const [socratic, setSocratic] = useState(false);
 
-  const courseData = DATA[course];
+  const [assignments, setAssignments] = useState<CanvasAssignment[]>([]);
+  const [assignmentsError, setAssignmentsError] = useState<string | null>(null);
 
-  function openSession(id: string) {
-    setSession(id);
-    setView("session");
-  }
+  const course = courses.find((c) => c.id === courseId)!;
+
+  useEffect(() => {
+    let cancelled = false;
+    setAssignments([]);
+    setAssignmentsError(null);
+    listAssignments(courseId)
+      .then((list) => {
+        if (!cancelled) setAssignments(list);
+      })
+      .catch((err) => {
+        if (!cancelled) setAssignmentsError(err instanceof Error ? err.message : "Couldn't load assignments");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId]);
+
   function openArtifact(type: ArtifactType) {
     setArtifact(type);
     setView("artifact");
   }
-  function openAssignment(id: string) {
-    setAssignment(id);
+  function openAssignment(id: number) {
+    setAssignmentId(id);
     setView("assignment");
   }
   function goHome() {
     setView("home");
   }
-  function changeCourse(code: string) {
-    setCourse(code);
+  function changeCourse(id: number) {
+    setCourseId(id);
     setView("home");
   }
+
+  const selectedAssignment = assignments.find((a) => a.id === assignmentId) ?? null;
 
   return (
     <div id="stage-app">
       <div className="app">
-        <Sidebar
-          course={course}
-          onCourseChange={changeCourse}
-          activeSession={session}
-          onOpenSession={openSession}
-        />
+        <Sidebar courses={courses} activeCourseId={courseId} onCourseChange={changeCourse} />
         <main className="main">
-          <Topbar course={courseData} courseCode={course} socratic={socratic} onToggleSocratic={() => setSocratic((s) => !s)} />
+          <Topbar
+            courseCode={course.code}
+            courseName={course.name}
+            socratic={socratic}
+            onToggleSocratic={() => setSocratic((s) => !s)}
+          />
           <div className="view">
             <div className="view-inner">
               {view === "home" && (
                 <HomeView
-                  course={courseData}
-                  courseCode={course}
-                  courseId={REAL_COURSE_IDS[course] ?? null}
+                  courseId={courseId}
+                  courseName={course.name}
+                  assignments={assignments}
+                  assignmentsError={assignmentsError}
                   socratic={socratic}
-                  onOpenSession={openSession}
                   onOpenArtifact={openArtifact}
                   onOpenAssignment={openAssignment}
                 />
               )}
-              {view === "session" && session && (
-                <SessionView course={courseData} sessionId={session} onBack={goHome} />
-              )}
               {view === "artifact" && (
-                <ArtifactView
-                  course={courseData}
-                  courseCode={course}
-                  artifact={artifact}
-                  onArtifactChange={setArtifact}
-                  onBack={goHome}
-                />
+                <ArtifactView artifact={artifact} onArtifactChange={setArtifact} onBack={goHome} />
               )}
-              {view === "assignment" && assignment && (
-                <AssignmentView
-                  course={courseData}
-                  assignmentId={assignment}
-                  courseId={REAL_COURSE_IDS[course] ?? null}
-                  realAssignmentId={REAL_ASSIGNMENT_IDS[assignment] ?? null}
-                  onBack={goHome}
-                />
+              {view === "assignment" && selectedAssignment && (
+                <AssignmentView courseId={courseId} assignment={selectedAssignment} onBack={goHome} />
               )}
             </div>
           </div>

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
-import type { ArtifactType, Course } from "../../types";
+import type { ArtifactType } from "../../types";
 import { ARTIFACT_TYPES } from "../../data";
-import { askQuestion, type AskMode, type Citation } from "../../sidecar";
+import { askQuestion, type AskMode, type CanvasAssignment, type Citation } from "../../sidecar";
 
 interface ChatTurn {
   question: string;
@@ -12,34 +12,45 @@ interface ChatTurn {
   error?: string;
 }
 
+function formatDue(dueAt: string | null): string {
+  if (!dueAt) return "No due date";
+  return new Date(dueAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function nextAssignment(assignments: CanvasAssignment[]): CanvasAssignment | null {
+  if (assignments.length === 0) return null;
+  const withDue = assignments.filter((a) => a.due_at);
+  if (withDue.length === 0) return assignments[0];
+  return [...withDue].sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime())[0];
+}
+
 export default function HomeView({
-  course,
-  courseCode,
   courseId,
+  courseName,
+  assignments,
+  assignmentsError,
   socratic,
-  onOpenSession,
   onOpenArtifact,
   onOpenAssignment,
 }: {
-  course: Course;
-  courseCode: string;
-  courseId: number | null;
+  courseId: number;
+  courseName: string;
+  assignments: CanvasAssignment[];
+  assignmentsError: string | null;
   socratic: boolean;
-  onOpenSession: (id: string) => void;
   onOpenArtifact: (type: ArtifactType) => void;
-  onOpenAssignment: (id: string) => void;
+  onOpenAssignment: (id: number) => void;
 }) {
   const [askValue, setAskValue] = useState("");
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const threadRef = useRef<HTMLDivElement>(null);
-  const nextAssignment = course.assignments[0];
+  const upNext = nextAssignment(assignments);
   const lastTurn = turns[turns.length - 1];
   const busy = lastTurn?.status === "loading" || lastTurn?.status === "streaming";
-  const disabled = busy || courseId == null;
 
   async function send() {
     const question = askValue.trim();
-    if (!question || disabled || courseId == null) return;
+    if (!question || busy) return;
     setAskValue("");
     const turnIndex = turns.length;
     setTurns((prev) => [...prev, { question, answer: "", citations: [], grounded: false, status: "loading" }]);
@@ -71,13 +82,7 @@ export default function HomeView({
       <div className="chat-panel">
         <div className="chat-head">Ask about this course</div>
         <div className="qa-thread" ref={threadRef}>
-          {turns.length === 0 && (
-            <div className="qa-empty">
-              {courseId == null
-                ? "Real Q&A isn't wired up for this course yet in this build."
-                : "Ask a question about this course to get started."}
-            </div>
-          )}
+          {turns.length === 0 && <div className="qa-empty">Ask a question about this course to get started.</div>}
           {turns.map((turn, i) => (
             <div key={i}>
               <div className="qa-q">{turn.question}</div>
@@ -112,11 +117,11 @@ export default function HomeView({
             type="text"
             placeholder="Ask about this course…"
             value={askValue}
-            disabled={disabled}
+            disabled={busy}
             onChange={(e) => setAskValue(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
           />
-          <button className="ask-send" onClick={send} disabled={disabled}>
+          <button className="ask-send" onClick={send} disabled={busy}>
             Ask
           </button>
         </div>
@@ -125,16 +130,18 @@ export default function HomeView({
       <div className="home-right">
         <div className="home-block">
           <div className="section-label">Next assignment</div>
-          <button className="assign-card" onClick={() => onOpenAssignment(nextAssignment.id)}>
-            <span className="main">
-              <div className="ttl">{nextAssignment.title}</div>
-              <div className="crs">
-                {courseCode} · {nextAssignment.status}
-              </div>
-            </span>
-            <span className="pill pill-ochre">Due {nextAssignment.due}</span>
-            <span className="go">›</span>
-          </button>
+          {assignmentsError && <div className="qa-a-error">{assignmentsError}</div>}
+          {!assignmentsError && !upNext && <div className="qa-empty">No assignments found.</div>}
+          {upNext && (
+            <button className="assign-card" onClick={() => onOpenAssignment(upNext.id)}>
+              <span className="main">
+                <div className="ttl">{upNext.name}</div>
+                <div className="crs">{courseName}</div>
+              </span>
+              <span className="pill pill-ochre">Due {formatDue(upNext.due_at)}</span>
+              <span className="go">›</span>
+            </button>
+          )}
         </div>
 
         <div className="home-block">
@@ -151,20 +158,7 @@ export default function HomeView({
 
         <div className="home-block">
           <div className="section-label">Recent sessions</div>
-          <div className="session-list">
-            {course.sessions.map((s) => (
-              <button className="session-card" key={s.id} onClick={() => onOpenSession(s.id)}>
-                <span className="num mono">{s.num}</span>
-                <span className="meta">
-                  <div className="ttl">{s.title}</div>
-                  <div className="dt">
-                    {s.date} · {s.duration}
-                  </div>
-                </span>
-                <span className="go">›</span>
-              </button>
-            ))}
-          </div>
+          <div className="qa-empty">Session capture isn't built yet.</div>
         </div>
       </div>
     </section>

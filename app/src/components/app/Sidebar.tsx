@@ -1,18 +1,14 @@
-import { DATA } from "../../data";
+import type { AvailableCourse } from "../../types";
 
 export default function Sidebar({
-  course,
+  courses,
+  activeCourseId,
   onCourseChange,
-  activeSession,
-  onOpenSession,
 }: {
-  course: string;
-  onCourseChange: (code: string) => void;
-  activeSession: string | null;
-  onOpenSession: (id: string) => void;
+  courses: AvailableCourse[];
+  activeCourseId: number;
+  onCourseChange: (id: number) => void;
 }) {
-  const sessions = DATA[course].sessions;
-
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -22,14 +18,14 @@ export default function Sidebar({
       <div>
         <div className="nav-label">Courses</div>
         <div className="nav-group">
-          {Object.keys(DATA).map((code) => (
+          {courses.map((c) => (
             <button
-              key={code}
-              className={"course-btn" + (code === course ? " active" : "")}
-              onClick={() => onCourseChange(code)}
+              key={c.id}
+              className={"course-btn" + (c.id === activeCourseId ? " active" : "")}
+              onClick={() => onCourseChange(c.id)}
             >
               <span className="dot"></span>
-              {code}
+              {c.code}
             </button>
           ))}
         </div>
@@ -38,16 +34,7 @@ export default function Sidebar({
       <div>
         <div className="nav-label">Sessions</div>
         <div className="nav-group">
-          {sessions.map((s) => (
-            <button
-              key={s.id}
-              className={"session-btn" + (activeSession === s.id ? " active" : "")}
-              onClick={() => onOpenSession(s.id)}
-            >
-              Class {s.num}
-              <span className="sdate">{s.date}</span>
-            </button>
-          ))}
+          <div className="qa-empty">Session capture isn't built yet.</div>
         </div>
       </div>
 
