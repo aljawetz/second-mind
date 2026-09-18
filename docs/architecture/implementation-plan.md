@@ -717,6 +717,13 @@ courses" view, reachable from the previously-dead Settings icon, confirmed by th
 **Test:** A machine that has never had any dev tooling installed — ideally a teammate's personal
 laptop, not the build machine — can install and run the app from the signed `.app` alone.
 **Depends on:** everything above.
+**Split, not fully done:** the packaging half shipped first, deliberately unsigned — see
+[the contribution & distribution plan](contribution-and-distribution-plan.md)'s step 5 for the
+real CI release pipeline (tag push → PyInstaller sidecar → `tauri build` → GitHub Release) and why
+notarization (a paid Apple Developer account) was deferred rather than blocking a first release on
+it. The "clean machine, no dev tooling" test above is real and still the bar, just against an
+unsigned `.dmg` for now — a first install needs the Gatekeeper bypass (right-click → Open), not a
+seamless double-click, until this step's other half lands.
 
 ## What this plan deliberately leaves open
 

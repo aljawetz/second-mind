@@ -141,22 +141,33 @@ first run; the `rust` job passed after this fix, confirmed on a second real run.
 **Verified:** templates and badges added; badge links and rendering can only be fully confirmed
 once this is pushed and the CI workflow has run at least once (same caveat as step 4).
 
-## 5. Release/installer pipeline (macOS only)
+## 5. Release/installer pipeline (macOS only) — done, shipping unsigned deliberately
 
 **Do:** A tag-triggered workflow (`v*`) that builds the PyInstaller sidecar, runs `tauri build`,
 and publishes the resulting `.dmg` to GitHub Releases. README gets a "Download" section pointing at
 the latest release.
 
-**Open call-out, not yet decided:** the app is currently ad-hoc signed (a known, documented gap —
-see implementation-plan.md's step 14). An unsigned `.dmg` triggers Gatekeeper's "Apple cannot
-verify this app" warning on every stranger's first install — real friction for a self-serve
-download. Proper notarization needs a paid Apple Developer account. Current plan: ship unsigned
-with a README note on bypassing Gatekeeper (right-click → Open), and treat real signing as
-separate future work rather than a blocker — but this is a cost/priority call, not a technical one,
-and stays open until confirmed.
+**Decision made:** ship unsigned now rather than block the first release on notarization (a paid
+Apple Developer account). A `.dmg` from this pipeline triggers Gatekeeper's "Apple cannot verify
+this app" warning on first install — real friction, accepted deliberately, with a README note on
+the bypass (right-click → Open). Real signing stays separate future work — implementation-plan.md's
+step 14 originally scoped "signed and notarized" as one unit; this splits it, shipping the
+unsigned half now.
 
 **Test:** A tagged push produces a GitHub Release with a downloadable `.dmg` attached; installing it
 on a clean macOS machine (no dev tools) and completing onboarding against a real Canvas account
 works end to end.
 
 **Depends on:** 1, 2, 4.
+
+**Verified:** the sidecar-build → Tauri-bundle pipeline was run for real, locally, end to end —
+the documented two-phase `uv sync` sequence (`--group convert` to generate the embedding model,
+then a full reconcile to `--group build` before PyInstaller runs) confirmed to actually strip
+torch/optimum back out before the shipped binary is built, exactly as `backend/README.md` already
+warned it must; the sidecar built, `SSB.app` bundled successfully. **The final `.dmg`-creation
+step could not be verified in this sandboxed shell** — Tauri's `bundle_dmg.sh` shells out to
+`osascript` to style the Finder window, and that AppleEvent call timed out (`-1712`) here, almost
+certainly a local automation-permission limitation of this specific execution context rather than
+a bug in the pipeline. Real verification came from actually pushing a tag and watching the
+workflow run on GitHub's own macOS runner instead of trusting local output — see the tag/release
+this step produced for the result.

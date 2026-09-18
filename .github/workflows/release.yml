@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# macOS only, unsigned — contribution-and-distribution-plan.md step 5. An
+# unsigned .dmg triggers Gatekeeper's "Apple cannot verify this app"
+# warning on first install (right-click -> Open bypasses it); real
+# notarization needs a paid Apple Developer account and is deliberately
+# deferred rather than blocking a first release on it.
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: app/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Two-phase deps deliberately, not `uv sync --all-groups` once:
+      # backend/README.md's own documented finding (implementation-plan.md
+      # Step 4) — building the sidecar from an environment that also has
+      # the `convert` group installed (optimum, pulled in only to run the
+      # ONNX export) silently bundles torch into the shipped binary. The
+      # embedding model is generated in one environment, then the
+      # environment is fully reconciled to build-only before PyInstaller
+      # ever runs.
+      - name: Generate the embedding model
+        working-directory: backend
+        run: |
+          uv sync --group convert
+          uv run python3 scripts/convert_embedding_model.py
+
+      - name: Fetch the session-transcription model
+        working-directory: backend
+        run: uv run python3 scripts/fetch_whisper_model.py
+
+      - name: Build the sidecar binary
+        working-directory: backend
+        run: |
+          uv sync --group build
+          uv run --group build pyinstaller ssb-backend.spec --distpath dist --workpath build
+
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Copy sidecar into the Tauri bundle
+        run: |
+          mkdir -p app/src-tauri/binaries
+          cp backend/dist/ssb-backend-aarch64-apple-darwin app/src-tauri/binaries/ssb-backend-aarch64-apple-darwin
+
+      - name: Build the Tauri app (.dmg)
+        working-directory: app
+        run: npm run tauri build
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/src-tauri/target/release/bundle/dmg/*.dmg
+          generate_release_notes: true
+          body: |
+            **Unsigned build.** macOS will say "Apple cannot verify this app" on first launch —
+            right-click the app → Open, then confirm, to bypass this (only needed once). See
+            [docs/architecture/contribution-and-distribution-plan.md](https://github.com/${{ github.repository }}/blob/main/docs/architecture/contribution-and-distribution-plan.md)
+            for why this isn't notarized yet.
+
+            **Tesseract required separately for OCR fallback on image-heavy slides**
+            (`brew install tesseract`) — not bundled into this build yet
+            (implementation-plan.md Step 5's real finding: `pytesseract` only wraps the system
+            binary, PyInstaller doesn't pick it up).

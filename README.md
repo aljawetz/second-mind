@@ -15,11 +15,22 @@ Your index, your recordings, your notes, on your machine.
 > assignment explanations all work end-to-end against real data. Study artifact generation (mock
 > tests, mindmaps, flashcards, slides) hasn't started yet; see
 > [the implementation plan](docs/architecture/implementation-plan.md) for exactly what's done.
-> There's no downloadable installer yet — see the Quickstart below to run it from source.
 
 ---
 
-## Quickstart (macOS)
+## Download (macOS)
+
+**[Latest release](https://github.com/aljawetz/ssb/releases/latest)** — download the `.dmg`, open
+it, drag SSB to Applications.
+
+This build is **unsigned** — macOS will say "Apple cannot verify this app." Right-click the app →
+Open, then confirm, to bypass this (only needed once; see
+[the contribution & distribution plan](docs/architecture/contribution-and-distribution-plan.md)
+for why real notarization isn't done yet). OCR fallback for image-heavy slides needs Tesseract
+installed separately (`brew install tesseract`) — not bundled into this build yet. Windows/Linux
+aren't built yet either.
+
+## Quickstart from source (macOS)
 
 ```bash
 git clone https://github.com/aljawetz/ssb.git
@@ -31,8 +42,7 @@ cd app && PATH="$HOME/.cargo/bin:$PATH" npm run tauri dev
 Prerequisites: `uv`, Node, Rust (`rustup`), `brew install tesseract`. During onboarding you'll
 need a Canvas API token (Account → Settings → New access token, on whatever Canvas instance your
 school uses) and an OpenAI API key. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev
-workflow. Windows/Linux and a downloadable installer aren't built yet — tracked in
-[the contribution & distribution plan](docs/architecture/contribution-and-distribution-plan.md).
+workflow.
 
 ---
 
