@@ -220,3 +220,13 @@ def add_nodes(nodes: list[TextNode], db_path: Path, table_name: str) -> None:
         load_index(db_path, table_name).insert_nodes(nodes)
     else:
         build_index(nodes, db_path, table_name)
+
+
+def delete_ref_doc_nodes(db_path: Path, table_name: str, ref_doc_id: str) -> None:
+    """Deleting a session (Step 12) — the first real caller of the delete()
+    override _PatchedLanceDBVectorStore exists for for since Step 7 (that
+    was built and verified against the raw table directly, but never
+    exercised through an actual app feature until now)."""
+    if not index_exists(db_path, table_name):
+        return
+    _PatchedLanceDBVectorStore(uri=str(db_path), table_name=table_name).delete(ref_doc_id)

@@ -308,7 +308,8 @@ button{font:inherit;color:inherit}
 
 /* ---------- assignment view ---------- */
 .assign-head{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap}
-.assign-head h2{font-size:1.3rem;font-weight:500}
+.assign-head h2{font-size:1.3rem;font-weight:500;cursor:default}
+.session-title-input{font-size:1.3rem;font-weight:500;font-family:inherit;border:1px solid var(--line-strong);border-radius:8px;padding:.15rem .5rem;background:var(--surface);color:var(--ink)}
 .assign-pills{display:flex;gap:.5rem;flex-wrap:wrap}
 .assign-prompt{font-size:.9rem;line-height:1.65;color:var(--ink-dim)}
 .explain-btn{
@@ -325,6 +326,16 @@ button{font:inherit;color:inherit}
 .explain-flag .cav{font-size:.75rem;color:var(--ink-faint)}
 .explain-list{margin:0;padding-left:1.1rem;display:flex;flex-direction:column;gap:.5rem;font-size:.87rem;line-height:1.55;color:var(--ink)}
 .explain-tips{display:flex;flex-direction:column;gap:.7rem}
+.markdown-body{font-size:.9rem;line-height:1.65;color:var(--ink-dim)}
+.markdown-body h1,.markdown-body h2,.markdown-body h3{color:var(--ink);font-weight:600;margin:1rem 0 .4rem}
+.markdown-body h1:first-child,.markdown-body h2:first-child,.markdown-body h3:first-child{margin-top:0}
+.markdown-body h1{font-size:1.05rem}
+.markdown-body h2{font-size:.96rem}
+.markdown-body h3{font-size:.9rem}
+.markdown-body p{margin:0 0 .6rem}
+.markdown-body ul,.markdown-body ol{margin:0 0 .6rem;padding-left:1.2rem}
+.markdown-body li{margin-bottom:.25rem}
+.markdown-body strong{color:var(--ink);font-weight:600}
 .explain-tip{display:flex;gap:.6rem;align-items:flex-start;font-size:.87rem;line-height:1.55}
 .explain-tip .cite{flex:none;margin-top:.15rem}
 
@@ -399,6 +410,11 @@ button{font:inherit;color:inherit}
 .index-row.done .stat{background:var(--moss);border-color:var(--moss)}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion: reduce){.index-row.busy .stat{animation:none}}
+.session-status-dot{
+  width:12px;height:12px;border-radius:50%;flex:none;margin-left:auto;
+  border:1.5px solid var(--indigo);border-top-color:transparent;animation:spin .7s linear infinite;
+}
+@media (prefers-reduced-motion: reduce){.session-status-dot{animation:none}}
 
 @media (max-width:760px){
   .app{flex-direction:column}

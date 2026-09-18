@@ -1,22 +1,25 @@
 import { useEffect, useState } from "react";
 import type { ArtifactType, AvailableCourse, ViewName } from "../../types";
-import { listAssignments, type CanvasAssignment } from "../../sidecar";
+import { listAssignments, listSessions, type CanvasAssignment, type SessionSummary } from "../../sidecar";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import HomeView from "./HomeView";
 import ArtifactView from "./ArtifactView";
 import AssignmentView from "./AssignmentView";
 import NewSessionView from "./NewSessionView";
+import SessionDetailView from "./SessionDetailView";
 
 export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
   const [courseId, setCourseId] = useState<number>(courses[0].id);
   const [view, setView] = useState<ViewName>("home");
   const [artifact, setArtifact] = useState<ArtifactType>("mocktest");
   const [assignmentId, setAssignmentId] = useState<number | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [socratic, setSocratic] = useState(false);
 
   const [assignments, setAssignments] = useState<CanvasAssignment[]>([]);
   const [assignmentsError, setAssignmentsError] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
 
   const course = courses.find((c) => c.id === courseId)!;
 
@@ -36,6 +39,27 @@ export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
     };
   }, [courseId]);
 
+  function refreshSessions() {
+    listSessions(courseId)
+      .then(setSessions)
+      .catch(() => {});
+  }
+
+  useEffect(() => {
+    refreshSessions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId]);
+
+  // A session left "recording"/"processing" keeps polling in the
+  // background while the sidebar is visible, so its status dot updates
+  // even if the student navigates away from the session's own page.
+  useEffect(() => {
+    if (!sessions.some((s) => s.status === "recording" || s.status === "processing")) return;
+    const id = setInterval(refreshSessions, 3000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessions, courseId]);
+
   function openArtifact(type: ArtifactType) {
     setArtifact(type);
     setView("artifact");
@@ -52,7 +76,16 @@ export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
     setView("home");
   }
   function openNewSession() {
+    setSessionId(null);
     setView("newSession");
+  }
+  function openSession(id: string) {
+    setSessionId(id);
+    setView("sessionDetail");
+  }
+  function handleSessionDeleted() {
+    refreshSessions();
+    goHome();
   }
 
   const selectedAssignment = assignments.find((a) => a.id === assignmentId) ?? null;
@@ -60,7 +93,15 @@ export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
   return (
     <div id="stage-app">
       <div className="app">
-        <Sidebar courses={courses} activeCourseId={courseId} onCourseChange={changeCourse} onNewSession={openNewSession} />
+        <Sidebar
+          courses={courses}
+          activeCourseId={courseId}
+          onCourseChange={changeCourse}
+          onNewSession={openNewSession}
+          sessions={sessions}
+          activeSessionId={sessionId}
+          onOpenSession={openSession}
+        />
         <main className="main">
           <Topbar
             courseCode={course.code}
@@ -87,7 +128,12 @@ export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
               {view === "assignment" && selectedAssignment && (
                 <AssignmentView courseId={courseId} assignment={selectedAssignment} onBack={goHome} />
               )}
-              {view === "newSession" && <NewSessionView courseId={courseId} onBack={goHome} />}
+              {view === "newSession" && (
+                <NewSessionView courseId={courseId} onBack={goHome} onSessionCreated={refreshSessions} />
+              )}
+              {view === "sessionDetail" && sessionId && (
+                <SessionDetailView courseId={courseId} sessionId={sessionId} onBack={goHome} onDeleted={handleSessionDeleted} />
+              )}
             </div>
           </div>
         </main>

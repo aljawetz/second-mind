@@ -27,9 +27,10 @@ target for SSB today; revisit this layout if that ever becomes real.)
 │   │   ├── manifest.db            # sync manifest (§5.5) — SQLite, schema in §4
 │   │   └── sessions/
 │   │       ├── 2026-09-12-class-06/
-│   │       │   ├── transcript.json        # raw audio is NOT kept — deleted right after
-│   │       │   ├── notes.md                #   transcription succeeds (implementation-plan.md
-│   │       │   └── summary.md              #   Step 12; same policy as raw Canvas files above)
+│   │       │   ├── meta.json               # display title (renamable) — raw audio is NOT
+│   │       │   ├── transcript.json         #   kept, deleted right after transcription
+│   │       │   ├── notes.md                #   succeeds (implementation-plan.md Step 12;
+│   │       │   └── summary.md              #   same policy as raw Canvas files above)
 │   │       └── 2026-09-10-class-05/
 │   │           └── ...
 │   └── 18654/

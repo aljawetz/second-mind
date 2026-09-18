@@ -32,10 +32,12 @@ SSB_HOME = Path.home() / ".ssb"
 ASK_PATH = re.compile(r"^/courses/(\d+)/ask$")
 ASSIGNMENTS_PATH = re.compile(r"^/courses/(\d+)/assignments$")
 EXPLAIN_PATH = re.compile(r"^/courses/(\d+)/assignments/(\d+)/explain$")
+SESSION_LIST_PATH = re.compile(r"^/courses/(\d+)/sessions$")
 SESSION_START_PATH = re.compile(r"^/courses/(\d+)/sessions/start$")
+SESSION_DETAIL_PATH = re.compile(r"^/courses/(\d+)/sessions/([\w-]+)$")
+SESSION_RENAME_PATH = re.compile(r"^/courses/(\d+)/sessions/([\w-]+)/rename$")
 SESSION_STOP_PATH = re.compile(r"^/sessions/([\w-]+)/stop$")
 SESSION_NOTES_PATH = re.compile(r"^/sessions/([\w-]+)/notes$")
-SESSION_STATUS_PATH = re.compile(r"^/sessions/([\w-]+)$")
 
 
 class ThreadingHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
@@ -100,9 +102,13 @@ class Handler(BaseHTTPRequestHandler):
             if assignments_match:
                 self._handle_list_assignments(assignments_match.group(1))
                 return
-            status_match = SESSION_STATUS_PATH.match(self.path)
-            if status_match:
-                self._handle_session_status(status_match.group(1))
+            list_match = SESSION_LIST_PATH.match(self.path)
+            if list_match:
+                self._handle_list_sessions(list_match.group(1))
+                return
+            detail_match = SESSION_DETAIL_PATH.match(self.path)
+            if detail_match:
+                self._handle_session_detail(detail_match.group(1), detail_match.group(2))
                 return
             self._send_json(404, {"error": {"code": "not_found", "message": "no such route"}})
 
@@ -149,12 +155,15 @@ class Handler(BaseHTTPRequestHandler):
         ]
         self._send_json(200, {"assignments": assignments})
 
-    def _handle_session_status(self, session_id: str):
-        status = sessions.get_status(session_id)
-        if status is None:
+    def _handle_list_sessions(self, course_id: str):
+        self._send_json(200, {"sessions": sessions.list_sessions(SSB_HOME, int(course_id))})
+
+    def _handle_session_detail(self, course_id: str, session_id: str):
+        detail = sessions.get_session_detail(SSB_HOME, int(course_id), session_id)
+        if detail is None:
             self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
             return
-        self._send_json(200, status)
+        self._send_json(200, detail)
 
     def do_POST(self):
         if self.path == "/config":
@@ -207,6 +216,18 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_session_notes(session_notes_match.group(1))
             return
 
+        rename_match = SESSION_RENAME_PATH.match(self.path)
+        if rename_match:
+            self._handle_session_rename(rename_match.group(1), rename_match.group(2))
+            return
+
+        self._send_json(404, {"error": {"code": "not_found", "message": "no such route"}})
+
+    def do_DELETE(self):
+        detail_match = SESSION_DETAIL_PATH.match(self.path)
+        if detail_match:
+            self._handle_session_delete(detail_match.group(1), detail_match.group(2))
+            return
         self._send_json(404, {"error": {"code": "not_found", "message": "no such route"}})
 
     def _handle_session_start(self, course_id: str):
@@ -236,6 +257,29 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
             return
         self._send_json(200, {"status": "saved"})
+
+    def _handle_session_rename(self, course_id: str, session_id: str):
+        length = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(length)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            self._send_json(400, {"error": {"code": "bad_request", "message": "invalid JSON"}})
+            return
+        try:
+            sessions.rename_session(SSB_HOME, int(course_id), session_id, data.get("title", ""))
+        except KeyError:
+            self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
+            return
+        self._send_json(200, {"status": "renamed"})
+
+    def _handle_session_delete(self, course_id: str, session_id: str):
+        try:
+            sessions.delete_session(SSB_HOME, int(course_id), session_id, SSB_HOME / "index.lancedb")
+        except KeyError:
+            self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
+            return
+        self._send_json(200, {"status": "deleted"})
 
     def _write_chunk(self, payload: dict):
         # Manual chunked transfer encoding — verified against a real client

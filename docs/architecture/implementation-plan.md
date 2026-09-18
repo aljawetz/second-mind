@@ -561,6 +561,40 @@ call. Still needed, not done here (per this step's own **Test** line above): a r
 someone actually talking, not synthetic TTS — synthetic speech is good enough to prove the
 mechanism works, not to judge real transcription accuracy.
 
+**Real bugs found from the user's own real recording** (the one this step's Test line called
+for) — none guessed, all from an actual click-through:
+1. **No session list at all** — the sidebar always said "not built yet" regardless of how many
+   sessions existed. Worse, the only source of session status (`_SESSIONS`, in-memory) doesn't
+   survive an app restart, so even a real listing built on it would forget every past session
+   the moment the sidecar restarted. Fixed by making session status/content disk-derived first,
+   falling back to the in-memory dict only for a session actively recording/processing in the
+   current process — `sessions.list_sessions()`/`get_session_detail()`, new `GET
+   /courses/{id}/sessions` and `GET /courses/{id}/sessions/{id}` (replacing the old unscoped
+   status endpoint). This is also what most likely explains the "not indexed" report below —
+   without a status indicator, there was no way to tell a still-processing recording (10-30+
+   seconds) from a broken one.
+2. **No way to see the full transcript**, only the enhanced summary. Added — `SessionContent`
+   (shared between the just-recorded view and the new session-detail view) renders both.
+3. **Enhanced notes markdown wasn't rendered** — the UI dumped the raw string into a `<div>`,
+   showing literal `#`/`-` characters. Added `react-markdown` (a real new frontend dependency,
+   not worked around) and a `.markdown-body` style block.
+4. **Real hallucination, reproduced and fixed**: given only a few seconds of transcript
+   mentioning a recognizable topic ("system architecture"), gpt-4o-mini wrote a full explanation
+   of that topic from its own training knowledge, not from anything actually said. The original
+   prompt's "don't add information that isn't in the transcript" wasn't strong enough. Rewrote
+   `SUMMARY_TEMPLATE` with explicit rules against using outside knowledge and against expanding
+   brief mentions — re-verified against the *exact* reported scenario (a one-sentence "system
+   architecture" mention) and confirmed the output now stays a one-line note instead of a full
+   explanation. This reduces the failure mode; it's a real, inherent LLM risk a prompt can't
+   fully eliminate.
+5. **Rename and delete, genuinely new:** sessions had no stored display name at all (just their
+   `<date>-class-<N>` folder name) — added `meta.json` per session. Delete needed to remove both
+   the on-disk directory *and* the LanceDB rows — `indexing.delete_ref_doc_nodes()`, wrapping
+   `_PatchedLanceDBVectorStore.delete()`, which Step 7 built and verified against a raw table but
+   had never actually been called by any real app feature until now. Verified for real: deleting a
+   session with 2 real indexed chunks left the table's row count and doc_ids exactly right
+   afterward, and the session list correctly stopped showing it.
+
 ### 13. Error handling + course removal
 **Do:** The full error-code contract (§2 of overview.md) across every endpoint; `unselect` and
 `DELETE` for courses as two structurally distinct actions.

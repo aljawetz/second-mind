@@ -167,13 +167,18 @@ export async function explainAssignment(courseId: number, assignmentId: number):
 // Session capture (implementation-plan.md Step 12, design spec §9.3).
 // Recording itself happens here in the frontend (getUserMedia +
 // MediaRecorder) — the backend only handles what comes after stop.
-export interface SessionStatus {
-  status: "recording" | "processing" | "done" | "error";
-  course_id?: number;
-  class_num?: number;
-  source_label?: string;
+export type SessionRunStatus = "recording" | "processing" | "done" | "error";
+
+export interface SessionSummary {
+  session_id: string;
+  title: string;
+  status: SessionRunStatus;
+}
+
+export interface SessionDetail extends SessionSummary {
   transcript?: string;
   summary?: string;
+  notes?: string;
   error?: string;
 }
 
@@ -192,14 +197,34 @@ export async function stopSession(sessionId: string, audioBlob: Blob): Promise<{
   return res.json();
 }
 
-export async function getSessionStatus(sessionId: string): Promise<SessionStatus> {
-  const res = await fetch(`http://127.0.0.1:8756/sessions/${sessionId}`);
-  return res.json();
-}
-
 export async function saveSessionNotes(sessionId: string, text: string): Promise<void> {
   await fetch(`http://127.0.0.1:8756/sessions/${sessionId}/notes`, {
     method: "POST",
     body: JSON.stringify({ text }),
   });
+}
+
+export async function listSessions(courseId: number): Promise<SessionSummary[]> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/sessions`);
+  const data = await res.json();
+  return data.sessions;
+}
+
+// Disk-backed, not just the in-memory status the backend tracks while
+// actively recording/processing — this is also how a past session (from
+// a previous app run) gets viewed, not just how an active one is polled.
+export async function getSessionDetail(courseId: number, sessionId: string): Promise<SessionDetail> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/sessions/${sessionId}`);
+  return res.json();
+}
+
+export async function renameSession(courseId: number, sessionId: string, title: string): Promise<void> {
+  await fetch(`http://127.0.0.1:8756/courses/${courseId}/sessions/${sessionId}/rename`, {
+    method: "POST",
+    body: JSON.stringify({ title }),
+  });
+}
+
+export async function deleteSession(courseId: number, sessionId: string): Promise<void> {
+  await fetch(`http://127.0.0.1:8756/courses/${courseId}/sessions/${sessionId}`, { method: "DELETE" });
 }

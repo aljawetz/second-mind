@@ -1,15 +1,22 @@
 import type { AvailableCourse } from "../../types";
+import type { SessionSummary } from "../../sidecar";
 
 export default function Sidebar({
   courses,
   activeCourseId,
   onCourseChange,
   onNewSession,
+  sessions,
+  activeSessionId,
+  onOpenSession,
 }: {
   courses: AvailableCourse[];
   activeCourseId: number;
   onCourseChange: (id: number) => void;
   onNewSession: () => void;
+  sessions: SessionSummary[];
+  activeSessionId: string | null;
+  onOpenSession: (id: string) => void;
 }) {
   return (
     <aside className="sidebar">
@@ -41,7 +48,24 @@ export default function Sidebar({
           </button>
         </div>
         <div className="nav-group">
-          <div className="qa-empty">Past sessions aren't listed yet — recordings are still saved and indexed.</div>
+          {sessions.length === 0 && <div className="qa-empty">No sessions yet.</div>}
+          {sessions.map((s) => (
+            <button
+              key={s.session_id}
+              className={"session-btn" + (s.session_id === activeSessionId ? " active" : "")}
+              onClick={() => onOpenSession(s.session_id)}
+            >
+              <span>{s.title}</span>
+              {(s.status === "recording" || s.status === "processing") && (
+                <span className="session-status-dot busy" title="Processing…"></span>
+              )}
+              {s.status === "error" && (
+                <span className="sdate" title="Couldn't be processed">
+                  ⚠
+                </span>
+              )}
+            </button>
+          ))}
         </div>
       </div>
 

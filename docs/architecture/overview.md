@@ -119,12 +119,30 @@ notes — a product decision, not a technical one). Both the transcript and the 
 get indexed (§9.3) — "transcript" and "notes" are real `source_type` values in `/ask`'s citations,
 same as "file".
 
-### `GET /sessions/{session_id}`
-Polled by the frontend until processing finishes.
+### `GET /courses/{course_id}/sessions`
+Lists real sessions for the sidebar, newest first — status is derived from disk (which files
+exist), not just in-memory state, so a session from a previous app run still shows up correctly.
 ```
-Response: { "status": "recording" | "processing" | "done" | "error",
-            "transcript"?: string, "summary"?: string, "error"?: string }
+Response: { "sessions": [ { "session_id": string, "title": string,
+                             "status": "recording" | "processing" | "done" | "error" } ] }
 ```
+
+### `GET /courses/{course_id}/sessions/{session_id}`
+Polled by the frontend until processing finishes; also how a past session's page loads.
+```
+Response: { "session_id": string, "title": string,
+            "status": "recording" | "processing" | "done" | "error",
+            "transcript"?: string, "summary"?: string, "notes"?: string, "error"?: string }
+```
+
+### `POST /courses/{course_id}/sessions/{session_id}/rename`
+`{"title": string}` — sessions have no display name beyond their `<date>-class-<N>` folder name
+otherwise.
+
+### `DELETE /courses/{course_id}/sessions/{session_id}`
+Removes the session's directory *and* its indexed chunks (`index.delete_ref_doc`) — both, not
+just one; a session that still answered Q&A questions after "deletion" would be a real bug, not a
+lag.
 
 ### `POST /sessions/{session_id}/notes`
 Saves the student's own in-progress rough notes (`{"text": string}`) — called whenever the notes

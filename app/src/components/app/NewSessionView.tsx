@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { getSessionStatus, saveSessionNotes, startSession, stopSession, type SessionStatus } from "../../sidecar";
+import { getSessionDetail, saveSessionNotes, startSession, stopSession, type SessionDetail } from "../../sidecar";
+import SessionContent from "./SessionContent";
 
 type Phase = "idle" | "starting" | "recording" | "processing" | "done" | "error";
 
@@ -9,12 +10,20 @@ type Phase = "idle" | "starting" | "recording" | "processing" | "done" | "error"
 // transcoding needed before it reaches the backend.
 const MIME_TYPE = "audio/mp4";
 
-export default function NewSessionView({ courseId, onBack }: { courseId: number; onBack: () => void }) {
+export default function NewSessionView({
+  courseId,
+  onBack,
+  onSessionCreated,
+}: {
+  courseId: number;
+  onBack: () => void;
+  onSessionCreated: () => void;
+}) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
-  const [result, setResult] = useState<SessionStatus | null>(null);
+  const [result, setResult] = useState<SessionDetail | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -40,6 +49,7 @@ export default function NewSessionView({ courseId, onBack }: { courseId: number;
     try {
       const { session_id } = await startSession(courseId);
       setSessionId(session_id);
+      onSessionCreated();
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -72,11 +82,13 @@ export default function NewSessionView({ courseId, onBack }: { courseId: number;
       try {
         await stopSession(sessionId, blob);
         pollRef.current = setInterval(async () => {
-          const status = await getSessionStatus(sessionId);
-          if (status.status === "done" || status.status === "error") {
+          const detail = await getSessionDetail(courseId, sessionId);
+          if (detail.status === "done" || detail.status === "error") {
             if (pollRef.current) clearInterval(pollRef.current);
-            setResult(status);
-            setPhase(status.status);
+            setResult(detail);
+            setError(detail.error ?? "Something went wrong processing the recording.");
+            setPhase(detail.status);
+            onSessionCreated();
           }
         }, 2000);
       } catch (err) {
@@ -146,13 +158,7 @@ export default function NewSessionView({ courseId, onBack }: { courseId: number;
 
       {phase === "error" && <p className="qa-a-error">{error}</p>}
 
-      {phase === "done" && result && (
-        <div className="panel">
-          <h3>Enhanced notes</h3>
-          <div className="assign-prompt">{result.summary}</div>
-          <div className="indexed-tag">✓ indexed — searchable in Q&A and artifacts</div>
-        </div>
-      )}
+      {phase === "done" && result && <SessionContent transcript={result.transcript} summary={result.summary} />}
     </section>
   );
 }
