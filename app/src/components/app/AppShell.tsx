@@ -8,8 +8,15 @@ import ArtifactView from "./ArtifactView";
 import AssignmentView from "./AssignmentView";
 import NewSessionView from "./NewSessionView";
 import SessionDetailView from "./SessionDetailView";
+import ManageCoursesView from "./ManageCoursesView";
 
-export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
+export default function AppShell({
+  courses,
+  onCourseRemoved,
+}: {
+  courses: AvailableCourse[];
+  onCourseRemoved: (courseId: number) => void;
+}) {
   const [courseId, setCourseId] = useState<number>(courses[0].id);
   const [view, setView] = useState<ViewName>("home");
   const [artifact, setArtifact] = useState<ArtifactType>("mocktest");
@@ -21,9 +28,21 @@ export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
   const [assignmentsError, setAssignmentsError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
 
-  const course = courses.find((c) => c.id === courseId)!;
+  // The active course can disappear out from under this view (unselected
+  // or deleted via Manage Courses) — fall back to whatever's left rather
+  // than crash on course.find(...)! finding nothing.
+  useEffect(() => {
+    if (!courses.some((c) => c.id === courseId) && courses.length > 0) {
+      setCourseId(courses[0].id);
+      setView("home");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courses]);
+
+  const course = courses.find((c) => c.id === courseId);
 
   useEffect(() => {
+    if (!course) return;
     let cancelled = false;
     setAssignments([]);
     setAssignmentsError(null);
@@ -37,9 +56,11 @@ export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
     return () => {
       cancelled = true;
     };
-  }, [courseId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId, !!course]);
 
   function refreshSessions() {
+    if (!course) return;
     listSessions(courseId)
       .then(setSessions)
       .catch(() => {});
@@ -48,7 +69,7 @@ export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
   useEffect(() => {
     refreshSessions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courseId]);
+  }, [courseId, !!course]);
 
   // A session left "recording"/"processing" keeps polling in the
   // background while the sidebar is visible, so its status dot updates
@@ -87,8 +108,21 @@ export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
     refreshSessions();
     goHome();
   }
+  function openManageCourses() {
+    setView("manageCourses");
+  }
+  function handleCourseRemoved(removedId: number) {
+    onCourseRemoved(removedId);
+  }
 
   const selectedAssignment = assignments.find((a) => a.id === assignmentId) ?? null;
+
+  // Removing the last course leaves nothing to render here — App.tsx owns
+  // the course list and would need to route back to onboarding for that
+  // case, not handled by this view.
+  if (!course) {
+    return null;
+  }
 
   return (
     <div id="stage-app">
@@ -101,6 +135,7 @@ export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
           sessions={sessions}
           activeSessionId={sessionId}
           onOpenSession={openSession}
+          onManageCourses={openManageCourses}
         />
         <main className="main">
           <Topbar
@@ -133,6 +168,9 @@ export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
               )}
               {view === "sessionDetail" && sessionId && (
                 <SessionDetailView courseId={courseId} sessionId={sessionId} onBack={goHome} onDeleted={handleSessionDeleted} />
+              )}
+              {view === "manageCourses" && (
+                <ManageCoursesView courses={courses} onBack={goHome} onCourseRemoved={handleCourseRemoved} />
               )}
             </div>
           </div>

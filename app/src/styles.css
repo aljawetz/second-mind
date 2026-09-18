@@ -397,6 +397,13 @@ button{font:inherit;color:inherit}
 .course-row .cmeta{flex:1;min-width:0}
 .course-row .ccode{font-size:.84rem;font-weight:600}
 .course-row .cname{font-size:.72rem;color:var(--ink-faint)}
+.manage-actions{display:flex;gap:.4rem;flex:none}
+.manage-actions .icon-btn{width:auto;padding:.3rem .6rem;font-size:.75rem;border:1px solid var(--line)}
+.manage-confirm{display:flex;align-items:center;gap:.4rem;flex:none}
+.manage-confirm input{
+  font-size:.78rem;border:1px solid var(--line-strong);border-radius:6px;padding:.3rem .5rem;
+  background:var(--surface);color:var(--ink);width:150px;
+}
 .course-count{font-size:.75rem;color:var(--ink-faint);text-align:center}
 .index-list{display:flex;flex-direction:column;gap:.8rem;max-height:280px;overflow-y:auto}
 .index-course{border:1px solid var(--line);border-radius:10px;padding:.75rem .85rem}

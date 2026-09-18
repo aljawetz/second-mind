@@ -214,6 +214,14 @@ def index_exists(db_path: Path, table_name: str) -> bool:
     return table_name in lancedb.connect(str(db_path)).table_names()
 
 
+def drop_table(db_path: Path, table_name: str) -> None:
+    """Course DELETE (Step 13) — the whole table, not specific rows
+    (delete_ref_doc_nodes is for one session; this is for the course
+    itself, e.g. no longer selected and never coming back)."""
+    if index_exists(db_path, table_name):
+        lancedb.connect(str(db_path)).drop_table(table_name)
+
+
 def ensure_fts_index(table) -> None:
     """Idempotent — LanceDB persists the FTS index on the table itself, so
     this only actually rebuilds when it's missing, not on every call.

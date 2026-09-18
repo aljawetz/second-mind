@@ -10,9 +10,11 @@ from pathlib import Path
 import httpx
 import openai
 from llama_index.vector_stores.lancedb.base import TableNotFoundError
+from onnxruntime.capi.onnxruntime_pybind11_state import NoSuchFile as OnnxModelFileMissing
 
 import canvas
 import config
+import courses
 import explain
 import generation
 import indexing
@@ -29,6 +31,8 @@ PORT = 8756
 # oversight).
 SSB_HOME = Path.home() / ".ssb"
 
+COURSE_PATH = re.compile(r"^/courses/(\d+)$")
+UNSELECT_PATH = re.compile(r"^/courses/(\d+)/unselect$")
 ASK_PATH = re.compile(r"^/courses/(\d+)/ask$")
 ASSIGNMENTS_PATH = re.compile(r"^/courses/(\d+)/assignments$")
 EXPLAIN_PATH = re.compile(r"^/courses/(\d+)/assignments/(\d+)/explain$")
@@ -122,6 +126,29 @@ class Handler(BaseHTTPRequestHandler):
             return 502, {"error": {"code": "canvas_error", "message": str(e)}}
         return 503, {"error": {"code": "canvas_unreachable", "message": "could not reach Canvas"}}  # httpx.TransportError
 
+    def _llm_error(self, e: Exception) -> tuple[int, dict]:
+        if isinstance(e, RuntimeError):
+            return 401, {"error": {"code": "llm_auth_failed", "message": str(e)}}
+        if isinstance(e, openai.AuthenticationError):
+            return 401, {"error": {"code": "llm_auth_failed", "message": "OpenAI API key invalid or expired"}}
+        if isinstance(e, openai.RateLimitError):
+            if e.code == "insufficient_quota":
+                return 402, {"error": {"code": "llm_quota_exceeded", "message": "OpenAI quota exceeded"}}
+            return 429, {"error": {"code": "llm_rate_limited", "message": "OpenAI rate limit hit — try again shortly"}}
+        return 503, {"error": {"code": "llm_unreachable", "message": "could not reach the LLM provider"}}  # openai.APIConnectionError
+
+    def _course_selected(self, course_id: int) -> bool:
+        # Real not_found gap (implementation-plan.md Step 13): Canvas
+        # returns the same 404 whether a course doesn't exist or just isn't
+        # accessible to this token, so canvas.py's own degrade-to-empty
+        # policy can't distinguish "bad id" from "no permission" — but this
+        # app's own selected_courses list is a real, local, unambiguous
+        # source of truth for "is this a course we know about at all."
+        return course_id in config.read_config(SSB_HOME).get("selected_courses", [])
+
+    def _not_found(self, message: str = "no such course"):
+        self._send_json(404, {"error": {"code": "not_found", "message": message}})
+
     def _handle_list_courses(self):
         try:
             raw = canvas.list_courses()
@@ -129,14 +156,17 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(*self._canvas_error(e))
             return
 
-        courses = [
+        course_list = [
             {"id": c["id"], "code": c.get("course_code"), "name": c.get("name")}
             for c in raw
             if c.get("name")  # some real courses come back with no name/code — skip, not usefully selectable
         ]
-        self._send_json(200, {"courses": courses})
+        self._send_json(200, {"courses": course_list})
 
     def _handle_list_assignments(self, course_id: str):
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
         try:
             raw = canvas.list_assignments(int(course_id))
         except (canvas.CanvasError, httpx.HTTPStatusError, httpx.TransportError) as e:
@@ -156,9 +186,15 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(200, {"assignments": assignments})
 
     def _handle_list_sessions(self, course_id: str):
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
         self._send_json(200, {"sessions": sessions.list_sessions(SSB_HOME, int(course_id))})
 
     def _handle_session_detail(self, course_id: str, session_id: str):
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
         detail = sessions.get_session_detail(SSB_HOME, int(course_id), session_id)
         if detail is None:
             self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
@@ -189,6 +225,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             valid, reason = validate_credential(data.get("kind", ""), data.get("value", ""))
             self._send_json(200, {"valid": valid, "reason": reason})
+            return
+
+        unselect_match = UNSELECT_PATH.match(self.path)
+        if unselect_match:
+            self._handle_unselect(unselect_match.group(1))
             return
 
         ask_match = ASK_PATH.match(self.path)
@@ -228,9 +269,31 @@ class Handler(BaseHTTPRequestHandler):
         if detail_match:
             self._handle_session_delete(detail_match.group(1), detail_match.group(2))
             return
+        course_match = COURSE_PATH.match(self.path)
+        if course_match:
+            self._handle_delete_course(course_match.group(1))
+            return
         self._send_json(404, {"error": {"code": "not_found", "message": "no such route"}})
 
+    def _handle_unselect(self, course_id: str):
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        courses.unselect_course(SSB_HOME, int(course_id))
+        self._send_json(200, {"status": "unselected"})
+
+    def _handle_delete_course(self, course_id: str):
+        db_path = SSB_HOME / "index.lancedb"
+        if not courses.has_local_data(SSB_HOME, int(course_id), db_path):
+            self._not_found()
+            return
+        courses.delete_course(SSB_HOME, int(course_id), db_path)
+        self._send_json(200, {"status": "deleted"})
+
     def _handle_session_start(self, course_id: str):
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
         self._send_json(200, sessions.start_session(SSB_HOME, int(course_id)))
 
     def _handle_session_stop(self, session_id: str):
@@ -266,6 +329,9 @@ class Handler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             self._send_json(400, {"error": {"code": "bad_request", "message": "invalid JSON"}})
             return
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
         try:
             sessions.rename_session(SSB_HOME, int(course_id), session_id, data.get("title", ""))
         except KeyError:
@@ -274,6 +340,9 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(200, {"status": "renamed"})
 
     def _handle_session_delete(self, course_id: str, session_id: str):
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
         try:
             sessions.delete_session(SSB_HOME, int(course_id), session_id, SSB_HOME / "index.lancedb")
         except KeyError:
@@ -292,6 +361,9 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.flush()
 
     def _handle_ask(self, course_id: str):
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
         length = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(length)
         try:
@@ -323,17 +395,11 @@ class Handler(BaseHTTPRequestHandler):
             # the same way as every other 200, not a one-off plain-JSON
             # shape, so the frontend has exactly one success format to parse.
             not_indexed = True
-        except RuntimeError as e:
-            self._send_json(401, {"error": {"code": "llm_auth_failed", "message": str(e)}})
+        except OnnxModelFileMissing:
+            self._send_json(500, {"error": {"code": "model_files_missing", "message": "the local embedding model is missing or corrupted"}})
             return
-        except openai.AuthenticationError:
-            self._send_json(401, {"error": {"code": "llm_auth_failed", "message": "OpenAI API key invalid or expired"}})
-            return
-        except openai.RateLimitError as e:
-            if e.code == "insufficient_quota":
-                self._send_json(402, {"error": {"code": "llm_quota_exceeded", "message": "OpenAI quota exceeded"}})
-            else:
-                self._send_json(429, {"error": {"code": "llm_rate_limited", "message": "OpenAI rate limit hit — try again shortly"}})
+        except (RuntimeError, openai.AuthenticationError, openai.RateLimitError, openai.APIConnectionError) as e:
+            self._send_json(*self._llm_error(e))
             return
 
         citations = [] if not_indexed else generation.build_citations(response.source_nodes)
@@ -359,6 +425,9 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.flush()
 
     def _handle_explain(self, course_id: str, assignment_id: str):
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
         # Drain any request body (overview.md documents Request: {}) — not
         # otherwise used.
         length = int(self.headers.get("Content-Length", 0))
@@ -383,17 +452,8 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             breakdown = explain.build_breakdown(name, description_text)
-        except RuntimeError as e:
-            self._send_json(401, {"error": {"code": "llm_auth_failed", "message": str(e)}})
-            return
-        except openai.AuthenticationError:
-            self._send_json(401, {"error": {"code": "llm_auth_failed", "message": "OpenAI API key invalid or expired"}})
-            return
-        except openai.RateLimitError as e:
-            if e.code == "insufficient_quota":
-                self._send_json(402, {"error": {"code": "llm_quota_exceeded", "message": "OpenAI quota exceeded"}})
-            else:
-                self._send_json(429, {"error": {"code": "llm_rate_limited", "message": "OpenAI rate limit hit — try again shortly"}})
+        except (RuntimeError, openai.AuthenticationError, openai.RateLimitError, openai.APIConnectionError) as e:
+            self._send_json(*self._llm_error(e))
             return
 
         try:
@@ -403,6 +463,9 @@ class Handler(BaseHTTPRequestHandler):
         except TableNotFoundError:
             # Course not indexed yet — same graceful degrade as /ask.
             pointers = []
+        except OnnxModelFileMissing:
+            self._send_json(500, {"error": {"code": "model_files_missing", "message": "the local embedding model is missing or corrupted"}})
+            return
 
         self._send_json(200, {"breakdown": breakdown, "pointers": pointers})
 

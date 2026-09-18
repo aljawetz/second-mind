@@ -42,6 +42,20 @@ export default function App() {
     setStage("keys");
   }
 
+  // Unselecting/deleting a course (implementation-plan.md Step 13) only
+  // ever happens from within AppShell, but the course list itself lives
+  // here — mark it unchecked so selectedCourses (and everything derived
+  // from it) shrinks on the next render. Removing the last one routes
+  // back to course selection rather than leaving AppShell with nothing
+  // to show.
+  function handleCourseRemoved(courseId: number) {
+    const remaining = courses.map((c) => (c.id === courseId ? { ...c, checked: false } : c));
+    setCourses(remaining);
+    if (!remaining.some((c) => c.checked)) {
+      setStage("courses");
+    }
+  }
+
   switch (stage) {
     case "startup":
       return <StartupGate onReady={handleBackendReady} />;
@@ -59,6 +73,6 @@ export default function App() {
     case "indexing":
       return <OnboardingIndexing courses={selectedCourses} onNext={() => setStage("app")} />;
     case "app":
-      return <AppShell courses={selectedCourses} />;
+      return <AppShell courses={selectedCourses} onCourseRemoved={handleCourseRemoved} />;
   }
 }

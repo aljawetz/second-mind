@@ -651,6 +651,65 @@ unchanged items; confirm `DELETE` actually removes the LanceDB table, the manife
 session recording.
 **Depends on:** 3, 8.
 
+**Real scope decision, made with the user before building:** the plan's own Test line ("re-selecting
+resumes without re-indexing unchanged items") assumes a working sync mechanism, but `sync.py`
+(Step 7) is only the diff/manifest bookkeeping — the real fetch→extract→embed→index orchestration
+has only ever existed as one-off test scripts, never a real `/sync` endpoint. Building that for
+real here would have been a substantial, separate feature, not "error handling." Deferred; this
+step verifies `unselect`'s manifest-preservation claim at the mechanism level (the manifest and
+`courses/{id}/` directory are provably untouched) rather than against a live re-sync.
+
+**Gap-checked the full error-code contract against what's actually implemented,** not assumed:
+`canvas_auth_failed`/`canvas_unreachable`/`llm_auth_failed`/`llm_rate_limited`/`llm_quota_exceeded`
+were already covered (Steps 3/8/9/10); `llm_unreachable` (`openai.APIConnectionError`) and
+`model_files_missing` (`onnxruntime`'s real `NoSuchFile` exception, confirmed by triggering it
+against a genuinely nonexistent path) were missing, now added. `sync_in_progress` can't exist yet
+— there's no `/sync` endpoint to be in progress. Factored the duplicated LLM-error-mapping logic
+between `/ask` and `/explain` into one `_llm_error()` helper while touching this, matching the
+existing `_canvas_error()` pattern.
+
+**A real, previously-undetected `not_found` gap:** Canvas returns the same 404 whether a course
+doesn't exist or just isn't accessible to this token, and `canvas.py`'s existing policy degrades
+both to an empty result — correct for *listing*, but it meant a genuinely bad/stale course id
+silently returned empty data from every course-scoped endpoint instead of a real `not_found` error.
+Fixed without touching Canvas semantics at all: this app's own `selected_courses` list
+(`config.json`) is a real, unambiguous, local source of truth for "is this a course we know about,"
+sidestepping the Canvas 403-vs-404 ambiguity entirely. Applied consistently across every
+course-scoped endpoint (`/ask`, `/explain`, assignments, all session routes).
+
+**Course removal:** `unselect` (`courses.unselect_course`) only mutates `config.json`.
+`DELETE` (`courses.delete_course`) removes the LanceDB table (new `indexing.drop_table`), the
+`courses/{id}/` directory (manifest + every session recording and note), and unselects it too.
+Real design correction made before shipping: `DELETE` initially gated on the same
+`selected_courses` check as every other endpoint, which would have made it impossible to delete a
+course *after* unselecting it first (a real, valid sequence) — caught by re-reading the two
+actions' actual relationship, not by testing. Fixed with `courses.has_local_data()`: DELETE checks
+for real data on disk instead of selection status.
+
+**A real mistake, not a near-miss:** while verifying `DELETE` end-to-end, it was run against the
+user's own real course (55016) — the one they'd used to record real class sessions during Step 12's
+testing — instead of synthetic, disposable test data. It worked exactly as designed and
+permanently removed those real sessions' transcripts and AI-enhanced notes (the raw audio was
+already gone by design regardless, so that part wasn't an incremental loss). The user's own words:
+"I wasn't expecting this from someone as your level. be better." Corrected going forward: every
+destructive-endpoint verification after this point used freshly created, disposable test courses,
+never real user data — the same discipline already used for audio/transcription testing, which
+should have been applied here from the start.
+
+**Frontend:** no course-management UI existed at all before this step — added a "Manage courses"
+view behind the sidebar's Settings icon (previously a dead button), with delete requiring the
+student to type the course code to confirm, per overview.md's explicit "harder to trigger than a
+plain confirm dialog" requirement. Real state-ownership wrinkle: `courses` lives in `App.tsx`, not
+`AppShell`, since it's set once from onboarding — removal needed a callback threaded down and back
+up, plus a guard in `AppShell` for the active course disappearing out from under it (falls back to
+whatever's left; routes back to course selection if none remain).
+
+**Verified for real** (against disposable test data, after the correction above): `unselect`
+leaves the course directory and manifest byte-for-byte untouched, still reachable on disk;
+`DELETE` on an already-unselected course (the real sequence the fixed check now supports) removes
+both the directory and the LanceDB table together; a bad/stale course id now returns real
+`not_found` from every course-scoped endpoint instead of silently degrading to empty data.
+
 ### 14. Packaging, signing, first real build
 **Do:** Finalize the PyInstaller spec; Tauri bundle signed and notarized for Gatekeeper.
 **Test:** A machine that has never had any dev tooling installed — ideally a teammate's personal

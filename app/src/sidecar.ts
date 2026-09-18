@@ -228,3 +228,15 @@ export async function renameSession(courseId: number, sessionId: string, title: 
 export async function deleteSession(courseId: number, sessionId: string): Promise<void> {
   await fetch(`http://127.0.0.1:8756/courses/${courseId}/sessions/${sessionId}`, { method: "DELETE" });
 }
+
+// Course removal (implementation-plan.md Step 13) — two structurally
+// distinct actions, not one endpoint with a flag. unselect only touches
+// config.json; delete is the real destructive path (LanceDB table,
+// manifest, every session recording and note — all of it, unrecoverable).
+export async function unselectCourse(courseId: number): Promise<void> {
+  await fetch(`http://127.0.0.1:8756/courses/${courseId}/unselect`, { method: "POST" });
+}
+
+export async function deleteCourse(courseId: number): Promise<void> {
+  await fetch(`http://127.0.0.1:8756/courses/${courseId}`, { method: "DELETE" });
+}
