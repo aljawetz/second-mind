@@ -709,6 +709,8 @@ leaves the course directory and manifest byte-for-byte untouched, still reachabl
 `DELETE` on an already-unselected course (the real sequence the fixed check now supports) removes
 both the directory and the LanceDB table together; a bad/stale course id now returns real
 `not_found` from every course-scoped endpoint instead of silently degrading to empty data.
+Re-verified through the real frozen sidecar binary, then through the real app UI — the "Manage
+courses" view, reachable from the previously-dead Settings icon, confirmed by the user directly.
 
 ### 14. Packaging, signing, first real build
 **Do:** Finalize the PyInstaller spec; Tauri bundle signed and notarized for Gatekeeper.
