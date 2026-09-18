@@ -119,10 +119,15 @@ be correct).
 
 **Verified:** every command each CI job runs was executed for real, locally, on this machine
 first (`uv sync --all-groups` + `convert_embedding_model.py` + `pytest tests/ -v` → 51 passed;
-`npx tsc --noEmit` and `npm run build` → clean; `cargo check` in `app/src-tauri` → clean). The
-GitHub Actions-specific plumbing itself (`astral-sh/setup-uv`, `actions/setup-node`,
-`dtolnay/rust-toolchain`, working-directory/cache config) is standard and can't be exercised
-without a real push — not yet confirmed against an actual Actions run.
+`npx tsc --noEmit` and `npm run build` → clean; `cargo check` in `app/src-tauri` → clean) — but the
+first real GitHub Actions run still caught something local verification couldn't: the `rust` job
+failed with `resource path 'binaries/ssb-backend-aarch64-apple-darwin' doesn't exist` —
+Tauri's build script validates every `externalBin` resource exists on disk before it'll even
+`cargo check`, and that binary is gitignored, only ever produced by the much heavier PyInstaller
+release build (step 5), which this fast type-check job was never meant to run. Fixed by stubbing
+an empty, executable placeholder at that exact path before `cargo check` — present, not
+functional, which is all a compile-only check needs. Backend and frontend jobs passed on the real
+first run; the `rust` job passed after this fix, confirmed on a second real run.
 
 ## 6. Repo hygiene — done
 
