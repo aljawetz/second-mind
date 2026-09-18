@@ -96,21 +96,27 @@ def build_citations(source_nodes: list[NodeWithScore]) -> list[dict]:
     trip through LanceDB retrieval and CitationQueryEngine's own node
     splitting (it model_dump/model_validate-copies the full node).
 
-    source_type is hardcoded "file": every node indexing.py currently
-    produces (pages_to_nodes, slides_to_nodes) comes from a Canvas File
-    item — "page"/"transcript"/"notes" aren't reachable until wiki-page
-    and transcript ingestion exist."""
+    source_type reads indexing.py's own item_type metadata (added Step 12)
+    rather than assuming "file" — "transcript"/"notes" are real, reachable
+    values now that session capture indexes those node kinds too. "page"
+    (Canvas wiki pages) is still unreached — nothing ingests those yet."""
     citations = []
     for node_with_score in source_nodes:
         node = node_with_score.node
         source = node.metadata.get("source", "")
-        if "page" in node.metadata:
+        # Every node now always carries all of page/slide/timestamp
+        # (indexing.py's _metadata, Step 12) — only some populated per
+        # node — so these must check the value, not just key presence.
+        if node.metadata.get("page") is not None:
             label = f"{source} · p.{node.metadata['page']}"
-        elif "slide" in node.metadata:
+        elif node.metadata.get("slide") is not None:
             label = f"{source} · slide {node.metadata['slide']}"
+        elif node.metadata.get("timestamp") is not None:
+            label = f"{source} · {node.metadata['timestamp']}"
         else:
             label = source
         source_rel = node.relationships.get(NodeRelationship.SOURCE)
         item_id = source_rel.node_id if source_rel else ""
-        citations.append({"source_type": "file", "label": label, "item_id": item_id})
+        source_type = node.metadata.get("item_type", "file")
+        citations.append({"source_type": source_type, "label": label, "item_id": item_id})
     return citations

@@ -6,6 +6,7 @@ import Topbar from "./Topbar";
 import HomeView from "./HomeView";
 import ArtifactView from "./ArtifactView";
 import AssignmentView from "./AssignmentView";
+import NewSessionView from "./NewSessionView";
 
 export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
   const [courseId, setCourseId] = useState<number>(courses[0].id);
@@ -50,13 +51,16 @@ export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
     setCourseId(id);
     setView("home");
   }
+  function openNewSession() {
+    setView("newSession");
+  }
 
   const selectedAssignment = assignments.find((a) => a.id === assignmentId) ?? null;
 
   return (
     <div id="stage-app">
       <div className="app">
-        <Sidebar courses={courses} activeCourseId={courseId} onCourseChange={changeCourse} />
+        <Sidebar courses={courses} activeCourseId={courseId} onCourseChange={changeCourse} onNewSession={openNewSession} />
         <main className="main">
           <Topbar
             courseCode={course.code}
@@ -83,6 +87,7 @@ export default function AppShell({ courses }: { courses: AvailableCourse[] }) {
               {view === "assignment" && selectedAssignment && (
                 <AssignmentView courseId={courseId} assignment={selectedAssignment} onBack={goHome} />
               )}
+              {view === "newSession" && <NewSessionView courseId={courseId} onBack={goHome} />}
             </div>
           </div>
         </main>

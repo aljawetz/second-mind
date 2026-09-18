@@ -98,13 +98,37 @@ Response: { "artifact": <type-specific structure>,
 ```
 
 ### `POST /courses/{course_id}/sessions/start`
-Called when the frontend detects the current time is inside a scheduled window (§9.2) and the
-student confirms the prompt.
+Called when the student clicks "+" next to Sessions to start a new recording — implementation-plan.md
+Step 12 built the manual-trigger version of this, not §9.2's scheduled-window auto-prompt (a real,
+stated future enhancement, not implemented). Recording itself (`getUserMedia`/`MediaRecorder`)
+happens in the frontend; this call only allocates the session's directory.
 ```
 Response: { "session_id": string, "status": "recording" }
 ```
-Followed by `POST /sessions/{session_id}/stop`, and the transcript/notes indexing (§9.3) happens
-server-side once stopped.
+
+### `POST /sessions/{session_id}/stop`
+Body is the raw recorded audio (`audio/mp4`), not JSON. Returns immediately — transcription runs
+in a background thread, never blocking this response, since a real multi-minute recording could
+take a while on CPU:
+```
+Response: { "session_id": string, "status": "processing" }
+```
+Once transcription finishes: the audio is deleted (never kept, §5), the transcript is saved, and a
+transcript-only LLM pass produces enhanced notes (deliberately not mixed with the student's own
+notes — a product decision, not a technical one). Both the transcript and the student's own notes
+get indexed (§9.3) — "transcript" and "notes" are real `source_type` values in `/ask`'s citations,
+same as "file".
+
+### `GET /sessions/{session_id}`
+Polled by the frontend until processing finishes.
+```
+Response: { "status": "recording" | "processing" | "done" | "error",
+            "transcript"?: string, "summary"?: string, "error"?: string }
+```
+
+### `POST /sessions/{session_id}/notes`
+Saves the student's own in-progress rough notes (`{"text": string}`) — called whenever the notes
+textarea loses focus, not on every keystroke.
 
 ### `POST /sync`
 Triggered on app launch (§5.5), **asynchronously** — it must never block session-capture

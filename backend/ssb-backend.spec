@@ -23,7 +23,10 @@ a = Analysis(
     # backend/ on disk — the model has to actually be bundled as data, not
     # just present on the build machine. Confirmed missing by actually
     # running a frozen build that imports indexing.py, not assumed.
-    datas=[("models/bge-small-en-v1.5-onnx", "models/bge-small-en-v1.5-onnx")],
+    datas=[
+        ("models/bge-small-en-v1.5-onnx", "models/bge-small-en-v1.5-onnx"),
+        ("models/faster-whisper-base", "models/faster-whisper-base"),
+    ],
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],

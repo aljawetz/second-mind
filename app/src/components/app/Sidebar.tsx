@@ -4,10 +4,12 @@ export default function Sidebar({
   courses,
   activeCourseId,
   onCourseChange,
+  onNewSession,
 }: {
   courses: AvailableCourse[];
   activeCourseId: number;
   onCourseChange: (id: number) => void;
+  onNewSession: () => void;
 }) {
   return (
     <aside className="sidebar">
@@ -32,9 +34,14 @@ export default function Sidebar({
       </div>
 
       <div>
-        <div className="nav-label">Sessions</div>
+        <div className="nav-label-row">
+          <span className="nav-label">Sessions</span>
+          <button className="icon-btn nav-add" title="Record a new session" aria-label="Record a new session" onClick={onNewSession}>
+            +
+          </button>
+        </div>
         <div className="nav-group">
-          <div className="qa-empty">Session capture isn't built yet.</div>
+          <div className="qa-empty">Past sessions aren't listed yet — recordings are still saved and indexed.</div>
         </div>
       </div>
 

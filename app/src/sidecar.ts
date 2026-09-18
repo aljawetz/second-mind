@@ -163,3 +163,43 @@ export async function explainAssignment(courseId: number, assignmentId: number):
   }
   return data;
 }
+
+// Session capture (implementation-plan.md Step 12, design spec §9.3).
+// Recording itself happens here in the frontend (getUserMedia +
+// MediaRecorder) — the backend only handles what comes after stop.
+export interface SessionStatus {
+  status: "recording" | "processing" | "done" | "error";
+  course_id?: number;
+  class_num?: number;
+  source_label?: string;
+  transcript?: string;
+  summary?: string;
+  error?: string;
+}
+
+export async function startSession(courseId: number): Promise<{ session_id: string; status: string }> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/sessions/start`, { method: "POST" });
+  return res.json();
+}
+
+// Raw audio bytes as the body (audio/mp4 from MediaRecorder) — not
+// JSON/base64, this backend already reads raw request bodies elsewhere.
+export async function stopSession(sessionId: string, audioBlob: Blob): Promise<{ session_id: string; status: string }> {
+  const res = await fetch(`http://127.0.0.1:8756/sessions/${sessionId}/stop`, {
+    method: "POST",
+    body: audioBlob,
+  });
+  return res.json();
+}
+
+export async function getSessionStatus(sessionId: string): Promise<SessionStatus> {
+  const res = await fetch(`http://127.0.0.1:8756/sessions/${sessionId}`);
+  return res.json();
+}
+
+export async function saveSessionNotes(sessionId: string, text: string): Promise<void> {
+  await fetch(`http://127.0.0.1:8756/sessions/${sessionId}/notes`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+}

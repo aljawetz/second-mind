@@ -14,6 +14,7 @@ actually points (the real ~/.ssb/, or a scratch dir for tests).
 from pathlib import Path
 from typing import Any
 
+import lancedb
 from lancedb.expr import col, lit
 from llama_index.core import StorageContext, VectorStoreIndex, set_global_tokenizer
 from llama_index.core.node_parser import SentenceSplitter
@@ -59,6 +60,20 @@ def _with_ref_doc(node: TextNode, canvas_item_id: str) -> TextNode:
     return node
 
 
+def _metadata(source: str, item_type: str, *, page=None, slide=None, timestamp=None) -> dict:
+    """Every node across every node-creation function carries the same set
+    of metadata keys, only some populated per node — required, not just
+    tidy: LanceDB infers a table's column schema from whatever the first
+    batch of nodes happens to contain, and a plain columnar insert can't
+    add a new column later. A table built from Canvas pages alone (only
+    ever seeing "page") rejected a later insert of transcript nodes
+    ("timestamp") with "field 'timestamp' does not exist in table schema"
+    — a real, previously-latent bug Step 12 surfaced, the first time this
+    project ever inserted a second, differently-shaped node type into an
+    existing table rather than building a table fresh in one batch."""
+    return {"source": source, "item_type": item_type, "page": page, "slide": slide, "timestamp": timestamp}
+
+
 def pages_to_nodes(pages: list[dict], source: str, canvas_item_id: str) -> list[TextNode]:
     """One node per page, split further only if the page's prose actually
     exceeds the target chunk size — most extracted pages don't."""
@@ -68,7 +83,7 @@ def pages_to_nodes(pages: list[dict], source: str, canvas_item_id: str) -> list[
         if not text.strip():
             continue
         for chunk in _splitter.split_text(text):
-            node = TextNode(text=chunk, metadata={"source": source, "page": page["page"]})
+            node = TextNode(text=chunk, metadata=_metadata(source, "file", page=page["page"]))
             nodes.append(_with_ref_doc(node, canvas_item_id))
     return nodes
 
@@ -81,8 +96,63 @@ def slides_to_nodes(slides: list[dict], source: str, canvas_item_id: str) -> lis
         text = slide["text"]
         if not text.strip():
             continue
-        node = TextNode(text=text, metadata={"source": source, "slide": slide["slide"]})
+        node = TextNode(text=text, metadata=_metadata(source, "file", slide=slide["slide"]))
         nodes.append(_with_ref_doc(node, canvas_item_id))
+    return nodes
+
+
+def _format_timestamp(seconds: float) -> str:
+    minutes, secs = divmod(int(seconds), 60)
+    return f"{minutes}:{secs:02d}"
+
+
+def transcript_to_nodes(segments: list[dict], source: str, session_id: str) -> list[TextNode]:
+    """One node per ~2000-char group of consecutive faster-whisper segments
+    (split further only if that group's text still exceeds the target chunk
+    size), labeled by real timestamp rather than a page/slide number —
+    matches overview.md's own citation example ("Lecture 6 · 14:22").
+    Step 12 (design spec §9.3): transcript is indexed, notes are indexed
+    separately (notes_to_nodes) — the AI note-enhancement step is
+    transcript-only by product decision, but both stay searchable."""
+    nodes = []
+    buffer: list[str] = []
+    buffer_start: float | None = None
+    buffer_len = 0
+    for seg in segments:
+        if buffer_start is None:
+            buffer_start = seg["start"]
+        buffer.append(seg["text"])
+        buffer_len += len(seg["text"])
+        if buffer_len >= CHUNK_SIZE * 4:  # ~4 chars/token, rough gate before splitting further
+            nodes += _flush_transcript_buffer(buffer, buffer_start, source, session_id)
+            buffer, buffer_start, buffer_len = [], None, 0
+    if buffer:
+        nodes += _flush_transcript_buffer(buffer, buffer_start, source, session_id)
+    return nodes
+
+
+def _flush_transcript_buffer(buffer: list[str], start: float, source: str, session_id: str) -> list[TextNode]:
+    text = " ".join(buffer).strip()
+    if not text:
+        return []
+    nodes = []
+    for chunk in _splitter.split_text(text):
+        node = TextNode(text=chunk, metadata=_metadata(source, "transcript", timestamp=_format_timestamp(start)))
+        nodes.append(_with_ref_doc(node, session_id))
+    return nodes
+
+
+def notes_to_nodes(notes_text: str, source: str, session_id: str) -> list[TextNode]:
+    """The student's own rough in-class notes — indexed separately from the
+    transcript, never fed into the AI note-enhancement step (that reads the
+    transcript alone, by explicit product decision), but still searchable
+    via Q&A like everything else the student captures."""
+    if not notes_text.strip():
+        return []
+    nodes = []
+    for chunk in _splitter.split_text(notes_text):
+        node = TextNode(text=chunk, metadata=_metadata(source, "notes"))
+        nodes.append(_with_ref_doc(node, session_id))
     return nodes
 
 
@@ -134,3 +204,19 @@ def load_index(db_path: Path, table_name: str) -> VectorStoreIndex:
     return VectorStoreIndex.from_vector_store(
         vector_store, embed_model=OnnxBgeEmbedding(), transformations=[_splitter]
     )
+
+
+def index_exists(db_path: Path, table_name: str) -> bool:
+    if not db_path.exists():
+        return False
+    return table_name in lancedb.connect(str(db_path)).table_names()
+
+
+def add_nodes(nodes: list[TextNode], db_path: Path, table_name: str) -> None:
+    """Session capture's entry point (Step 12) — a course may have no index
+    yet at all (a session recorded before any Canvas sync), so this can't
+    assume load_index's table already exists the way /ask and /explain do."""
+    if index_exists(db_path, table_name):
+        load_index(db_path, table_name).insert_nodes(nodes)
+    else:
+        build_index(nodes, db_path, table_name)

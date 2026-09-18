@@ -491,6 +491,76 @@ the test is real transcription accuracy and speed on that, plus confirming the t
 notes get indexed and become askable afterward (closing the loop back to step 9).
 **Depends on:** 1, 6.
 
+**Scope decision, made with the user before building:** built the manual-trigger version, not
+§9.1/§9.2's scheduled-window auto-prompt. A "+" next to "Sessions" always lets the student start a
+session on demand; no weekly-schedule onboarding, no app-open window detection. Schedule-based
+auto-prompt stays a real, stated future enhancement, not silently dropped.
+
+**Design informed by researching how Granola and Wispr Flow actually work** (real product research,
+not guessed): Granola's real mechanism is note-first enhancement — rough in-meeting notes anchor an
+LLM's post-meeting cleanup of the full transcript, and raw audio is deleted right after
+transcription, no recordings kept. Adopted the audio-deletion policy (matches this project's own
+existing precedent for Canvas files, data-model.md §1's "hashed, extracted, embedded, then
+discarded"). Deliberately did NOT adopt notes-anchor-transcript merging — the user's call: the
+AI-enhancement step (`sessions._enhance_notes`) reads the transcript alone; the student's own rough
+notes stay a separate, independently-indexed artifact, never mixed into that prompt. Live/streaming
+transcription (Granola's other real behavior) was explicitly deferred — batch transcription after
+stop only.
+
+**Architecture:** recording happens in the browser layer (`getUserMedia` + `MediaRecorder`), not
+the Python backend — verified against current Tauri docs/issues, not assumed, that this works on
+macOS's WKWebView. `POST /sessions/{id}/stop`'s body is the raw audio blob (not JSON/base64); the
+response returns immediately (`{status: "processing"}`) while `faster-whisper` transcribes in a
+background thread (safe because of Step 9's `ThreadingHTTPServer`) — a real multi-minute recording
+blocking the HTTP response would be bad UX and risk client timeouts. A new `GET /sessions/{id}`
+(not in the original overview.md contract) is polled by the frontend for completion.
+
+**Three real bugs found before/while building this, none guessed:**
+1. **macOS silently kills mic access with no prompt at all** unless `Info.plist` declares
+   `NSMicrophoneUsageDescription` — verified against current Tauri GitHub issues showing exactly
+   this failure mode. Fixed by adding `app/src-tauri/Info.plist`; Tauri merges it automatically,
+   confirmed against the official docs, no `tauri.conf.json` change needed. Verified dev-mode mic
+   access specifically works for unsigned/ad-hoc builds (a real citation, not assumed) — production
+   signing (Step 14) needs its own `Entitlements.plist` separately, deferred.
+2. **A genuine fork bomb**, not a theoretical risk: the frozen sidecar binary, once anything
+   triggered `faster-whisper`'s internal multiprocessing, re-executed its entire `main.py` from
+   scratch as if bootstrapping a worker — which itself spawned more workers, recursively, without
+   bound. Caught in an isolated PyInstaller spike before it ever touched the real app, killed
+   immediately (`pkill -9`), root-caused to the missing standard fix: `multiprocessing.freeze_support()`
+   as the first statement in `main.py`'s `if __name__ == "__main__":` guard. Re-verified against the
+   real frozen binary afterward: stable at 3 processes throughout a real transcription, `/ping`
+   stayed responsive the whole time.
+3. **LanceDB tables have a fixed columnar schema inferred from the first batch inserted** — a table
+   built from Canvas pages alone (metadata: `source`, `page`, `item_type`) rejected a later insert
+   of transcript nodes (`source`, `timestamp`, `item_type`) with "field 'timestamp' does not exist
+   in table schema." The first time this project ever inserted a second, differently-shaped node
+   type into an already-built table rather than building fresh in one batch — latent since Step 6,
+   only surfaced here. Fixed by giving every node-creation function the same full metadata key set
+   (`indexing._metadata()`), populated per-type, `None` otherwise; `generation.build_citations()`
+   updated to check values, not key presence. Also added `indexing.index_exists()`/`add_nodes()` —
+   session capture can't assume a course was ever synced from Canvas at all before its first
+   recording, unlike `/ask`/`/explain` which already assume an index exists.
+
+**The faster-whisper model is bundled, not downloaded at runtime** — same reasoning and mechanism
+as the BGE embedding model (Step 4): a recording feature needing network access the first time a
+student uses it, possibly mid-class on spotty wifi, would undercut "your machine, your index."
+`scripts/fetch_whisper_model.py` (new, mirrors `convert_embedding_model.py`) fetches
+`Systran/faster-whisper-base`'s real CTranslate2 files into `models/faster-whisper-base/`
+(gitignored, ~145MB, regenerable); `ssb-backend.spec` bundles it the same way.
+
+**source_type "transcript"/"notes" are now real, reachable citation values** — previously hardcoded
+to "file" in `generation.build_citations()` since nothing indexed anything else. `/ask` verified
+retrieving both a session's transcript and the student's own notes as real citations for a real
+question, through both `uv run python3` and the real frozen binary.
+
+**Verified end-to-end, twice** — once under `uv run python3`, once through the actual frozen
+sidecar binary: start → real synthetic-speech recording → stop → real transcription → real
+AI-enhanced structured notes → raw audio deleted → `transcript.json`/`notes.md`/`summary.md` on
+disk exactly as designed → both transcript and notes indexed and retrievable via a real `/ask`
+call. Still needed, not done here (per this step's own **Test** line above): a real recording of
+someone actually talking, not synthetic TTS — synthetic speech is good enough to prove the
+mechanism works, not to judge real transcription accuracy.
+
 ### 13. Error handling + course removal
 **Do:** The full error-code contract (§2 of overview.md) across every endpoint; `unselect` and
 `DELETE` for courses as two structurally distinct actions.

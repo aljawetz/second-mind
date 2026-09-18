@@ -1,6 +1,7 @@
 """Sidecar backend — see docs/architecture/implementation-plan.md."""
 
 import json
+import multiprocessing
 import re
 import socketserver
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -15,6 +16,7 @@ import config
 import explain
 import generation
 import indexing
+import sessions
 
 HOST = "127.0.0.1"
 PORT = 8756
@@ -30,6 +32,10 @@ SSB_HOME = Path.home() / ".ssb"
 ASK_PATH = re.compile(r"^/courses/(\d+)/ask$")
 ASSIGNMENTS_PATH = re.compile(r"^/courses/(\d+)/assignments$")
 EXPLAIN_PATH = re.compile(r"^/courses/(\d+)/assignments/(\d+)/explain$")
+SESSION_START_PATH = re.compile(r"^/courses/(\d+)/sessions/start$")
+SESSION_STOP_PATH = re.compile(r"^/sessions/([\w-]+)/stop$")
+SESSION_NOTES_PATH = re.compile(r"^/sessions/([\w-]+)/notes$")
+SESSION_STATUS_PATH = re.compile(r"^/sessions/([\w-]+)$")
 
 
 class ThreadingHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
@@ -94,6 +100,10 @@ class Handler(BaseHTTPRequestHandler):
             if assignments_match:
                 self._handle_list_assignments(assignments_match.group(1))
                 return
+            status_match = SESSION_STATUS_PATH.match(self.path)
+            if status_match:
+                self._handle_session_status(status_match.group(1))
+                return
             self._send_json(404, {"error": {"code": "not_found", "message": "no such route"}})
 
     def _canvas_error(self, e: Exception) -> tuple[int, dict]:
@@ -139,6 +149,13 @@ class Handler(BaseHTTPRequestHandler):
         ]
         self._send_json(200, {"assignments": assignments})
 
+    def _handle_session_status(self, session_id: str):
+        status = sessions.get_status(session_id)
+        if status is None:
+            self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
+            return
+        self._send_json(200, status)
+
     def do_POST(self):
         if self.path == "/config":
             length = int(self.headers.get("Content-Length", 0))
@@ -175,7 +192,50 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_explain(explain_match.group(1), explain_match.group(2))
             return
 
+        session_start_match = SESSION_START_PATH.match(self.path)
+        if session_start_match:
+            self._handle_session_start(session_start_match.group(1))
+            return
+
+        session_stop_match = SESSION_STOP_PATH.match(self.path)
+        if session_stop_match:
+            self._handle_session_stop(session_stop_match.group(1))
+            return
+
+        session_notes_match = SESSION_NOTES_PATH.match(self.path)
+        if session_notes_match:
+            self._handle_session_notes(session_notes_match.group(1))
+            return
+
         self._send_json(404, {"error": {"code": "not_found", "message": "no such route"}})
+
+    def _handle_session_start(self, course_id: str):
+        self._send_json(200, sessions.start_session(SSB_HOME, int(course_id)))
+
+    def _handle_session_stop(self, session_id: str):
+        length = int(self.headers.get("Content-Length", 0))
+        audio_bytes = self.rfile.read(length)
+        try:
+            result = sessions.stop_session(session_id, audio_bytes, SSB_HOME / "index.lancedb")
+        except KeyError:
+            self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
+            return
+        self._send_json(200, result)
+
+    def _handle_session_notes(self, session_id: str):
+        length = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(length)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            self._send_json(400, {"error": {"code": "bad_request", "message": "invalid JSON"}})
+            return
+        try:
+            sessions.save_notes(session_id, data.get("text", ""))
+        except KeyError:
+            self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
+            return
+        self._send_json(200, {"status": "saved"})
 
     def _write_chunk(self, payload: dict):
         # Manual chunked transfer encoding — verified against a real client
@@ -307,5 +367,11 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    # Required before anything that might use multiprocessing (faster-whisper's
+    # transcription backend does) — without this, the frozen PyInstaller binary
+    # re-executes this entire script every time a worker process is spawned,
+    # which recursively re-spawns more workers. Confirmed as a real, genuine
+    # fork bomb during Step 12's development, not a theoretical risk.
+    multiprocessing.freeze_support()
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     server.serve_forever()

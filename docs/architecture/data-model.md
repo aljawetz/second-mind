@@ -27,9 +27,9 @@ target for SSB today; revisit this layout if that ever becomes real.)
 │   │   ├── manifest.db            # sync manifest (§5.5) — SQLite, schema in §4
 │   │   └── sessions/
 │   │       ├── 2026-09-12-class-06/
-│   │       │   ├── audio.m4a
-│   │       │   ├── transcript.json
-│   │       │   └── notes.md
+│   │       │   ├── transcript.json        # raw audio is NOT kept — deleted right after
+│   │       │   ├── notes.md                #   transcription succeeds (implementation-plan.md
+│   │       │   └── summary.md              #   Step 12; same policy as raw Canvas files above)
 │   │       └── 2026-09-10-class-05/
 │   │           └── ...
 │   └── 18654/
@@ -136,7 +136,12 @@ this should be confirmed against the actual LanceDB integration, not assumed fro
 
 Each session gets its own directory named for the date and class number
 (`2026-09-12-class-06/`), not a bare UUID — so a student who goes looking through
-`~/.ssb/<id>/courses/49797/sessions/` in Finder can find last Tuesday's class without opening the
+`~/.ssb/courses/49797/sessions/` in Finder can find last Tuesday's class without opening the
 app. `transcript.json` carries timestamped segments (the citation anchor for Q&A, matching the
-`"Lecture 6 · 14:22"` label shape used throughout the mockup and §7); `notes.md` is plain
-Markdown, editable outside SSB if the student ever wants to.
+`"Lecture 6 · 14:22"` label shape used throughout the mockup and §7); `notes.md` is the student's
+own rough in-class notes, plain Markdown, editable outside SSB if they ever want to; `summary.md`
+is AI-enhanced structured notes generated from the transcript alone (implementation-plan.md Step
+12 — a deliberate product decision not to mix the student's own notes into that generation step).
+The raw audio recording is never kept past transcription — deleted as soon as it succeeds, the
+same "don't retain raw source material longer than needed" policy already applied to Canvas files
+below (§1).

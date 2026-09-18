@@ -47,6 +47,18 @@ Produces `models/bge-small-en-v1.5-onnx/` (gitignored). See
 [docs/architecture/rag-pipeline.md §3](../docs/architecture/rag-pipeline.md) for why this exists —
 avoids bundling `torch` into the shipped app.
 
+## Fetching the session-transcription model (one-time)
+
+Not committed — `model.bin` alone is ~145MB. Needs network access to Hugging Face.
+
+```bash
+uv run python3 scripts/fetch_whisper_model.py
+```
+
+Produces `models/faster-whisper-base/` (gitignored). Bundled into the shipped binary the same way
+as the embedding model above — implementation-plan.md Step 12 — rather than downloaded at runtime,
+so session recording works fully offline once installed.
+
 ## Fetching ingestion test fixtures (one-time)
 
 Not committed, and not regenerable from a public source — these are an instructor's actual course
