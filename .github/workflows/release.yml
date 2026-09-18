@@ -5,6 +5,13 @@ on:
     tags:
       - "v*"
 
+# contents: write — real finding from the first actual run: this repo's
+# default GITHUB_TOKEN permissions don't include creating a release
+# ("Resource not accessible by integration"), which isn't obvious until a
+# tag push actually fails on it.
+permissions:
+  contents: write
+
 # macOS only, unsigned — contribution-and-distribution-plan.md step 5. An
 # unsigned .dmg triggers Gatekeeper's "Apple cannot verify this app"
 # warning on first install (right-click -> Open bypasses it); real
