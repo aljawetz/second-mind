@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 import { getCredential, setCredential } from "../../credentials";
-import { validateCredential } from "../../sidecar";
+import { getConfig, validateCredential, writeConfig } from "../../sidecar";
 
-export default function OnboardingKeys({ onNext }: { onNext: () => void }) {
+// canvasUrl comes back from onNext already normalized (config.py's
+// normalize_canvas_base_url, applied server-side on write) rather than
+// whatever raw form the student typed — contribution-and-distribution-
+// plan.md step 2, SSB used to only work against canvas.cmu.edu.
+export default function OnboardingKeys({ onNext }: { onNext: (canvasUrl: string) => void }) {
+  const [canvasUrl, setCanvasUrl] = useState("");
   const [canvasKey, setCanvasKey] = useState("");
   const [openaiKey, setOpenaiKey] = useState("");
   const [canvasError, setCanvasError] = useState("");
@@ -11,16 +16,18 @@ export default function OnboardingKeys({ onNext }: { onNext: () => void }) {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    Promise.all([getCredential("canvas-token"), getCredential("openai-key")]).then(
-      ([canvas, openai]) => {
+    Promise.all([getCredential("canvas-token"), getCredential("openai-key"), getConfig()]).then(
+      ([canvas, openai, cfg]) => {
         if (canvas) setCanvasKey(canvas);
         if (openai) setOpenaiKey(openai);
+        if (cfg.canvas_base_url) setCanvasUrl(cfg.canvas_base_url);
         setLoaded(true);
       }
     );
   }, []);
 
-  const canProceed = loaded && !submitting && canvasKey.trim() !== "" && openaiKey.trim() !== "";
+  const canProceed =
+    loaded && !submitting && canvasUrl.trim() !== "" && canvasKey.trim() !== "" && openaiKey.trim() !== "";
 
   async function handleConnect() {
     setSubmitting(true);
@@ -39,12 +46,13 @@ export default function OnboardingKeys({ onNext }: { onNext: () => void }) {
       return;
     }
 
-    await Promise.all([
+    const [, , savedConfig] = await Promise.all([
       setCredential("canvas-token", canvasKey),
       setCredential("openai-key", openaiKey),
+      writeConfig({ canvas_base_url: canvasUrl }),
     ]);
     setSubmitting(false);
-    onNext();
+    onNext(savedConfig.canvas_base_url ?? canvasUrl);
   }
 
   return (
@@ -61,6 +69,17 @@ export default function OnboardingKeys({ onNext }: { onNext: () => void }) {
           <p className="onboard-sub">Keys stay on this device — SSB talks to Canvas and your model provider directly.</p>
         </div>
         <div className="field">
+          <label htmlFor="canvas-url">Your school's Canvas URL</label>
+          <input
+            type="text"
+            id="canvas-url"
+            placeholder="canvas.cmu.edu"
+            value={canvasUrl}
+            onChange={(e) => setCanvasUrl(e.target.value)}
+          />
+          <span className="hint">The Canvas address you already use to log in — e.g. canvas.cmu.edu</span>
+        </div>
+        <div className="field">
           <label htmlFor="key-canvas">Canvas API token</label>
           <input
             type="password"
@@ -71,7 +90,7 @@ export default function OnboardingKeys({ onNext }: { onNext: () => void }) {
           {canvasError ? (
             <span className="field-error">{canvasError}</span>
           ) : (
-            <span className="hint">canvas.cmu.edu → Account → Settings → New access token</span>
+            <span className="hint">Your Canvas → Account → Settings → New access token</span>
           )}
         </div>
         <div className="field">

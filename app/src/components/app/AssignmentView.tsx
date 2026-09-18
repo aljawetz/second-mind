@@ -11,11 +11,13 @@ type ExplainState =
 
 export default function AssignmentView({
   courseId,
+  canvasBaseUrl,
   assignment,
   onBack,
   onOpenSession,
 }: {
   courseId: number;
+  canvasBaseUrl: string;
   assignment: CanvasAssignment;
   onBack: () => void;
   onOpenSession: (sessionId: string) => void;
@@ -88,7 +90,7 @@ export default function AssignmentView({
                   )}
                   {explain.data.pointers.map((p, i) => (
                     <div className="explain-tip" key={i}>
-                      <button className="cite cite-link" onClick={() => openCitation(courseId, p, onOpenSession)}>
+                      <button className="cite cite-link" onClick={() => openCitation(canvasBaseUrl, courseId, p, onOpenSession)}>
                         {p.label}
                       </button>
                     </div>

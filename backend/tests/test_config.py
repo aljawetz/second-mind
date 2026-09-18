@@ -29,3 +29,23 @@ def test_credentials_status_reports_missing_when_no_keyring_entry(monkeypatch):
 def test_credentials_status_reports_present(monkeypatch):
     monkeypatch.setattr(config.keyring, "get_password", lambda service, key: "some-value")
     assert config.credentials_status() == {"canvas": True, "openai": True}
+
+
+def test_normalize_canvas_base_url_adds_scheme():
+    assert config.normalize_canvas_base_url("canvas.cmu.edu") == "https://canvas.cmu.edu"
+
+
+def test_normalize_canvas_base_url_strips_trailing_slash():
+    assert config.normalize_canvas_base_url("https://canvas.cmu.edu/") == "https://canvas.cmu.edu"
+
+
+def test_normalize_canvas_base_url_strips_pasted_api_path():
+    assert config.normalize_canvas_base_url("https://canvas.cmu.edu/api/v1") == "https://canvas.cmu.edu"
+
+
+def test_normalize_canvas_base_url_keeps_explicit_http():
+    assert config.normalize_canvas_base_url("http://localhost:8080") == "http://localhost:8080"
+
+
+def test_normalize_canvas_base_url_empty_stays_empty():
+    assert config.normalize_canvas_base_url("   ") == ""

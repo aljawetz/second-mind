@@ -1,5 +1,8 @@
 # SSB — Student Second Brain
 
+[![CI](https://github.com/aljawetz/ssb/actions/workflows/ci.yml/badge.svg)](https://github.com/aljawetz/ssb/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **The open-source alternative to [UniFlow Study](https://www.uniflowstudy.com/).**
 
 One app per student that ingests your real course material, captures your lectures, answers
@@ -8,11 +11,28 @@ build by hand — mock tests, mindmaps, slides, flashcards.
 
 Your index, your recordings, your notes, on your machine.
 
-> **Status: early development.** Sprint 5 (core prototype) is underway — the Tauri app shell,
-> Python sidecar, Keychain-backed credential storage, and Canvas integration are working
-> end-to-end against real data. RAG (ingestion, embeddings, retrieval) hasn't started yet; see
+> **Status: early development.** Grounded Q&A, Canvas sync, lecture capture + transcription, and
+> assignment explanations all work end-to-end against real data. Study artifact generation (mock
+> tests, mindmaps, flashcards, slides) hasn't started yet; see
 > [the implementation plan](docs/architecture/implementation-plan.md) for exactly what's done.
-> There is no installable build yet.
+> There's no downloadable installer yet — see the Quickstart below to run it from source.
+
+---
+
+## Quickstart (macOS)
+
+```bash
+git clone https://github.com/aljawetz/ssb.git
+cd ssb
+./scripts/bootstrap.sh          # checks prerequisites, installs everything, fetches local models
+cd app && PATH="$HOME/.cargo/bin:$PATH" npm run tauri dev
+```
+
+Prerequisites: `uv`, Node, Rust (`rustup`), `brew install tesseract`. During onboarding you'll
+need a Canvas API token (Account → Settings → New access token, on whatever Canvas instance your
+school uses) and an OpenAI API key. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev
+workflow. Windows/Linux and a downloadable installer aren't built yet — tracked in
+[the contribution & distribution plan](docs/architecture/contribution-and-distribution-plan.md).
 
 ---
 
@@ -145,8 +165,9 @@ silently blends outside knowledge into a course-grounded answer.
 - [RAG pipeline](docs/architecture/rag-pipeline.md) — ingestion, embedding, retrieval, generation
 - [Implementation plan](docs/architecture/implementation-plan.md) — the sequenced build order,
   a concrete test per step, and what's actually verified so far
+- [Contribution & distribution plan](docs/architecture/contribution-and-distribution-plan.md) —
+  how SSB is becoming installable and contributable by people outside this class
 
 ## License
 
-TBD — will be an OSI-approved open-source license before first release. "Open source" is the
-product's central claim, so this gets settled, not left dangling.
+[MIT](LICENSE).

@@ -43,6 +43,7 @@ export interface SsbConfig {
   selected_courses?: number[];
   llm_provider?: string;
   onboarding_complete?: boolean;
+  canvas_base_url?: string;
 }
 
 export async function getConfig(): Promise<SsbConfig> {

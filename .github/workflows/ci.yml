@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install Tesseract (OCR fallback, pytesseract wraps the binary)
+        run: brew install tesseract
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync --all-groups
+
+      - name: Generate the embedding model
+        # Public Hugging Face checkpoint, no secrets needed — gives
+        # test_embeddings.py real coverage in CI instead of skipping.
+        # Canvas-fixture-dependent tests (test_ingestion.py) still skip
+        # cleanly here, same as local dev without a Canvas token — CI never
+        # gets a real Canvas or OpenAI credential.
+        working-directory: backend
+        run: uv run python3 scripts/convert_embedding_model.py
+
+      - name: Run tests
+        working-directory: backend
+        run: uv run pytest tests/ -v
+
+  frontend:
+    name: Frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: app
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: app
+        run: npm run build
+
+  rust:
+    name: Tauri shell (cargo check)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Build frontend (cargo check needs frontendDist to exist)
+        working-directory: app
+        run: npm run build
+
+      - name: cargo check
+        working-directory: app/src-tauri
+        run: cargo check

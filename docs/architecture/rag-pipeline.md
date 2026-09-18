@@ -100,48 +100,68 @@ only if retrieval quality turns out to be a real problem in practice, not assume
 
 **LanceDB**, via LlamaIndex's official `LanceDBVectorStore` integration (`llama-index-vector-stores-lancedb`,
 actively maintained), one database per student, one table per course (design spec §10;
-[data-model.md](data-model.md) §1). LanceDB's native hybrid search (vector + full-text) is exposed
-through this integration directly — no separate BM25 library and no manual reranking step to build
-and maintain.
+[data-model.md](data-model.md) §1).
+
+**Hybrid retrieval is hand-built (`generation.HybridRetriever`), not the integration's own
+`query_type="hybrid"` — real finding, this section originally assumed the opposite.** Vector
+search alone missed exact name/keyword lookups (a real query about a person named in a class
+recording scored only 0.34–0.42 via cosine similarity, well under the grounding cutoff below).
+The obvious fix — LlamaIndex's built-in `query_type="hybrid"` — turned out to return a fake score:
+`_to_llama_similarities()` falls back to `np.linspace(1, 0, n)` (pure rank position) whenever the
+result set lacks a real `score`/`_distance` column, confirmed by testing a deliberately off-topic
+control query and finding the top result always scored exactly 1.0 regardless of actual relevance.
+That's unusable for a grounding threshold, so `HybridRetriever` keeps two separately-scored
+retrieval paths instead of fusing them into one number: real vector search (filtered against
+`SIMILARITY_CUTOFF` below) plus LanceDB's raw BM25 full-text search via `table.search(...,
+query_type="fts")`. BM25's score magnitude isn't portable across corpora the way cosine similarity
+is — confirmed: the same off-topic control query scored ~0 on one real course's corpus and ~4 on a
+different one, an order of magnitude apart for the same query, traced to a real, coincidental
+keyword match rather than a bug — so the FTS side takes no magnitude threshold at all, only the
+single best-ranked match (`FTS_TOP_K = 1`), trusting `CitationQueryEngine`'s own synthesis step as
+a verified second line of defense against a weak match slipping through.
 
 **Cited responses come from LlamaIndex's `CitationQueryEngine`**, not a hand-built citation
-mechanism — it retrieves, chunks sources at a configurable citation granularity, and returns a
-response whose `source_nodes` are the actual chunks the answer was built from, each carrying the
-citation-anchor metadata from §2.
+mechanism — it retrieves (via `HybridRetriever` above), chunks sources at a configurable citation
+granularity, and returns a response whose `source_nodes` are the actual chunks the answer was
+built from, each carrying the citation-anchor metadata from §2. `generation.build_citations()`
+maps `source_nodes` to the citation shape the frontend renders, reading each node's real
+`item_type` metadata (`"file"`, `"transcript"`, or `"notes"` — see §6) for `source_type` rather
+than assuming every citation is a file.
 
-**Groundedness is enforced at the retrieval boundary via a `SimilarityPostprocessor`**
-(`similarity_cutoff`, a built-in LlamaIndex node postprocessor), not left to the LLM's judgment
-alone. Nodes below the cutoff are filtered out before response synthesis ever sees them; if nothing
-survives the filter, the pipeline treats that as "nothing relevant is indexed" and returns the
-not-covered response (design spec §7) without ever sending an unsupported context to the LLM. The
-cutoff value is a tunable constant, not a hard-coded assumption — it needs calibration against real
-queries before Sprint 5, the same way Sprint 3 flagged the density heuristic as needing tuning
-against more real course material.
+**Groundedness is enforced inside `HybridRetriever` itself, not via a `node_postprocessor` on the
+query engine** — vector nodes are filtered against `SIMILARITY_CUTOFF` (cosine similarity, a real,
+portable threshold, calibrated below) before being combined with the FTS nodes, so nothing
+downstream re-filters either kind against a scale it was never computed on. If nothing survives,
+the pipeline treats that as "nothing relevant is indexed" and returns the not-covered response
+(design spec §7) without ever sending an unsupported context to the LLM. **Calibrated against real
+retrieval scores** (not guessed): on-topic queries against real indexed content scored
+0.6555–0.7524, deliberately off-topic queries scored 0.3077–0.3967 — a clean gap, no overlap.
+`SIMILARITY_CUTOFF = 0.5` sits with real margin on both sides, biased slightly toward the
+conservative end (reject a borderline match rather than risk an unsupported context reaching the
+LLM). 4 on-topic + 3 off-topic queries against one real course — a real data point, not an
+exhaustive sweep.
 
-**Tested end-to-end (retrieval half) against the real tiered-extraction corpus from Sprint 3.**
-Indexed both real files (the Zotero PDF via the full plain-text/OCR pipeline, the lecture deck via
-plain text) into an actual `LanceDBVectorStore` with `bge-small-en-v1.5` embeddings, then ran four
-known-answer queries through the retriever. All four found the correct page within the top 3
-results. The most important result: the query whose answer only exists in OCR-recovered text
-("what citation style should I choose") retrieved that page as the **top** result — confirming
-that OCR output too noisy to display as a clean citation is still good enough as *embedding input*
-for correct retrieval. Those are different bars, and this clears the one retrieval actually needs.
-One ranking nuance, not a failure: a query about installation steps ranked an adjacent
-install-sequence page above the exact expected one (both topically valid, correct answer still
-rank 2 of 3) — worth watching for near-duplicate adjacent content once real courses are indexed at
-scale. **This is a 4-query smoke test proving the mechanism works, not a precision@k benchmark** —
-that needs many more real queries across more courses at Sprint 5. Generation (the LLM synthesizing
-a cited answer from these retrieved nodes) remains untested — no LLM API key was available in this
-environment to exercise `CitationQueryEngine`'s synthesis step.
+**Tested end-to-end, both retrieval and generation, against real indexed courses** — this section
+previously said generation remained untested for lack of an LLM key; that's long since resolved.
+`scripts/generation_smoke_test.py` runs real, billed OpenAI calls against a real course's index,
+verifying citations, the not-covered case (a deliberately off-topic query returns zero source
+nodes, not a hallucinated answer), and Socratic mode. The real `/ask` endpoint has been exercised
+end-to-end through the actual app UI (implementation-plan.md's Q&A frontend wiring and every step
+after it), not just via scripts.
 
 ## 5. Generation — where LLM provider calls happen
 
-LlamaIndex's own multi-provider LLM abstraction (`llama-index-llms-openai`,
-`llama-index-llms-anthropic`, etc.) wired into the `CitationQueryEngine` from §4, selected by
-`config.json`'s `llm_provider` ([data-model.md](data-model.md) §3) with the matching key pulled
-from Keychain — not a hand-rolled provider-switch interface. The system prompt is what actually
-encodes the grounding rules from design spec §7 — answer-first by default, Socratic mode as a
-toggle, cite every factual claim, never blend in open-domain knowledge unless the (separately
+**OpenAI only right now, not the pluggable multi-provider setup this section previously
+described.** `generation.py`, `explain.py`, and `sessions.py` each import
+`llama_index.llms.openai.OpenAI` directly and hardcode `DEFAULT_MODEL = "gpt-4o-mini"` — there's
+no `llama-index-llms-anthropic` dependency, and nothing reads `config.json`'s `llm_provider` back
+to select between providers (`OnboardingCourses.tsx` writes it as a static `"openai"` during
+onboarding, but no backend code ever reads it). The design intent — LlamaIndex's own multi-
+provider LLM abstraction, selected by `llm_provider` with the matching key pulled from Keychain —
+is still the plan, just not built; real multi-provider support is future work, not implemented
+despite `config.json` already carrying a field that implies it is. The system prompt is what
+actually encodes the grounding rules from design spec §7 — answer-first by default, Socratic mode
+as a toggle, cite every factual claim, never blend in open-domain knowledge unless the (separately
 labeled) web-search path was explicitly used.
 
 **Streaming by default** (NFR5, design spec §5) — a Q&A response starts rendering as tokens arrive
@@ -154,7 +174,35 @@ provider — cheap per-query for text models, but the vision-tier ingestion fall
 meaningfully more expensive per page and should stay an opt-in fallback rather than a default,
 exactly as Sprint 3 concluded.
 
-## 6. Study artifacts and the assignment explainer
+## 6. Session capture's nodes
+
+Not in this pipeline's original design — added when session capture (implementation-plan.md Step
+12) became the first feature to insert a second, differently-shaped node type into a table a
+Canvas sync had already built. `indexing.transcript_to_nodes()` groups consecutive
+faster-whisper segments into ~2000-char buffers (split further by the same `SentenceSplitter` as
+§2 if a buffer still exceeds the target chunk size), each node's citation anchor a real timestamp
+(`"14:22"`) rather than a page/slide number — the same metadata pattern as §2, just a different
+anchor kind. `indexing.notes_to_nodes()` indexes the student's own rough in-class notes
+separately from the transcript — never fed into the AI note-enhancement step (that reads the
+transcript alone, by product decision), but still searchable via Q&A like everything else. Both
+carry `item_type` metadata (`"transcript"` / `"notes"`) that §4's citation-building now reads
+directly, and both set their `ref_doc_id` to the real `session_id` (`indexing._with_ref_doc()`,
+matching data-model.md §4's convention for `canvas_item_id`) — a session/notes citation click can
+navigate straight to that session, no lookup needed.
+
+**Real finding: LanceDB infers a table's column schema from whatever the first batch of nodes
+happens to contain, and a plain columnar insert can't add a new column later.** A table built from
+Canvas pages alone (only ever populating `page`) rejected a later insert of transcript nodes
+(populating `timestamp` instead) with `"field 'timestamp' does not exist in table schema"` — the
+first time this project ever inserted a second, differently-shaped node type into an existing
+table rather than building one fresh in a single batch. Fixed by `indexing._metadata()`: every
+node-creation function (`pages_to_nodes`, `slides_to_nodes`, `transcript_to_nodes`,
+`notes_to_nodes`) now populates the *same* full metadata key set (`source`, `item_type`, `page`,
+`slide`, `timestamp`), leaving whichever keys don't apply to that node kind as `None` rather than
+omitted — a schema-compatibility constraint from the storage layer, not a design preference, and
+the reason every node in this pipeline carries keys it doesn't use.
+
+## 7. Study artifacts and the assignment explainer
 
 Both reuse this same retrieval-then-generate shape, not a separate pipeline:
 

@@ -30,6 +30,7 @@ PORT = 8756
 # for this architecture (revisited and deliberately simplified — not an
 # oversight).
 SSB_HOME = Path.home() / ".ssb"
+canvas.SSB_HOME = SSB_HOME
 
 COURSE_PATH = re.compile(r"^/courses/(\d+)$")
 UNSELECT_PATH = re.compile(r"^/courses/(\d+)/unselect$")
@@ -220,6 +221,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(400, {"error": {"code": "bad_request", "message": "invalid JSON"}})
                 return
             merged = {**config.read_config(SSB_HOME), **data}
+            if merged.get("canvas_base_url"):
+                merged["canvas_base_url"] = config.normalize_canvas_base_url(merged["canvas_base_url"])
             config.write_config(SSB_HOME, merged)
             self._send_json(200, merged)
             return

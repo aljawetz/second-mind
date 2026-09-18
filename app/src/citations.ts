@@ -10,7 +10,15 @@ import type { Citation } from "./sidecar";
 // actually reachable today (generation.py: real Canvas sync/ingestion —
 // implementation-plan.md Step 11 — is deferred, so "page" is unreached);
 // this still opens the right URL shape for it once that lands.
+//
+// canvasBaseUrl comes from the student's own configured Canvas origin
+// (config.json's canvas_base_url, set during onboarding) — never a
+// hardcoded domain; SSB only ever worked against canvas.cmu.edu before
+// contribution-and-distribution-plan.md step 2. Falls back to CMU's
+// Canvas only if config genuinely hasn't loaded yet, matching canvas.py's
+// own default.
 export async function openCitation(
+  canvasBaseUrl: string,
   courseId: number,
   citation: Citation,
   onOpenSession: (sessionId: string) => void
@@ -19,5 +27,6 @@ export async function openCitation(
     onOpenSession(citation.item_id);
     return;
   }
-  await open(`https://canvas.cmu.edu/courses/${courseId}/files/${citation.item_id}`);
+  const origin = canvasBaseUrl || "https://canvas.cmu.edu";
+  await open(`${origin}/courses/${courseId}/files/${citation.item_id}`);
 }

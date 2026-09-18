@@ -10,6 +10,7 @@ import AppShell from "./components/app/AppShell";
 export default function App() {
   const [stage, setStage] = useState<OnboardStage>("startup");
   const [courses, setCourses] = useState<AvailableCourse[]>([]);
+  const [canvasBaseUrl, setCanvasBaseUrl] = useState("");
   const selectedCourses = courses.filter((c) => c.checked);
 
   // Returning-user check (config.json, data-model.md §3): skip onboarding
@@ -22,6 +23,7 @@ export default function App() {
     try {
       const [status, cfg] = await Promise.all([getCredentialsStatus(), getConfig()]);
       const remembered = cfg.selected_courses ?? [];
+      setCanvasBaseUrl(cfg.canvas_base_url ?? "");
       if (status.canvas && status.openai && cfg.onboarding_complete && remembered.length > 0) {
         const allCourses = await listCourses();
         const restored = allCourses.map((c) => ({
@@ -73,7 +75,14 @@ export default function App() {
     case "startup":
       return <StartupGate onReady={handleBackendReady} />;
     case "keys":
-      return <OnboardingKeys onNext={() => setStage("courses")} />;
+      return (
+        <OnboardingKeys
+          onNext={(url) => {
+            setCanvasBaseUrl(url);
+            setStage("courses");
+          }}
+        />
+      );
     case "courses":
       return (
         <OnboardingCourses
@@ -86,6 +95,13 @@ export default function App() {
     case "indexing":
       return <OnboardingIndexing courses={selectedCourses} onNext={() => setStage("app")} />;
     case "app":
-      return <AppShell courses={selectedCourses} onCourseRemoved={handleCourseRemoved} onCourseAdded={handleCourseAdded} />;
+      return (
+        <AppShell
+          courses={selectedCourses}
+          canvasBaseUrl={canvasBaseUrl}
+          onCourseRemoved={handleCourseRemoved}
+          onCourseAdded={handleCourseAdded}
+        />
+      );
   }
 }

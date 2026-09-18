@@ -30,6 +30,25 @@ def write_config(ssb_home: Path, data: dict) -> None:
     config_path(ssb_home).write_text(json.dumps(data, indent=2))
 
 
+def normalize_canvas_base_url(raw: str) -> str:
+    """Accepts whatever a student reasonably pastes during onboarding — a
+    bare domain, with or without a scheme, with or without a trailing slash
+    or an accidental /api/v1 — and returns just the origin (e.g.
+    "https://canvas.cmu.edu"). The single canonical form both canvas.py
+    (which appends /api/v1 itself) and the frontend's citation links
+    (which use the origin directly) build on top of, contribution-and-
+    distribution-plan.md step 2 — SSB was hardcoded to canvas.cmu.edu
+    before this."""
+    value = raw.strip().rstrip("/")
+    if not value:
+        return value
+    if not value.startswith(("http://", "https://")):
+        value = f"https://{value}"
+    if value.endswith("/api/v1"):
+        value = value[: -len("/api/v1")]
+    return value.rstrip("/")
+
+
 def credentials_status() -> dict:
     return {
         "canvas": bool(keyring.get_password(CREDENTIAL_SERVICE, "canvas-token")),

@@ -18,6 +18,7 @@ interface ChatTurn {
 export default function HomeView({
   courseId,
   courseName,
+  canvasBaseUrl,
   assignments,
   assignmentsError,
   socratic,
@@ -27,6 +28,7 @@ export default function HomeView({
 }: {
   courseId: number;
   courseName: string;
+  canvasBaseUrl: string;
   assignments: CanvasAssignment[];
   assignmentsError: string | null;
   socratic: boolean;
@@ -95,7 +97,7 @@ export default function HomeView({
                             <button
                               className="cite cite-link"
                               key={ci}
-                              onClick={() => openCitation(courseId, c, onOpenSession)}
+                              onClick={() => openCitation(canvasBaseUrl, courseId, c, onOpenSession)}
                             >
                               {c.label}
                             </button>

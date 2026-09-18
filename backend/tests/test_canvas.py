@@ -9,6 +9,7 @@ import pytest
 import respx
 
 import canvas
+import config
 
 FIXTURES = Path(__file__).parent / "fixtures" / "canvas"
 BASE = canvas.CANVAS_API_URL
@@ -21,6 +22,14 @@ def load(name: str) -> dict:
 @pytest.fixture(autouse=True)
 def fake_token(monkeypatch):
     monkeypatch.setattr(canvas.keyring, "get_password", lambda service, key: "fake-token-for-tests")
+
+
+@pytest.fixture(autouse=True)
+def fake_ssb_home(tmp_path, monkeypatch):
+    # No config.json here — real isolation from whatever's on the actual
+    # dev machine, and _api_base() falls through to CANVAS_API_URL (BASE
+    # above), same as every test already assumes.
+    monkeypatch.setattr(canvas, "SSB_HOME", tmp_path)
 
 
 @respx.mock
@@ -68,6 +77,20 @@ def test_course_structure_403_degrades_to_empty():
     respx.get(f"{BASE}/courses/55709/modules").mock(return_value=httpx.Response(fx["status"], json=fx["body"]))
     modules = canvas.get_course_structure(55709)
     assert modules == []
+
+
+@respx.mock
+def test_configured_base_url_is_used_instead_of_default(tmp_path, monkeypatch):
+    """contribution-and-distribution-plan.md step 2 — a school other than
+    CMU must actually be reachable, not just accepted by onboarding."""
+    monkeypatch.setattr(canvas, "SSB_HOME", tmp_path)
+    config.write_config(tmp_path, {"canvas_base_url": "https://canvas.instructure.com"})
+    fx = load("courses")
+    respx.get("https://canvas.instructure.com/api/v1/courses").mock(
+        return_value=httpx.Response(fx["status"], json=fx["body"])
+    )
+    result = canvas.list_courses()
+    assert len(result) == len(fx["body"])
 
 
 @respx.mock

@@ -12,10 +12,12 @@ import ManageCoursesView from "./ManageCoursesView";
 
 export default function AppShell({
   courses,
+  canvasBaseUrl,
   onCourseRemoved,
   onCourseAdded,
 }: {
   courses: AvailableCourse[];
+  canvasBaseUrl: string;
   onCourseRemoved: (courseId: number) => void;
   onCourseAdded: (course: AvailableCourse) => void;
 }) {
@@ -155,6 +157,7 @@ export default function AppShell({
                 <HomeView
                   courseId={courseId}
                   courseName={course.name}
+                  canvasBaseUrl={canvasBaseUrl}
                   assignments={assignments}
                   assignmentsError={assignmentsError}
                   socratic={socratic}
@@ -169,6 +172,7 @@ export default function AppShell({
               {view === "assignment" && selectedAssignment && (
                 <AssignmentView
                   courseId={courseId}
+                  canvasBaseUrl={canvasBaseUrl}
                   assignment={selectedAssignment}
                   onBack={goHome}
                   onOpenSession={openSession}

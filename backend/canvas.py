@@ -12,12 +12,19 @@ A 429 means rate-limited and gets retried with backoff — §5.
 
 import re
 import time
+from pathlib import Path
 
 import httpx
 import keyring
 
+import config
+
+# Default when nothing's configured yet — real base URL is a config.json
+# value (contribution-and-distribution-plan.md step 2), not a constant;
+# SSB used to only work against CMU's Canvas at all.
 CANVAS_API_URL = "https://canvas.cmu.edu/api/v1"
 CREDENTIAL_SERVICE = "com.ssb.app"
+SSB_HOME = Path.home() / ".ssb"  # set to the real value by main.py at startup; tests monkeypatch this directly
 
 _LINK_RE = re.compile(r'<([^>]+)>;\s*rel="([^"]+)"')
 
@@ -33,9 +40,14 @@ def _token() -> str:
     return token
 
 
+def _api_base() -> str:
+    origin = config.read_config(SSB_HOME).get("canvas_base_url")
+    return f"{origin}/api/v1" if origin else CANVAS_API_URL
+
+
 def _client() -> httpx.Client:
     return httpx.Client(
-        base_url=CANVAS_API_URL,
+        base_url=_api_base(),
         headers={"Authorization": f"Bearer {_token()}"},
         timeout=15.0,
     )
