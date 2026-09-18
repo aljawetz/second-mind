@@ -56,6 +56,19 @@ export default function App() {
     }
   }
 
+  // Adding a course post-onboarding (implementation-plan.md's UI feedback
+  // round) — mirrors handleCourseRemoved's shape. `courses` may not already
+  // contain this id at all (the returning-user restore path in
+  // handleBackendReady only ever ran listCourses() once, before this course
+  // was added), so this adds a fresh entry rather than assuming one exists
+  // to flip a flag on.
+  function handleCourseAdded(course: AvailableCourse) {
+    setCourses((prev) => {
+      const exists = prev.some((c) => c.id === course.id);
+      return exists ? prev.map((c) => (c.id === course.id ? { ...c, checked: true } : c)) : [...prev, course];
+    });
+  }
+
   switch (stage) {
     case "startup":
       return <StartupGate onReady={handleBackendReady} />;
@@ -73,6 +86,6 @@ export default function App() {
     case "indexing":
       return <OnboardingIndexing courses={selectedCourses} onNext={() => setStage("app")} />;
     case "app":
-      return <AppShell courses={selectedCourses} onCourseRemoved={handleCourseRemoved} />;
+      return <AppShell courses={selectedCourses} onCourseRemoved={handleCourseRemoved} onCourseAdded={handleCourseAdded} />;
   }
 }

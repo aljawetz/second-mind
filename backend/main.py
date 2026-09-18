@@ -173,16 +173,25 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(*self._canvas_error(e))
             return
 
-        assignments = [
-            {
-                "id": a["id"],
-                "name": a.get("name", ""),
-                "due_at": a.get("due_at"),
-                "points_possible": a.get("points_possible"),
-                "description": explain.html_to_text(a.get("description") or ""),
-            }
-            for a in raw
-        ]
+        assignments = []
+        for a in raw:
+            submission = a.get("submission") or {}
+            assignments.append(
+                {
+                    "id": a["id"],
+                    "name": a.get("name", ""),
+                    "due_at": a.get("due_at"),
+                    "points_possible": a.get("points_possible"),
+                    "description": explain.html_to_text(a.get("description") or ""),
+                    # Real Canvas submission status (canvas.list_assignments's
+                    # include[]=submission), not guessed from due date — a
+                    # workflow_state of "unsubmitted" (or no submission object
+                    # at all, e.g. a not-for-credit assignment) means not done.
+                    "submitted": submission.get("workflow_state") not in (None, "unsubmitted"),
+                    "late": bool(submission.get("late")),
+                    "missing": bool(submission.get("missing")),
+                }
+            )
         self._send_json(200, {"assignments": assignments})
 
     def _handle_list_sessions(self, course_id: str):

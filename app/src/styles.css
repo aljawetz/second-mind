@@ -101,14 +101,21 @@ button{font:inherit;color:inherit}
   padding:.85rem 1.4rem;border-bottom:1px solid var(--line);
   background:var(--paper);
 }
-.topbar h1{font-size:1.15rem;font-weight:500}
-.topbar .code{color:var(--ink-faint);font-family:'IBM Plex Mono',monospace;font-size:.78rem}
+.topbar h1{font-size:1.15rem;font-weight:500;flex:none}
+/* A long course name must truncate, not push topbar-right off-window —
+   real bug: a flex row with no min-width:0 on its text child refuses to
+   shrink past the name's longest word, overflowing the topbar at narrow
+   window widths instead of wrapping or eliding. */
+.topbar .code{
+  color:var(--ink-faint);font-family:'IBM Plex Mono',monospace;font-size:.78rem;
+  flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
 .pill{
   display:inline-flex;align-items:center;gap:.35rem;
   font-size:.68rem;padding:.28rem .55rem;border-radius:99px;
   background:var(--moss-ink);color:var(--moss);font-weight:600;white-space:nowrap;
 }
-.topbar-right{margin-left:auto;display:flex;align-items:center;gap:.7rem}
+.topbar-right{margin-left:auto;flex:none;display:flex;align-items:center;gap:.7rem}
 .toggle-wrap{display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:var(--ink-dim)}
 .toggle{
   width:34px;height:19px;border-radius:99px;background:var(--line-strong);
@@ -125,14 +132,19 @@ button{font:inherit;color:inherit}
 .view-inner{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:1.6rem}
 #view-new-session,#view-artifact,#view-assignment{display:flex;flex-direction:column;gap:2.1rem}
 
-#view-home{display:grid;grid-template-columns:1.15fr 1fr;gap:1.8rem;align-items:stretch}
+#view-home{display:grid;grid-template-columns:1.15fr 1fr;gap:1.8rem;align-items:start}
 .chat-panel{
   display:flex;flex-direction:column;gap:1rem;
   background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.2rem;
+  /* Real bug: with no height cap this panel just grows with the thread,
+     pushing the ask-bar below the window — sticky + a viewport-relative
+     max-height keeps the input reachable without scrolling the page,
+     while only the thread itself scrolls internally. */
+  position:sticky;top:0;max-height:calc(100vh - 7.5rem);
 }
-.chat-head{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
-.chat-panel .qa-thread{flex:1}
-.chat-panel .ask-bar{border:none;box-shadow:none;background:var(--paper)}
+.chat-head{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:600;flex:none}
+.chat-panel .qa-thread{flex:1;min-height:0;overflow-y:auto}
+.chat-panel .ask-bar{border:none;box-shadow:none;background:var(--paper);flex:none}
 .home-right{display:flex;flex-direction:column;gap:2.1rem}
 .home-right .home-block:first-child{border-top:none;padding-top:0}
 
@@ -166,6 +178,8 @@ button{font:inherit;color:inherit}
   font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--indigo);
   background:var(--indigo-ink);padding:.1rem .4rem;border-radius:5px;white-space:nowrap;
 }
+.cite-link{border:none;cursor:pointer;text-decoration:none}
+.cite-link:hover{background:var(--indigo);color:var(--indigo-ink)}
 .qa-sources{
   margin-top:.7rem;padding-top:.6rem;border-top:1px dashed var(--line);
   display:flex;flex-wrap:wrap;gap:.4rem;font-size:.72rem;color:var(--ink-faint);
@@ -190,7 +204,10 @@ button{font:inherit;color:inherit}
 
 .pill-ochre{background:var(--ochre-ink);color:var(--ochre)}
 .pill-neutral{background:var(--paper);color:var(--ink-dim);border:1px solid var(--line);font-weight:500}
+.pill-green{background:var(--moss-ink);color:var(--moss)}
+.pill-red{background:#F7E3E3;color:var(--danger)}
 
+.assign-list{display:flex;flex-direction:column;gap:.55rem;max-height:340px;overflow-y:auto;padding-right:.15rem}
 .assign-card{
   display:flex;align-items:center;gap:.9rem;width:100%;text-align:left;
   background:var(--surface);border:1px solid var(--line);border-radius:10px;
@@ -373,6 +390,13 @@ button{font:inherit;color:inherit}
 }
 .btn-primary:hover{opacity:.93}
 .btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-secondary{
+  background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);border-radius:10px;
+  padding:.75rem 1rem;font-size:.88rem;font-weight:600;cursor:pointer;width:100%;
+}
+.btn-secondary:hover{border-color:var(--indigo);color:var(--indigo)}
+.recording-actions{display:flex;gap:.6rem}
+.recording-actions .btn-primary,.recording-actions .btn-secondary{width:auto;flex:1}
 .back-mini{
   align-self:flex-start;background:none;border:none;color:var(--ink-faint);
   font-size:.78rem;cursor:pointer;padding:0;
@@ -390,7 +414,7 @@ button{font:inherit;color:inherit}
 .course-pick{display:flex;flex-direction:column;gap:.5rem;max-height:260px;overflow-y:auto}
 .course-row{
   display:flex;align-items:center;gap:.7rem;border:1px solid var(--line);border-radius:10px;
-  padding:.6rem .8rem;cursor:pointer;
+  padding:.6rem .8rem;cursor:pointer;flex-wrap:wrap;
 }
 .course-row:hover{border-color:var(--indigo)}
 .course-row input{accent-color:var(--indigo);width:16px;height:16px;flex:none}
@@ -399,10 +423,10 @@ button{font:inherit;color:inherit}
 .course-row .cname{font-size:.72rem;color:var(--ink-faint)}
 .manage-actions{display:flex;gap:.4rem;flex:none}
 .manage-actions .icon-btn{width:auto;padding:.3rem .6rem;font-size:.75rem;border:1px solid var(--line)}
-.manage-confirm{display:flex;align-items:center;gap:.4rem;flex:none}
+.manage-confirm{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;min-width:0}
 .manage-confirm input{
   font-size:.78rem;border:1px solid var(--line-strong);border-radius:6px;padding:.3rem .5rem;
-  background:var(--surface);color:var(--ink);width:150px;
+  background:var(--surface);color:var(--ink);width:150px;min-width:0;flex:1 1 120px;
 }
 .course-count{font-size:.75rem;color:var(--ink-faint);text-align:center}
 .index-list{display:flex;flex-direction:column;gap:.8rem;max-height:280px;overflow-y:auto}
@@ -428,6 +452,13 @@ button{font:inherit;color:inherit}
   .sidebar{width:100%;flex-direction:row;overflow-x:auto;overflow-y:visible;align-items:center;gap:.9rem;padding:.7rem .8rem}
   .brand{padding:0}
   .nav-group{flex-direction:row}
+  /* .course-btn/.session-btn's width:100% is meant for the normal
+     vertical (column) sidebar, where it fills the column — in a row-
+     direction flex container that same width:100% is a main-axis size,
+     so every button demands the full row's width and the row overflows
+     wildly instead of laying out as compact horizontal pills. Real bug
+     hit by actually shrinking the window below this breakpoint. */
+  .course-btn,.session-btn{width:auto;flex:none;white-space:nowrap}
   .sidebar-foot{display:none}
   .split{grid-template-columns:1fr}
   #view-home{grid-template-columns:1fr}

@@ -13,9 +13,11 @@ import ManageCoursesView from "./ManageCoursesView";
 export default function AppShell({
   courses,
   onCourseRemoved,
+  onCourseAdded,
 }: {
   courses: AvailableCourse[];
   onCourseRemoved: (courseId: number) => void;
+  onCourseAdded: (course: AvailableCourse) => void;
 }) {
   const [courseId, setCourseId] = useState<number>(courses[0].id);
   const [view, setView] = useState<ViewName>("home");
@@ -114,6 +116,9 @@ export default function AppShell({
   function handleCourseRemoved(removedId: number) {
     onCourseRemoved(removedId);
   }
+  function handleCourseAdded(course: AvailableCourse) {
+    onCourseAdded(course);
+  }
 
   const selectedAssignment = assignments.find((a) => a.id === assignmentId) ?? null;
 
@@ -155,13 +160,19 @@ export default function AppShell({
                   socratic={socratic}
                   onOpenArtifact={openArtifact}
                   onOpenAssignment={openAssignment}
+                  onOpenSession={openSession}
                 />
               )}
               {view === "artifact" && (
                 <ArtifactView artifact={artifact} onArtifactChange={setArtifact} onBack={goHome} />
               )}
               {view === "assignment" && selectedAssignment && (
-                <AssignmentView courseId={courseId} assignment={selectedAssignment} onBack={goHome} />
+                <AssignmentView
+                  courseId={courseId}
+                  assignment={selectedAssignment}
+                  onBack={goHome}
+                  onOpenSession={openSession}
+                />
               )}
               {view === "newSession" && (
                 <NewSessionView courseId={courseId} onBack={goHome} onSessionCreated={refreshSessions} />
@@ -170,7 +181,12 @@ export default function AppShell({
                 <SessionDetailView courseId={courseId} sessionId={sessionId} onBack={goHome} onDeleted={handleSessionDeleted} />
               )}
               {view === "manageCourses" && (
-                <ManageCoursesView courses={courses} onBack={goHome} onCourseRemoved={handleCourseRemoved} />
+                <ManageCoursesView
+                  courses={courses}
+                  onBack={goHome}
+                  onCourseRemoved={handleCourseRemoved}
+                  onCourseAdded={handleCourseAdded}
+                />
               )}
             </div>
           </div>

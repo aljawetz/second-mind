@@ -1,7 +1,10 @@
 import { useRef, useState } from "react";
 import type { ArtifactType } from "../../types";
 import { ARTIFACT_TYPES } from "../../data";
-import { askQuestion, type AskMode, type CanvasAssignment, type Citation } from "../../sidecar";
+import { askQuestion, type AskMode, type Citation } from "../../sidecar";
+import { splitAssignments, statusPill } from "../../assignmentStatus";
+import type { CanvasAssignment } from "../../sidecar";
+import { openCitation } from "../../citations";
 
 interface ChatTurn {
   question: string;
@@ -12,18 +15,6 @@ interface ChatTurn {
   error?: string;
 }
 
-function formatDue(dueAt: string | null): string {
-  if (!dueAt) return "No due date";
-  return new Date(dueAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function nextAssignment(assignments: CanvasAssignment[]): CanvasAssignment | null {
-  if (assignments.length === 0) return null;
-  const withDue = assignments.filter((a) => a.due_at);
-  if (withDue.length === 0) return assignments[0];
-  return [...withDue].sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime())[0];
-}
-
 export default function HomeView({
   courseId,
   courseName,
@@ -32,6 +23,7 @@ export default function HomeView({
   socratic,
   onOpenArtifact,
   onOpenAssignment,
+  onOpenSession,
 }: {
   courseId: number;
   courseName: string;
@@ -40,11 +32,12 @@ export default function HomeView({
   socratic: boolean;
   onOpenArtifact: (type: ArtifactType) => void;
   onOpenAssignment: (id: number) => void;
+  onOpenSession: (sessionId: string) => void;
 }) {
   const [askValue, setAskValue] = useState("");
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const threadRef = useRef<HTMLDivElement>(null);
-  const upNext = nextAssignment(assignments);
+  const { upcoming, past } = splitAssignments(assignments);
   const lastTurn = turns[turns.length - 1];
   const busy = lastTurn?.status === "loading" || lastTurn?.status === "streaming";
 
@@ -99,9 +92,13 @@ export default function HomeView({
                         <div className="qa-sources">
                           <span>Sources</span>
                           {turn.citations.map((c, ci) => (
-                            <span className="cite" key={ci}>
+                            <button
+                              className="cite cite-link"
+                              key={ci}
+                              onClick={() => openCitation(courseId, c, onOpenSession)}
+                            >
                               {c.label}
-                            </span>
+                            </button>
                           ))}
                         </div>
                       )}
@@ -129,20 +126,51 @@ export default function HomeView({
 
       <div className="home-right">
         <div className="home-block">
-          <div className="section-label">Next assignment</div>
+          <div className="section-label">Upcoming assignments</div>
           {assignmentsError && <div className="qa-a-error">{assignmentsError}</div>}
-          {!assignmentsError && !upNext && <div className="qa-empty">No assignments found.</div>}
-          {upNext && (
-            <button className="assign-card" onClick={() => onOpenAssignment(upNext.id)}>
-              <span className="main">
-                <div className="ttl">{upNext.name}</div>
-                <div className="crs">{courseName}</div>
-              </span>
-              <span className="pill pill-ochre">Due {formatDue(upNext.due_at)}</span>
-              <span className="go">›</span>
-            </button>
+          {!assignmentsError && assignments.length === 0 && <div className="qa-empty">No assignments found.</div>}
+          {!assignmentsError && assignments.length > 0 && upcoming.length === 0 && (
+            <div className="qa-empty">Nothing upcoming.</div>
+          )}
+          {upcoming.length > 0 && (
+            <div className="assign-list">
+              {upcoming.map((a) => {
+                const pill = statusPill(a);
+                return (
+                  <button className="assign-card" key={a.id} onClick={() => onOpenAssignment(a.id)}>
+                    <span className="main">
+                      <div className="ttl">{a.name}</div>
+                      <div className="crs">{courseName}</div>
+                    </span>
+                    <span className={`pill ${pill.cls}`}>{pill.text}</span>
+                    <span className="go">›</span>
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
+
+        {past.length > 0 && (
+          <div className="home-block">
+            <div className="section-label">Past &amp; completed</div>
+            <div className="assign-list">
+              {past.map((a) => {
+                const pill = statusPill(a);
+                return (
+                  <button className="assign-card" key={a.id} onClick={() => onOpenAssignment(a.id)}>
+                    <span className="main">
+                      <div className="ttl">{a.name}</div>
+                      <div className="crs">{courseName}</div>
+                    </span>
+                    <span className={`pill ${pill.cls}`}>{pill.text}</span>
+                    <span className="go">›</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="home-block">
           <div className="section-label">Study artifacts</div>

@@ -106,4 +106,8 @@ def build_pointers(index, name: str, description_text: str) -> list[dict]:
     nodes = retriever.retrieve(f"{name}\n\n{description_text}")
     nodes = SimilarityPostprocessor(similarity_cutoff=generation.SIMILARITY_CUTOFF).postprocess_nodes(nodes)
     citations = generation.build_citations(nodes)
-    return [{"label": c["label"], "item_id": c["item_id"]} for c in citations]
+    # source_type carried through so the frontend can click-through a
+    # pointer the same way it does a /ask citation (external Canvas link
+    # vs. in-app session navigation) instead of only handling one of the
+    # two places citations appear.
+    return [{"label": c["label"], "item_id": c["item_id"], "source_type": c["source_type"]} for c in citations]

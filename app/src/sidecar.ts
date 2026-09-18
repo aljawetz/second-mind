@@ -81,6 +81,12 @@ export interface CanvasAssignment {
   due_at: string | null;
   points_possible: number | null;
   description: string;
+  // Real Canvas submission status (main.py's /courses/{id}/assignments,
+  // include[]=submission) — not derived from due_at, so a late-but-turned-in
+  // assignment or a not-yet-due one both come through correctly.
+  submitted: boolean;
+  late: boolean;
+  missing: boolean;
 }
 
 export async function listAssignments(courseId: number): Promise<CanvasAssignment[]> {
@@ -141,6 +147,7 @@ export async function askQuestion(
 export interface Pointer {
   label: string;
   item_id: string;
+  source_type: Citation["source_type"];
 }
 
 export interface AssignmentExplanation {
@@ -173,6 +180,7 @@ export interface SessionSummary {
   session_id: string;
   title: string;
   status: SessionRunStatus;
+  class_num: number | null;
 }
 
 export interface SessionDetail extends SessionSummary {
@@ -182,7 +190,9 @@ export interface SessionDetail extends SessionSummary {
   error?: string;
 }
 
-export async function startSession(courseId: number): Promise<{ session_id: string; status: string }> {
+export async function startSession(
+  courseId: number
+): Promise<{ session_id: string; status: string; class_num: number; title: string }> {
   const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/sessions/start`, { method: "POST" });
   return res.json();
 }

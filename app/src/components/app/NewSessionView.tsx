@@ -21,10 +21,12 @@ export default function NewSessionView({
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionTitle, setSessionTitle] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState<SessionDetail | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [paused, setPaused] = useState(false);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -47,8 +49,9 @@ export default function NewSessionView({
     setPhase("starting");
     setError("");
     try {
-      const { session_id } = await startSession(courseId);
+      const { session_id, title } = await startSession(courseId);
       setSessionId(session_id);
+      setSessionTitle(title);
       onSessionCreated();
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -62,6 +65,7 @@ export default function NewSessionView({
       recorderRef.current = recorder;
 
       setElapsed(0);
+      setPaused(false);
       timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
       setPhase("recording");
     } catch (err) {
@@ -70,10 +74,25 @@ export default function NewSessionView({
     }
   }
 
+  function handlePauseResume() {
+    const recorder = recorderRef.current;
+    if (!recorder) return;
+    if (paused) {
+      recorder.resume();
+      timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
+      setPaused(false);
+    } else {
+      recorder.pause();
+      if (timerRef.current) clearInterval(timerRef.current);
+      setPaused(true);
+    }
+  }
+
   function handleStop() {
     const recorder = recorderRef.current;
     if (!recorder || !sessionId) return;
     if (timerRef.current) clearInterval(timerRef.current);
+    setPaused(false);
     setPhase("processing");
 
     recorder.onstop = async () => {
@@ -115,7 +134,7 @@ export default function NewSessionView({
         ‹ Course home
       </button>
       <div className="assign-head">
-        <h2>New session</h2>
+        <h2>{sessionTitle ?? "New session"}</h2>
       </div>
 
       {phase === "idle" && (
@@ -134,10 +153,15 @@ export default function NewSessionView({
             <h3>Recording</h3>
             {phase === "recording" ? (
               <>
-                <p className="mono">● {formatElapsed(elapsed)}</p>
-                <button className="btn-primary" onClick={handleStop}>
-                  ■ Stop recording
-                </button>
+                <p className="mono">{paused ? "‖ Paused" : "●"} {formatElapsed(elapsed)}</p>
+                <div className="recording-actions">
+                  <button className="btn-secondary" onClick={handlePauseResume}>
+                    {paused ? "▶ Resume" : "‖ Pause"}
+                  </button>
+                  <button className="btn-primary" onClick={handleStop}>
+                    ■ Stop recording
+                  </button>
+                </div>
               </>
             ) : (
               <p className="qa-thinking">Transcribing and generating notes…</p>

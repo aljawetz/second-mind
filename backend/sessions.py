@@ -83,6 +83,11 @@ SUMMARY_TEMPLATE = PromptTemplate(
 # for anything else (including every session from a previous app run).
 _SESSIONS: dict[str, dict] = {}
 
+# Guards class_counter.json read-modify-write — ThreadingHTTPServer handles
+# requests concurrently, and a lost update here would hand out a duplicate
+# class number, not just a cosmetic bug.
+_counter_lock = threading.Lock()
+
 
 def _sessions_dir(ssb_home: Path, course_id: int) -> Path:
     return ssb_home / "courses" / str(course_id) / "sessions"
@@ -90,6 +95,20 @@ def _sessions_dir(ssb_home: Path, course_id: int) -> Path:
 
 def _session_dir(ssb_home: Path, course_id: int, session_id: str) -> Path:
     return _sessions_dir(ssb_home, course_id) / session_id
+
+
+def _next_class_num(ssb_home: Path, course_id: int) -> int:
+    # A persistent, monotonic counter — NOT a live count of session
+    # directories. Real bug found in the user's own feedback: counting
+    # directories reuses a number as soon as any session is deleted
+    # (Step 13's DELETE), which silently violates "start at 1 and keep
+    # counting."
+    counter_path = ssb_home / "courses" / str(course_id) / "class_counter.json"
+    with _counter_lock:
+        counter_path.parent.mkdir(parents=True, exist_ok=True)
+        current = json.loads(counter_path.read_text())["next"] if counter_path.exists() else 1
+        counter_path.write_text(json.dumps({"next": current + 1}))
+        return current
 
 
 def _read_meta(session_dir: Path) -> dict:
@@ -104,12 +123,12 @@ def _write_meta(session_dir: Path, meta: dict) -> None:
 def start_session(ssb_home: Path, course_id: int) -> dict:
     sessions_dir = _sessions_dir(ssb_home, course_id)
     sessions_dir.mkdir(parents=True, exist_ok=True)
-    class_num = len([p for p in sessions_dir.iterdir() if p.is_dir()]) + 1
+    class_num = _next_class_num(ssb_home, course_id)
     session_id = f"{date.today().isoformat()}-class-{class_num}"
     session_dir = sessions_dir / session_id
     session_dir.mkdir(exist_ok=True)
-    title = f"Class #{class_num} — {date.today().isoformat()}"
-    _write_meta(session_dir, {"title": title})
+    title = f"Class #{class_num}"
+    _write_meta(session_dir, {"title": title, "class_num": class_num})
     _SESSIONS[session_id] = {
         "status": "recording",
         "course_id": course_id,
@@ -117,7 +136,7 @@ def start_session(ssb_home: Path, course_id: int) -> dict:
         "class_num": class_num,
         "source_label": title,
     }
-    return {"session_id": session_id, "status": "recording"}
+    return {"session_id": session_id, "status": "recording", "class_num": class_num, "title": title}
 
 
 def save_notes(session_id: str, text: str) -> None:
@@ -192,7 +211,14 @@ def list_sessions(ssb_home: Path, course_id: int) -> list[dict]:
         meta = _read_meta(session_dir)
         live = _SESSIONS.get(session_id)
         status = live["status"] if live and live["course_id"] == course_id else _status_from_disk(session_dir)
-        result.append({"session_id": session_id, "title": meta.get("title", session_id), "status": status})
+        result.append(
+            {
+                "session_id": session_id,
+                "title": meta.get("title", session_id),
+                "status": status,
+                "class_num": meta.get("class_num"),
+            }
+        )
     return result
 
 
@@ -203,7 +229,12 @@ def get_session_detail(ssb_home: Path, course_id: int, session_id: str) -> dict 
     meta = _read_meta(session_dir)
     live = _SESSIONS.get(session_id)
     status = live["status"] if live and live["course_id"] == course_id else _status_from_disk(session_dir)
-    detail: dict = {"session_id": session_id, "title": meta.get("title", session_id), "status": status}
+    detail: dict = {
+        "session_id": session_id,
+        "title": meta.get("title", session_id),
+        "status": status,
+        "class_num": meta.get("class_num"),
+    }
     if live and "error" in live:
         detail["error"] = live["error"]
     transcript_path = session_dir / "transcript.json"

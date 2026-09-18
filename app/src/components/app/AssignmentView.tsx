@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { explainAssignment, type AssignmentExplanation, type CanvasAssignment } from "../../sidecar";
+import { openCitation } from "../../citations";
+import { statusPill } from "../../assignmentStatus";
 
 type ExplainState =
   | { status: "closed" }
@@ -7,19 +9,16 @@ type ExplainState =
   | { status: "error"; message: string }
   | { status: "done"; data: AssignmentExplanation };
 
-function formatDue(dueAt: string | null): string {
-  if (!dueAt) return "No due date";
-  return new Date(dueAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
 export default function AssignmentView({
   courseId,
   assignment,
   onBack,
+  onOpenSession,
 }: {
   courseId: number;
   assignment: CanvasAssignment;
   onBack: () => void;
+  onOpenSession: (sessionId: string) => void;
 }) {
   const [explain, setExplain] = useState<ExplainState>({ status: "closed" });
 
@@ -48,7 +47,10 @@ export default function AssignmentView({
         <h2>{assignment.name}</h2>
       </div>
       <div className="assign-pills">
-        <span className="pill pill-ochre">Due {formatDue(assignment.due_at)}</span>
+        {(() => {
+          const pill = statusPill(assignment);
+          return <span className={`pill ${pill.cls}`}>{pill.text}</span>;
+        })()}
         {assignment.points_possible != null && (
           <span className="pill pill-neutral">{assignment.points_possible} pts</span>
         )}
@@ -86,7 +88,9 @@ export default function AssignmentView({
                   )}
                   {explain.data.pointers.map((p, i) => (
                     <div className="explain-tip" key={i}>
-                      <span className="cite">{p.label}</span>
+                      <button className="cite cite-link" onClick={() => openCitation(courseId, p, onOpenSession)}>
+                        {p.label}
+                      </button>
                     </div>
                   ))}
                 </div>

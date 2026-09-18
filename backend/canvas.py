@@ -89,8 +89,12 @@ def list_courses() -> list[dict]:
 
 
 def list_assignments(course_id: int) -> list[dict]:
+    # include[]=submission embeds the student's own real submission status
+    # (workflow_state, submitted_at, late, missing) directly in each
+    # assignment — confirmed against a real course, avoids an N+1 call per
+    # assignment to /submissions/self.
     with _client() as client:
-        return _get_all(client, f"/courses/{course_id}/assignments", params={"per_page": 50})
+        return _get_all(client, f"/courses/{course_id}/assignments", params={"per_page": 50, "include[]": "submission"})
 
 
 def get_assignment(course_id: int, assignment_id: int) -> dict | None:
