@@ -160,14 +160,18 @@ works end to end.
 
 **Depends on:** 1, 2, 4.
 
-**Verified:** the sidecar-build → Tauri-bundle pipeline was run for real, locally, end to end —
-the documented two-phase `uv sync` sequence (`--group convert` to generate the embedding model,
-then a full reconcile to `--group build` before PyInstaller runs) confirmed to actually strip
-torch/optimum back out before the shipped binary is built, exactly as `backend/README.md` already
-warned it must; the sidecar built, `SSB.app` bundled successfully. **The final `.dmg`-creation
-step could not be verified in this sandboxed shell** — Tauri's `bundle_dmg.sh` shells out to
-`osascript` to style the Finder window, and that AppleEvent call timed out (`-1712`) here, almost
-certainly a local automation-permission limitation of this specific execution context rather than
-a bug in the pipeline. Real verification came from actually pushing a tag and watching the
-workflow run on GitHub's own macOS runner instead of trusting local output — see the tag/release
-this step produced for the result.
+**Verified — a real release exists.** The sidecar-build → Tauri-bundle pipeline was run for real,
+locally, end to end first — the documented two-phase `uv sync` sequence (`--group convert` to
+generate the embedding model, then a full reconcile to `--group build` before PyInstaller runs)
+confirmed to actually strip torch/optimum back out before the shipped binary is built, exactly as
+`backend/README.md` already warned it must; the sidecar built, `SSB.app` bundled successfully. The
+final `.dmg`-creation step couldn't be verified in that local sandboxed shell — Tauri's
+`bundle_dmg.sh` shells out to `osascript` to style the Finder window, and that AppleEvent call
+timed out (`-1712`) there. Pushed a real `v0.1.0` tag instead of trusting local output alone: the
+first real run confirmed the local failure *was* sandbox-specific — `.dmg` bundling succeeded
+cleanly on GitHub's own macOS runner — but surfaced a second real finding local testing couldn't
+have caught either: this repo's default `GITHUB_TOKEN` permissions don't include creating a
+release (`Resource not accessible by integration`). Fixed with an explicit `permissions: contents:
+write` block; re-tagged and re-pushed. **Second run fully green** — a real, public
+[v0.1.0 release](https://github.com/aljawetz/ssb/releases/tag/v0.1.0) exists with a downloadable
+`.dmg` attached.
