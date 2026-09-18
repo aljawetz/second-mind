@@ -43,11 +43,27 @@ pipeline — lives in **[docs/architecture/](../architecture/overview.md)**, not
 - [Implementation plan](../architecture/implementation-plan.md) — a sequenced build order (15
   steps, Sprint 5–6) with dependencies and a concrete test for each one.
 
-**Narrowed, not fully closed — gap against this sprint's rubric:** the "Implementation and
-Integration Plan" requirement (20% of this sprint's score) asks for component ownership,
-dependencies, integration points, and sprint-based milestones. Dependencies, integration points,
-and milestones are now written down in
-[docs/architecture/implementation-plan.md](../architecture/implementation-plan.md). **Component
-ownership is the one piece left** — it needs actual team member names and role assignments, which
-aren't something to fabricate into a graded deliverable. Still open until that information is
-supplied.
+Dependencies, integration points, and milestones are written down in
+[docs/architecture/implementation-plan.md](../architecture/implementation-plan.md) (a concrete
+"Depends on:" per step) and in the sprint table on the [README](../../README.md#project-context)
+(sprint-based milestones). **Component ownership**, the last open piece of this requirement, is
+below — team: 3 PMs (Richa, Lakshita, Shatakshi), 3 Engineers (Arthur, Aaron, Yongje).
+
+### Engineering — owns building and maintaining the technical components
+
+| Owner | Components |
+| --- | --- |
+| Arthur | App shell & sidecar infra ([Steps 0–1](../architecture/implementation-plan.md)); Credentials & Canvas integration (Steps 2–3); Error handling & course management (Step 13); Contribution & distribution pipeline (license, CI, release) |
+| Aaron | Ingestion, embedding & retrieval pipeline (Steps 4–6, and the cross-step integration check); Sync mechanism (Step 7); Generation/Q&A backend (Step 8) |
+| Yongje | Q&A frontend wiring (Step 9); Assignment explainer (Step 10); Session capture (Step 12); **Study artifacts (Step 11 — not yet built, next up)** |
+
+### Product — owns a cross-cutting responsibility spanning multiple steps, not a single component
+
+| Owner | Responsibility |
+| --- | --- |
+| Richa | Responsible AI & scope boundaries — the explain-never-draft line (design spec §7.1), recordings-stay-private, web-search labeling; validates Steps 8, 10, 12 against these |
+| Lakshita | Testing & calibration rigor — the grounding-cutoff calibration methodology, the regression-fixture discipline, "verify against real data, not mocks" across all steps |
+| Shatakshi | Docs, specs & external readiness — keeping `docs/architecture/*.md` accurate against what's actually built, the contribution & distribution plan's PM-facing pieces (README, CONTRIBUTING, issue templates), later sprints' user/impact validation |
+
+This mirrors each step's own **Owner:** line in
+[implementation-plan.md](../architecture/implementation-plan.md).

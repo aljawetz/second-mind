@@ -2,9 +2,10 @@
 
 A sequenced build order with a concrete test for each step — "how do we know this actually works,"
 not just "what does it do." Maps to the sprints already in [the design
-spec](../specs/2026-09-14-ssb-design.md) §13. **Owner: TBD on every step** — this plan sequences
-the work and its dependencies; assigning it to actual team members is separate, still-open work
-(see [sprint-04.md](../sprints/sprint-04.md)).
+spec](../specs/2026-09-14-ssb-design.md) §13. Each step now names a real **Owner** — see
+[sprint-04.md](../sprints/sprint-04.md) for the full team/component table and the PM-side
+cross-cutting responsibilities (Responsible AI boundaries, testing/calibration rigor, docs/specs
+accuracy) that sit alongside these.
 
 Each step names what it depends on. Steps with no shared dependency can run in parallel once the
 team exists to run them in parallel.
@@ -12,6 +13,7 @@ team exists to run them in parallel.
 ## Sprint 5 — Core prototype (ingestion, retrieval, grounded Q&A)
 
 ### 0. Project scaffolding
+**Owner:** Arthur.
 **Do:** Tauri project shell wrapping the existing mockup UI unmodified; a Python backend project
 with `pyproject.toml` and a pinned lockfile.
 **Test:** `tauri dev` launches and shows the current mockup, unchanged, with no backend wired yet.
@@ -22,6 +24,7 @@ cleanly — see [the design spec](../specs/2026-09-14-ssb-design.md) §10. Same 
 Tauri/sidecar wiring underneath; only the frontend's own structure changed.
 
 ### 1. Sidecar proof of concept
+**Owner:** Arthur.
 **Do:** A trivial Python HTTP server (one `/ping` endpoint), frozen via a hand-written PyInstaller
 `.spec` file (not the bare `--onefile` flag — [overview.md](overview.md) §3), wired as a Tauri
 sidecar with the correct `<name>-<target-triple>` binary naming.
@@ -40,6 +43,7 @@ the verdict. This will resolve itself once step 14 lands signing/notarization; u
 onboarding startup gate (step 2) has to say so rather than time out.
 
 ### 2. Credential storage + onboarding shell
+**Owner:** Arthur.
 **Do:** Keychain read/write for the Canvas token and LLM key; the 4-step onboarding UI wired to
 stub backend calls that validate format only, not real API calls yet. Precedes onboarding: a
 startup gate that polls `/ping` before showing any onboarding stage, with copy that escalates to
@@ -87,6 +91,7 @@ still-running sidecar. Fixed by routing every 404 through `_send_json` instead, 
 consistent, parseable `{error: {code, message}}` body instead of an empty one.
 
 ### 3. Canvas integration (real calls)
+**Owner:** Arthur.
 **Do:** A direct Canvas REST API client in the Python backend (`httpx`, sync) — bearer-token auth
 from Keychain, `Link`-header pagination — implementing course listing and content fetch for pages,
 assignments, announcements, and files (via the module-item workaround for the Files-tab 403), per
@@ -110,6 +115,7 @@ static mock list with the student's real Canvas courses — confirmed working en
 running app.
 
 ### 4. Embedding layer (ONNX, torch-free)
+**Owner:** Aaron.
 **Do:** One-time ONNX conversion of `bge-small-en-v1.5` via `optimum[onnx]` (dev machines
 only — `optimum[exporters]` named in earlier drafts of this doc isn't a real extra in the
 current package); a custom `BaseEmbedding` subclass wrapping `onnxruntime` directly, per the
@@ -134,6 +140,7 @@ binary — PyInstaller bundles whatever's importable in the venv it runs from, n
 which has no path to torch at all. Confirmed clean on a rebuild from that corrected environment.
 
 ### 5. Ingestion pipeline (tiered extraction)
+**Owner:** Aaron (grouped with the embedding/retrieval pipeline it feeds directly into).
 **Do:** Real code for Sprint 3's tiered extraction: plain-text → density heuristic
 (`chars<100 OR (chars<400 AND has_image)`, [rag-pipeline.md](rag-pipeline.md) §1) → OCR. Vision
 fallback deliberately deferred to step 8, where the pluggable LLM client actually gets built —
@@ -160,6 +167,7 @@ PyInstaller and needs its own packaging story, deferred to step 14.
 **Depends on:** 3 (for new files going forward), but can start immediately against cached fixtures.
 
 ### 6. Chunking + indexing (LlamaIndex + LanceDB)
+**Owner:** Aaron.
 **Do:** Wire ingestion output into LlamaIndex nodes carrying citation-anchor metadata (§2 of
 rag-pipeline.md); index into a per-student, per-course LanceDB table.
 **Test:** Re-run this sprint's retrieval smoke test as an actual automated test, not a one-off
@@ -193,6 +201,7 @@ frozen build:**
   inference (not just importing) in a frozen build with the fix applied.
 
 ### 7. Sync mechanism
+**Owner:** Aaron.
 **Do:** The manifest diff (new/changed/deleted/unchanged, [design spec](../specs/2026-09-14-ssb-design.md)
 §5.5) against real Canvas listings; verify `delete_ref_doc(canvas_item_id)` actually removes the
 right chunks (the flagged caveat in [data-model.md](data-model.md) §4 — there's a real open
@@ -234,6 +243,7 @@ cause to [lancedb#3825](https://github.com/lancedb/lancedb/pull/3825), a deliber
 change on LanceDB's side.
 
 ### Integration check — everything above, chained together against live data
+**Owner:** Aaron.
 
 Every test through step 7 exercises one step in isolation: step 3 replays cached Canvas JSON,
 steps 5/6 use cached extraction fixtures, step 7's diff test uses a simulated listing. Nothing had
@@ -250,6 +260,7 @@ LanceDB delete bug) turned up a real bug, this clean run is itself informative �
 steps 3, 5, 6, and 7 hold.
 
 ### 8. Generation (LLM calls + citations)
+**Owner:** Aaron (build); Richa validates against the Responsible AI grounding/citation boundary.
 **Do:** Wire `CitationQueryEngine` + `SimilarityPostprocessor` + a pluggable LLM client selected by
 `config.json`'s `llm_provider`.
 **Test:** Run real queries against the indexed fixtures from step 6, **with an actual API key** —
@@ -281,6 +292,7 @@ the design's tone — the *mechanism* is confirmed correct; formatting a proper 
 job, where the `/ask` HTTP response actually gets built.
 
 ### 9. Q&A frontend wiring
+**Owner:** Yongje.
 **Do:** Wire the mockup's chat panel to the real `POST /courses/{id}/ask` endpoint
 ([overview.md](overview.md) §2), including the full error-code handling (§2's error table).
 **Test:** Manual end-to-end click-through: ask a real question, see a real cited, streamed answer;
@@ -419,6 +431,7 @@ user's own step, per the established pattern for anything requiring a native GUI
 ## Sprint 6 — End-to-end alpha (session capture, study artifacts)
 
 ### 10. Assignment explainer
+**Owner:** Yongje (build); Richa validates the explain-never-draft boundary (design spec §7.1).
 **Do:** The narrower retrieval + prompt for explain-only behavior, including the topic-level-only
 pointer constraint found necessary when testing against a real coding assignment ([design
 spec](../specs/2026-09-14-ssb-design.md) §7.1).
@@ -474,6 +487,7 @@ real explanation returned. Resolved in the real course/assignment selection wiri
 assignments now come from Canvas directly, no bridge left.
 
 ### 11. Study artifacts
+**Owner:** Yongje — not yet built, next up.
 **Do:** The four artifact types (mock test, mindmap, flashcards, slides) with caching keyed by
 course + type + a hash of the content generated from, plus an explicit "regenerate" action.
 **Test:** Generate each type once; requesting it again without new content returns the cached
@@ -482,6 +496,7 @@ the "N new items since this was generated" nudge rather than silently invalidati
 **Depends on:** 8.
 
 ### 12. Session capture
+**Owner:** Yongje (build); Richa validates the recordings-stay-private policy.
 **Do:** The onboarding schedule editor (with syllabus best-effort pre-fill, [design
 spec](../specs/2026-09-14-ssb-design.md) §9.1); app-open window detection (§9.2); recording
 start/stop; `faster-whisper` transcription wired to real audio.
@@ -643,6 +658,7 @@ attempt after catching it as actively unsafe**, not just imperfect:
   safety net wasn't a trade worth making without being asked.
 
 ### 13. Error handling + course removal
+**Owner:** Arthur.
 **Do:** The full error-code contract (§2 of overview.md) across every endpoint; `unselect` and
 `DELETE` for courses as two structurally distinct actions.
 **Test:** Force each error condition end-to-end and confirm the exact status/code from the table;
@@ -713,6 +729,7 @@ Re-verified through the real frozen sidecar binary, then through the real app UI
 courses" view, reachable from the previously-dead Settings icon, confirmed by the user directly.
 
 ### 14. Packaging, signing, first real build
+**Owner:** Arthur.
 **Do:** Finalize the PyInstaller spec; Tauri bundle signed and notarized for Gatekeeper.
 **Test:** A machine that has never had any dev tooling installed — ideally a teammate's personal
 laptop, not the build machine — can install and run the app from the signed `.app` alone.
@@ -730,8 +747,6 @@ seamless double-click, until this step's other half lands.
 - **Generation faithfulness verification** (does the LLM's answer stay faithful to its cited
   source, not just "was something relevant retrieved") — a real gap named this sprint, not yet
   designed. Worth resolving before step 8 is considered done, not after.
-- **Component ownership and who works on what** — this plan sequences and tests the work; assigning
-  it to real people is the actual remaining piece of Sprint 4's Implementation and Integration Plan.
 - **The offline evaluation harness** for the citation-groundedness-rate success metric (design spec
   §12) — operationalizing "hand-graded on a fixed question set" into an actual repeatable process
   is separate from building the feature itself.
