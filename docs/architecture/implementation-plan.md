@@ -633,7 +633,10 @@ attempt after catching it as actively unsafe**, not just imperfect:
 - **Verified end-to-end after the fix, both the original failure and no regression:** the exact
   "Alice Tiams" question now returns a real, correctly-grounded, correctly-honest answer (1 source
   node); the original on-topic calibration query still works (5 source nodes); the original
-  off-topic control still correctly declines to answer.
+  off-topic control still correctly declines to answer. Re-verified through the real frozen sidecar
+  binary too (FTS depends on a native Tantivy extension — the same category of freeze risk as
+  faster-whisper earlier in this step), and finally through the real app UI, asking the user's own
+  original failing question again — confirmed by the user directly.
 - `explain.py`'s `build_pointers()` deliberately left on pure vector search, not switched to
   `HybridRetriever` — pointers are bare citations with no LLM synthesis step to catch a false
   positive the way `/ask` now can, so mixing in the less-reliable FTS path there without that
