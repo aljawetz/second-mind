@@ -7,10 +7,12 @@ toggle, cite every factual claim, never blend in open-domain knowledge.
 """
 
 import keyring
+from llama_index.core.base.base_retriever import BaseRetriever
 from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.core.prompts import PromptTemplate
 from llama_index.core.query_engine import CitationQueryEngine
-from llama_index.core.schema import NodeRelationship, NodeWithScore
+from llama_index.core.schema import NodeRelationship, NodeWithScore, QueryBundle
+from llama_index.core.vector_stores.utils import metadata_dict_to_node
 from llama_index.llms.openai import OpenAI
 
 CREDENTIAL_SERVICE = "com.ssb.app"
@@ -35,6 +37,25 @@ NOT_COVERED_MESSAGE = (
 # once more courses are indexed at scale, same caveat as the density
 # heuristic's own calibration.
 SIMILARITY_CUTOFF = 0.5
+
+# No fixed magnitude cutoff for the FTS side (unlike SIMILARITY_CUTOFF
+# above) — real finding (implementation-plan.md Step 12): BM25 magnitude
+# depends on corpus statistics (term/document frequency), not a fixed 0-1
+# scale like cosine similarity, so a threshold calibrated on one course's
+# data doesn't transfer to another (confirmed: the same off-topic control
+# query scored ~0 on one real course's corpus and ~4 on a different real
+# course's — an order of magnitude apart, same query). Relative rank
+# *within* one query's own FTS results is still meaningful even though
+# absolute magnitude isn't comparable across corpora, so this takes only
+# the single best FTS match (FTS_TOP_K) rather than thresholding score —
+# minimizing exposure to weak tail matches. This doesn't eliminate false
+# positives from real-but-incidental term overlap (a query sharing one
+# real word with unrelated content — confirmed: "recipe" in a query
+# matched real course slides citing the book "JUnit Recipes"), but
+# CitationQueryEngine's own synthesis step is a real second line of
+# defense — verified it still correctly declined to answer even with that
+# weak match included, rather than fabricating an answer from it.
+FTS_TOP_K = 1
 
 # config.json (data-model.md §3) doesn't exist as real code yet — nothing
 # in this codebase reads/writes it (Step 2 only built Keychain
@@ -77,13 +98,59 @@ def _get_llm_key() -> str:
     return key
 
 
+class HybridRetriever(BaseRetriever):
+    """Combines vector search (semantic — good for concepts) with LanceDB's
+    native BM25 full-text search (exact keyword/name matching — what
+    vector search is inherently weak at, since a proper noun doesn't have
+    strong semantic "neighbors" the way a concept does). Built by hand,
+    not via llama-index-vector-stores-lancedb's own query_type="hybrid":
+    that path's score comes back as a fake rank-position number
+    (`_to_llama_similarities`'s `np.linspace` fallback, confirmed by
+    testing a real off-topic control query and finding the top result
+    always scored 1.0 regardless of actual relevance) — unusable for a
+    grounding threshold, so this keeps the two retrieval paths, and their
+    non-comparable scores, deliberately separate instead of trying to
+    fuse them into one number.
+
+    Filtering happens here, inside the retriever, not via a
+    node_postprocessor on the query engine — vector nodes are filtered
+    against SIMILARITY_CUTOFF (cosine similarity, a real, portable
+    threshold); FTS nodes have no threshold at all (see FTS_TOP_K) since
+    BM25 magnitude isn't portable across corpora — only the single
+    best-ranked FTS match is taken, and combined with the vector nodes
+    only after both are independently decided, so nothing downstream
+    re-filters either kind against a scale it was never computed on."""
+
+    def __init__(self, index, similarity_top_k: int = 5):
+        self._index = index
+        self._similarity_top_k = similarity_top_k
+        super().__init__()
+
+    def _retrieve(self, query_bundle: QueryBundle) -> list[NodeWithScore]:
+        vector_nodes = self._index.as_retriever(similarity_top_k=self._similarity_top_k).retrieve(query_bundle)
+        vector_nodes = SimilarityPostprocessor(similarity_cutoff=SIMILARITY_CUTOFF).postprocess_nodes(vector_nodes)
+        seen_ids = {n.node.node_id for n in vector_nodes}
+
+        table = self._index.vector_store.table
+        fts_df = table.search(query_bundle.query_str, query_type="fts").limit(FTS_TOP_K).to_pandas()
+        fts_nodes = []
+        for _, row in fts_df.iterrows():
+            node = metadata_dict_to_node(row["metadata"])
+            if node.node_id in seen_ids:
+                continue
+            fts_nodes.append(NodeWithScore(node=node, score=float(row["_score"])))
+            seen_ids.add(node.node_id)
+
+        return vector_nodes + fts_nodes
+
+
 def build_query_engine(index, socratic: bool = False, streaming: bool = True) -> CitationQueryEngine:
     llm = OpenAI(model=DEFAULT_MODEL, api_key=_get_llm_key())
     template = SOCRATIC_TEMPLATE if socratic else ANSWER_FIRST_TEMPLATE
     return CitationQueryEngine.from_args(
         index,
         llm=llm,
-        node_postprocessors=[SimilarityPostprocessor(similarity_cutoff=SIMILARITY_CUTOFF)],
+        retriever=HybridRetriever(index),
         citation_qa_template=template,
         streaming=streaming,
     )

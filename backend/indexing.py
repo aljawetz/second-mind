@@ -189,9 +189,11 @@ def build_index(nodes: list[TextNode], db_path: Path, table_name: str) -> Vector
     # notes for chunking, just a second, previously-undiscovered code path
     # into the same default (implementation-plan.md Step 9 — only surfaced
     # by actually running the frozen binary, not `uv run python3`).
-    return VectorStoreIndex(
+    index = VectorStoreIndex(
         nodes, storage_context=storage_context, embed_model=OnnxBgeEmbedding(), transformations=[_splitter]
     )
+    ensure_fts_index(vector_store.table)
+    return index
 
 
 def load_index(db_path: Path, table_name: str) -> VectorStoreIndex:
@@ -212,12 +214,29 @@ def index_exists(db_path: Path, table_name: str) -> bool:
     return table_name in lancedb.connect(str(db_path)).table_names()
 
 
+def ensure_fts_index(table) -> None:
+    """Idempotent — LanceDB persists the FTS index on the table itself, so
+    this only actually rebuilds when it's missing, not on every call.
+    Real (harmless) deprecation warning: LanceDB's replacement API for this
+    (`create_index(config=FTS())`) doesn't accept a column name the way the
+    docs suggest — confirmed by trying it directly, not assumed — so this
+    stays on the documented-deprecated-but-working call instead of chasing
+    an unclear replacement signature. HybridRetriever (generation.py) is
+    Step 12's real reason this exists: BM25 full-text search for exact
+    name/keyword lookups vector search alone is weak at."""
+    if any(getattr(i, "index_type", None) == "FTS" for i in table.list_indices()):
+        return
+    table.create_fts_index("text", replace=True)
+
+
 def add_nodes(nodes: list[TextNode], db_path: Path, table_name: str) -> None:
     """Session capture's entry point (Step 12) — a course may have no index
     yet at all (a session recorded before any Canvas sync), so this can't
     assume load_index's table already exists the way /ask and /explain do."""
     if index_exists(db_path, table_name):
-        load_index(db_path, table_name).insert_nodes(nodes)
+        index = load_index(db_path, table_name)
+        index.insert_nodes(nodes)
+        ensure_fts_index(index.vector_store.table)
     else:
         build_index(nodes, db_path, table_name)
 

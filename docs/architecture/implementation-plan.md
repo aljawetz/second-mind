@@ -595,6 +595,50 @@ for) — none guessed, all from an actual click-through:
    session with 2 real indexed chunks left the table's row count and doc_ids exactly right
    afterward, and the session list correctly stopped showing it.
 
+**A sixth real bug, found from an actual real question the user asked** ("how is Alice Tiams?" —
+a real name mentioned in a real recording) — **and a design change that required reverting a first
+attempt after catching it as actively unsafe**, not just imperfect:
+
+- **Root cause, confirmed by testing the exact query against the live index:** pure vector
+  (semantic) search scored the query only 0.34-0.42 — well below `SIMILARITY_CUTOFF` — even though
+  the content genuinely exists. Embeddings are inherently weak at proper nouns/exact names, which
+  don't have strong semantic "neighbors" the way concepts do.
+- **First attempt: `llama-index-vector-stores-lancedb`'s own `query_type="hybrid"`.** Wired in,
+  then tested against a real off-topic control query before trusting it — and found the "similarity"
+  score was **always exactly 1.0 for the top result, for every query, on-topic or off-topic**.
+  Traced to `_to_llama_similarities()`'s fallback path (`np.linspace(1, 0, n)` — pure rank position,
+  zero real relevance signal) when the hybrid result set doesn't carry a `score`/`_distance` column
+  in the shape that function expects. A `SimilarityPostprocessor` cutoff against this can never
+  reject anything — it would have silently broken grounding entirely, the one mechanism this app
+  treats as non-negotiable. **Reverted immediately**, before this reached the user or a commit.
+- **The real fix: hand-built hybrid retrieval** (`generation.HybridRetriever`), keeping vector
+  search (existing, real cosine scores, unchanged) and LanceDB's native BM25 full-text search as
+  two genuinely separate paths with non-comparable scores, combined only after each is
+  independently filtered — never fed through one shared threshold. New `indexing.ensure_fts_index()`
+  builds LanceDB's FTS index once per table (idempotent — checks `list_indices()` first).
+- **A second real complication, caught before committing:** a fixed BM25 magnitude cutoff
+  (initially 0.5, calibrated the same way as `SIMILARITY_CUTOFF`) doesn't generalize — the *same*
+  off-topic control query scored ~0 (no results) on one real course's corpus and ~4-4.7 on a
+  different real course's corpus, because BM25 magnitude depends on corpus term statistics, unlike
+  cosine similarity's fixed 0-1 scale. Investigating *why* the second course matched at all
+  surfaced a real, inherent limitation of keyword search, not a bug: the query's word "recipe"
+  literally matched the real course slides' citation of the book "JUnit Recipes" — genuine term
+  overlap, contextually irrelevant. **Resolved, with the user, by dropping the magnitude threshold
+  entirely** (`FTS_TOP_K = 1` instead of `FTS_CUTOFF`) — relative rank within one query's own FTS
+  results is meaningful even though absolute magnitude isn't portable across corpora, and
+  `CitationQueryEngine`'s own synthesis step is a real, verified second line of defense: re-tested
+  and confirmed it still correctly declined to answer even with that one weak match included, never
+  fabricating an answer from it. Accepted, bounded residual risk: an occasional loosely-related
+  citation shown alongside a still-correct, still-declined answer — not a hallucination risk.
+- **Verified end-to-end after the fix, both the original failure and no regression:** the exact
+  "Alice Tiams" question now returns a real, correctly-grounded, correctly-honest answer (1 source
+  node); the original on-topic calibration query still works (5 source nodes); the original
+  off-topic control still correctly declines to answer.
+- `explain.py`'s `build_pointers()` deliberately left on pure vector search, not switched to
+  `HybridRetriever` — pointers are bare citations with no LLM synthesis step to catch a false
+  positive the way `/ask` now can, so mixing in the less-reliable FTS path there without that
+  safety net wasn't a trade worth making without being asked.
+
 ### 13. Error handling + course removal
 **Do:** The full error-code contract (§2 of overview.md) across every endpoint; `unselect` and
 `DELETE` for courses as two structurally distinct actions.
