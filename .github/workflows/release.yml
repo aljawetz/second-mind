@@ -13,10 +13,13 @@ permissions:
   contents: write
 
 # macOS only, unsigned — contribution-and-distribution-plan.md step 5. An
-# unsigned .dmg triggers Gatekeeper's "Apple cannot verify this app"
-# warning on first install (right-click -> Open bypasses it); real
-# notarization needs a paid Apple Developer account and is deliberately
-# deferred rather than blocking a first release on it.
+# unsigned .dmg triggers Gatekeeper on first install: either "Apple cannot
+# verify this app" (right-click -> Open bypasses it) or, more often on
+# recent macOS, "SSB is damaged and can't be opened" (right-click -> Open
+# does NOT bypass this one; requires `xattr -cr` on the app, documented in
+# the release body below). Real notarization needs a paid Apple Developer
+# account and is deliberately deferred rather than blocking a first
+# release on it.
 jobs:
   build:
     runs-on: macos-latest
@@ -73,14 +76,46 @@ jobs:
         working-directory: app
         run: npm run tauri build
 
+      # Real bug found in v0.1.0: Tauri's bundler never re-signs the
+      # assembled .app after copying in Contents/Resources (icon.icns) --
+      # the only signature present is the Rust linker's automatic ad-hoc
+      # signature from compile time, whose CodeDirectory claims resources
+      # are sealed when no _CodeSignature dir actually exists. That
+      # mismatch is exactly what macOS reports as "SSB is damaged and
+      # can't be opened" -- not a Gatekeeper false positive, an actually
+      # invalid signature on the shipped bundle. Fix: ad-hoc re-sign the
+      # finished bundle, then rebuild the .dmg from the corrected .app
+      # instead of trusting Tauri's already-broken .dmg output.
+      - name: Fix the code signature and repackage the .dmg
+        working-directory: app
+        run: |
+          APP="src-tauri/target/release/bundle/macos/SSB.app"
+          DMG_DIR="src-tauri/target/release/bundle/dmg"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict --verbose=4 "$APP"
+          rm -f "$DMG_DIR"/*.dmg
+          hdiutil create -volname SSB -srcfolder "$APP" -ov -format UDZO "$DMG_DIR/SSB.dmg"
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: app/src-tauri/target/release/bundle/dmg/*.dmg
           generate_release_notes: true
           body: |
-            **Unsigned build.** macOS will say "Apple cannot verify this app" on first launch —
-            right-click the app → Open, then confirm, to bypass this (only needed once). See
+            **Unsigned build.** macOS Gatekeeper will block it on first launch, with one of two
+            messages depending on your macOS version:
+
+            - **"Apple cannot verify this app"** (has an "Open Anyway" option) — right-click the
+              app → Open, then confirm.
+            - **"SSB is damaged and can't be opened"** — right-click → Open does **not** fix this
+              one. Open Terminal and run:
+              ```
+              xattr -cr /Applications/SSB.app
+              ```
+              (point it at wherever you placed `SSB.app` if not yet in Applications), then open it
+              normally.
+
+            Only needed once per download. See
             [docs/architecture/contribution-and-distribution-plan.md](https://github.com/${{ github.repository }}/blob/main/docs/architecture/contribution-and-distribution-plan.md)
             for why this isn't notarized yet.
 

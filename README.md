@@ -23,10 +23,21 @@ Your index, your recordings, your notes, on your machine.
 **[Latest release](https://github.com/aljawetz/ssb/releases/latest)** — download the `.dmg`, open
 it, drag SSB to Applications.
 
-This build is **unsigned** — macOS will say "Apple cannot verify this app." Right-click the app →
-Open, then confirm, to bypass this (only needed once; see
+This build is **unsigned** — macOS Gatekeeper will block it on first launch. Depending on your
+macOS version you'll see one of two messages:
+
+- **"Apple cannot verify this app"** (with an "Open Anyway" option) — right-click the app → Open,
+  then confirm.
+- **"SSB is damaged and can't be opened"** — this is Gatekeeper's stricter quarantine check for
+  unsigned apps; right-click → Open does **not** fix it. Instead, open Terminal and run:
+  ```bash
+  xattr -cr /Applications/SSB.app
+  ```
+  (point it at wherever you placed `SSB.app` if not yet in Applications), then open it normally.
+
+Only needed once per download; see
 [the contribution & distribution plan](docs/architecture/contribution-and-distribution-plan.md)
-for why real notarization isn't done yet). OCR fallback for image-heavy slides needs Tesseract
+for why real notarization isn't done yet. OCR fallback for image-heavy slides needs Tesseract
 installed separately (`brew install tesseract`) — not bundled into this build yet. Windows/Linux
 aren't built yet either.
 
