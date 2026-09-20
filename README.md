@@ -23,17 +23,24 @@ Your index, your recordings, your notes, on your machine.
 **[Latest release](https://github.com/aljawetz/ssb/releases/latest)** — download the `.dmg`, open
 it, drag SSB to Applications.
 
-This build is **unsigned** — macOS Gatekeeper will block it on first launch. Depending on your
-macOS version you'll see one of two messages:
+This build is **unsigned** (not notarized by Apple) — macOS Gatekeeper will block it on first
+launch. The fastest fix, open Terminal and run:
+```bash
+xattr -cr /Applications/SSB.app
+```
+(point it at wherever you placed `SSB.app` if not yet in Applications), then open it normally.
 
-- **"Apple cannot verify this app"** (with an "Open Anyway" option) — right-click the app → Open,
-  then confirm.
-- **"SSB is damaged and can't be opened"** — this is Gatekeeper's stricter quarantine check for
-  unsigned apps; right-click → Open does **not** fix it. Instead, open Terminal and run:
-  ```bash
-  xattr -cr /Applications/SSB.app
-  ```
-  (point it at wherever you placed `SSB.app` if not yet in Applications), then open it normally.
+If you'd rather not use Terminal, depending on your macOS version you'll see one of these
+messages, each with its own bypass:
+
+- **"Apple could not verify '[App]' is free of malware..."** (current macOS) — no inline bypass.
+  Try to open it once (you'll be blocked), then go to System Settings → Privacy & Security →
+  scroll down to "'SSB' was blocked to protect your Mac" → **Open Anyway** → try opening it again
+  and confirm.
+- **"Apple cannot verify this app"** (older macOS, has an inline "Open Anyway") — right-click the
+  app → Open, then confirm.
+- **"SSB is damaged and can't be opened"** — this shouldn't happen on v0.1.1+ (a real broken
+  code-signature bug, since fixed); if you see it, please file an issue.
 
 Only needed once per download; see
 [the contribution & distribution plan](docs/architecture/contribution-and-distribution-plan.md)
