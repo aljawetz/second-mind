@@ -76,23 +76,18 @@ content. `tests/test_ingestion.py` skips cleanly if you haven't run this yet. Al
 installed locally for the OCR tests (`brew install tesseract` on macOS) — not a Python package,
 `pytesseract` only wraps the binary.
 
-## Running the full end-to-end integration check
+## Running the course sync smoke test
 
-Everything above tests one step in isolation (cached fixtures, simulated Canvas listings). This
-chains all of them together against live data — real Canvas file → extract → embed → index →
-sync manifest → retrieve — for a real course, catching anything that only breaks at the seams
-between steps rather than inside any one of them.
+Real Canvas course, real files, real embedding — verifies a first sync produces new items and an
+immediate re-sync (no remote changes) is a true no-op. Supersedes the old
+integration_smoke_test.py, which only ever proved the "new -> unchanged" half of this.
 
 ```bash
-uv run python3 scripts/integration_smoke_test.py
+uv run python3 scripts/course_sync_smoke_test.py
 ```
 
-Not a pytest test (needs live Canvas access and real time — OCR + embedding across several real
-files). Everything it touches lives in a `tempfile.TemporaryDirectory()`, nothing persists.
-Defaults to course 55710 (18654-SV); edit `COURSE_ID`/`FILE_LIMIT` at the top of the script to
-point elsewhere. `EXCLUDE_FILE_IDS` is a deliberate denylist — a file this script pulled once
-already turned out to be a real named individual's personal document, not course material; kept
-as an explicit guard rather than trusting "grab the first N files" not to pick it up again.
+No OpenAI key needed — sync never calls an LLM, only the local embedding model. Needs
+`models/bge-small-en-v1.5-onnx/` (`scripts/convert_embedding_model.py`).
 
 ## Running the generation smoke test
 

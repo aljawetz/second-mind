@@ -148,15 +148,20 @@ lag.
 Saves the student's own in-progress rough notes (`{"text": string}`) — called whenever the notes
 textarea loses focus, not on every keystroke.
 
-### `POST /sync`
-Triggered on app launch (§5.5), **asynchronously** — it must never block session-capture
-recognition (§9.2). A student opening the app right as class starts needs the record prompt
-immediately, not after a 20-second sync across several courses finishes. No request body; runs the
-manifest diff for every selected course and returns a summary, not the full diff, since the
-frontend only needs to know it happened:
+### `POST /courses/{course_id}/sync`
+Streamed (chunked NDJSON, same shape as `/ask`) — one line per Canvas item as it's processed, so
+the frontend can show real per-item progress instead of a spinner with no feedback. Covers Canvas
+Files (`.pdf`/`.pptx` only) and Canvas Pages; incremental via `sync.py`'s manifest diff, so an
+unchanged item is skipped entirely. Triggered explicitly (onboarding's indexing step, and later a
+manual re-sync action) — not an automatic background sync on every app launch.
 ```
-Response: { "courses_synced": number, "items_new": number, "items_updated": number,
-            "items_removed": number }
+Response (chunked NDJSON):
+  {"item": string, "status": "done"} |
+  {"item": string, "status": "failed", "error": string}
+  ... one line per processed item ...
+  {"done": true, "new": number, "changed": number, "removed": number, "failed": number}
+  -- or, if the whole course failed before any items were processed --
+  {"done": true, "error": string}
 ```
 
 ### `POST /courses/{course_id}/unselect`
