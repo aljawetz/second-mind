@@ -14,6 +14,7 @@ from onnxruntime.capi.onnxruntime_pybind11_state import NoSuchFile as OnnxModelF
 
 import canvas
 import config
+import course_sync
 import courses
 import explain
 import generation
@@ -35,6 +36,7 @@ canvas.SSB_HOME = SSB_HOME
 COURSE_PATH = re.compile(r"^/courses/(\d+)$")
 UNSELECT_PATH = re.compile(r"^/courses/(\d+)/unselect$")
 ASK_PATH = re.compile(r"^/courses/(\d+)/ask$")
+SYNC_PATH = re.compile(r"^/courses/(\d+)/sync$")
 ASSIGNMENTS_PATH = re.compile(r"^/courses/(\d+)/assignments$")
 EXPLAIN_PATH = re.compile(r"^/courses/(\d+)/assignments/(\d+)/explain$")
 SESSION_LIST_PATH = re.compile(r"^/courses/(\d+)/sessions$")
@@ -249,6 +251,11 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_ask(ask_match.group(1))
             return
 
+        sync_match = SYNC_PATH.match(self.path)
+        if sync_match:
+            self._handle_course_sync(sync_match.group(1))
+            return
+
         explain_match = EXPLAIN_PATH.match(self.path)
         if explain_match:
             self._handle_explain(explain_match.group(1), explain_match.group(2))
@@ -432,6 +439,20 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._write_chunk({"delta": generation.NOT_COVERED_MESSAGE})
         self._write_chunk({"done": True})
+        self.wfile.write(b"0\r\n\r\n")
+        self.wfile.flush()
+
+    def _handle_course_sync(self, course_id: str):
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        for event in course_sync.sync_course(int(course_id), SSB_HOME):
+            self._write_chunk(event)
         self.wfile.write(b"0\r\n\r\n")
         self.wfile.flush()
 
