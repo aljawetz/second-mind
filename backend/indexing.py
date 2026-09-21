@@ -74,16 +74,21 @@ def _metadata(source: str, item_type: str, *, page=None, slide=None, timestamp=N
     return {"source": source, "item_type": item_type, "page": page, "slide": slide, "timestamp": timestamp}
 
 
-def pages_to_nodes(pages: list[dict], source: str, canvas_item_id: str) -> list[TextNode]:
+def pages_to_nodes(pages: list[dict], source: str, canvas_item_id: str, item_type: str = "file") -> list[TextNode]:
     """One node per page, split further only if the page's prose actually
-    exceeds the target chunk size — most extracted pages don't."""
+    exceeds the target chunk size — most extracted pages don't.
+
+    item_type defaults to "file" for the original PDF-page caller
+    (generation.py's citation formatting reads this back as source_type);
+    course_sync.py passes item_type="page" for Canvas wiki pages, which
+    aren't paginated at all, so their nodes carry page=None."""
     nodes = []
     for page in pages:
         text = page["text"]
         if not text.strip():
             continue
         for chunk in _splitter.split_text(text):
-            node = TextNode(text=chunk, metadata=_metadata(source, "file", page=page["page"]))
+            node = TextNode(text=chunk, metadata=_metadata(source, item_type, page=page["page"]))
             nodes.append(_with_ref_doc(node, canvas_item_id))
     return nodes
 

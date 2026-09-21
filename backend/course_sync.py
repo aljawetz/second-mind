@@ -75,7 +75,13 @@ def _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed):
     full = canvas.get_page(course_id, page_summary["url"])
     title = (full or {}).get("title") or page_summary.get("title") or page_summary["url"]
     text = ingestion.extract_html_page((full or {}).get("body") or "")
-    nodes = indexing.pages_to_nodes([{"page": 1, "text": text, "needs_fallback": False}], title, prefixed_id)
+    # item_type="page": a Canvas wiki page is a flat document, not
+    # paginated like a PDF — generation.py's citation formatting reads
+    # item_type back as source_type, so this must say "page", not "file",
+    # and carries no fabricated page number.
+    nodes = indexing.pages_to_nodes(
+        [{"page": None, "text": text, "needs_fallback": False}], title, prefixed_id, item_type="page"
+    )
 
     if nodes:
         indexing.add_nodes(nodes, db_path, table_name)
@@ -102,12 +108,25 @@ def sync_course(course_id: int, ssb_home: Path):
 
     file_items = [item for module in structure for item in module.get("items", []) if item.get("type") == "File"]
 
+    new_count = changed_count = removed_count = failed_count = 0
+
+    # Metadata collection itself can fail per-item (a malformed module item
+    # missing content_id, or get_file hitting a real Canvas/network error) —
+    # isolated here the same as the extraction/indexing failures below, so
+    # one bad file doesn't abort the whole course sync.
     file_metas = {}
     for item in file_items:
-        meta = canvas.get_file(item["content_id"])
+        try:
+            meta = canvas.get_file(item["content_id"])
+        except Exception as e:
+            failed_count += 1
+            yield {"item": str(item.get("content_id", "?")), "status": "failed", "error": str(e)}
+            continue
         if meta is None:
             continue
-        if Path(meta.get("display_name", "")).suffix.lower() not in SUPPORTED_FILE_SUFFIXES:
+        display_name = meta.get("display_name", "")
+        if Path(display_name).suffix.lower() not in SUPPORTED_FILE_SUFFIXES:
+            print(f"[course_sync] skipping unsupported file: {display_name}")
             continue
         file_metas[str(meta["id"])] = meta
 
@@ -117,8 +136,6 @@ def sync_course(course_id: int, ssb_home: Path):
 
     file_diff = sync.diff(conn, "file", file_remote)
     page_diff = sync.diff(conn, "page", page_remote)
-
-    new_count = changed_count = removed_count = failed_count = 0
 
     for event in _sync_deleted(conn, db_path, table_name, "file", file_diff["deleted"]):
         removed_count += 1
