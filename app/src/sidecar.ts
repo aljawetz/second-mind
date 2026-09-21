@@ -142,6 +142,44 @@ export async function askQuestion(
   }
 }
 
+export interface SyncEvent {
+  item?: string;
+  status?: "done" | "failed";
+  error?: string;
+  done?: boolean;
+  new?: number;
+  changed?: number;
+  removed?: number;
+  failed?: number;
+}
+
+// Same chunked-NDJSON contract as /ask (main.py's _write_chunk), just a
+// different endpoint and event shape — the parsing loop is identical on
+// purpose, not duplicated by accident.
+export async function syncCourse(courseId: number, onEvent: (event: SyncEvent) => void): Promise<void> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/sync`, { method: "POST" });
+
+  if (!res.ok || !res.body) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error?.message ?? `sync failed (${res.status})`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let newlineIndex;
+    while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+      if (line.trim()) onEvent(JSON.parse(line));
+    }
+  }
+}
+
 export interface Pointer {
   label: string;
   item_id: string;
