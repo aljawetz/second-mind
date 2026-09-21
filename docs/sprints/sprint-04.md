@@ -28,10 +28,13 @@ deferred assignment helper (§4), session-capture scheduling and triggering (§9
 two-column course-home layout (chat + assignments/artifacts/sessions). Prototyped as a clickable,
 hardcoded UI mockup to pressure-test the flow before writing it into the spec.
 
-The extensive technical architecture this sprint's rubric asks for — end-to-end component diagram,
-interface definitions, folder structure and data model, Canvas integration detail, and the RAG/LLM
-pipeline — lives in **[docs/architecture/](../architecture/overview.md)**, not in this file:
+**The deliverable is [the technical design document](../architecture/design-document.md)** — the
+consolidated 4–6 page design: end-to-end architecture diagram, interface definitions, technology
+choices, deployment, reliability/security/privacy/responsible-AI, and the ownership, dependency, and
+milestone plan. The detailed documents in **[docs/architecture/](../architecture/overview.md)** are
+its appendices:
 
+- [Design document](../architecture/design-document.md) — the submitted deliverable.
 - [Overview](../architecture/overview.md) — system shape, component interfaces, deployment,
   security, reliability.
 - [Data model](../architecture/data-model.md) — on-disk folder structure, how a course and its
