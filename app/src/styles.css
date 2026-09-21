@@ -156,6 +156,13 @@ button{font:inherit;color:inherit}
 }
 
 .view{flex:1;min-height:0;overflow-y:auto;padding:1.6rem 1.6rem 3rem;background:var(--paper)}
+/* The home view doesn't page-scroll (view-inner-fill makes it fill the
+   column instead) — the extra 3rem bottom padding above was scroll
+   breathing room for every OTHER view, but here it just ate into the
+   100% height view-inner-fill resolves against, cutting both columns
+   short with dead space below instead of extending them to the window's
+   real bottom edge. */
+.view.view-fill{padding-bottom:1.6rem}
 .view-inner{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:1.6rem}
 /* Only the home view fills the screen edge-to-edge with two independently
    scrolling columns — every other view (assignment, artifact, session…)

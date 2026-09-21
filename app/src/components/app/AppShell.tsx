@@ -149,7 +149,7 @@ export default function AppShell({
             courseName={course.name}
             overrideTitle={view === "manageCourses" ? "Manage courses" : undefined}
           />
-          <div className="view">
+          <div className={"view" + (view === "home" ? " view-fill" : "")}>
             <div className={"view-inner" + (view === "home" ? " view-inner-fill" : "")}>
               {view === "home" && (
                 <HomeView
