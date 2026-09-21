@@ -20,6 +20,7 @@ dependencies = [
     "pytesseract>=0.3",
     "tokenizers>=0.21",
     "faster-whisper>=1.2.1",
+    "beautifulsoup4>=4.12",
 ]
 
 [dependency-groups]
