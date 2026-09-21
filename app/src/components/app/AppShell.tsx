@@ -26,7 +26,6 @@ export default function AppShell({
   const [artifact, setArtifact] = useState<ArtifactType>("mocktest");
   const [assignmentId, setAssignmentId] = useState<number | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [socratic, setSocratic] = useState(false);
 
   const [assignments, setAssignments] = useState<CanvasAssignment[]>([]);
   const [assignmentsError, setAssignmentsError] = useState<string | null>(null);
@@ -148,11 +147,10 @@ export default function AppShell({
           <Topbar
             courseCode={course.code}
             courseName={course.name}
-            socratic={socratic}
-            onToggleSocratic={() => setSocratic((s) => !s)}
+            overrideTitle={view === "manageCourses" ? "Manage courses" : undefined}
           />
           <div className="view">
-            <div className="view-inner">
+            <div className={"view-inner" + (view === "home" ? " view-inner-fill" : "")}>
               {view === "home" && (
                 <HomeView
                   courseId={courseId}
@@ -160,7 +158,6 @@ export default function AppShell({
                   canvasBaseUrl={canvasBaseUrl}
                   assignments={assignments}
                   assignmentsError={assignmentsError}
-                  socratic={socratic}
                   onOpenArtifact={openArtifact}
                   onOpenAssignment={openAssignment}
                   onOpenSession={openSession}

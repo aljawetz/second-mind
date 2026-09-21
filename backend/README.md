@@ -96,9 +96,8 @@ as an explicit guard rather than trusting "grab the first N files" not to pick i
 
 ## Running the generation smoke test
 
-Same real-data pattern as above, plus a real LLM call — verifies citations, the not-covered case
-(a deliberately off-topic query should return zero source nodes, not a hallucinated answer), and
-Socratic mode.
+Same real-data pattern as above, plus a real LLM call — verifies citations and the not-covered
+case (a deliberately off-topic query should return zero source nodes, not a hallucinated answer).
 
 ```bash
 uv run python3 scripts/generation_smoke_test.py

@@ -76,8 +76,7 @@ SSB is the version you can read, run, and own.
 
 **Ask questions about your actual courses.** Grounded answers with citations to the specific page,
 file, or lecture moment they came from. If your material doesn't support an answer, SSB says so
-instead of guessing. Answer-first by default; Socratic mode is a toggle for when you're studying
-rather than hunting.
+instead of guessing.
 
 **Capture your lectures.** Open SSB during class and it recognizes you're in a scheduled session,
 creates a page for it, starts recording, transcribes locally, and puts a notes editor next to the

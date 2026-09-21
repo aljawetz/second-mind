@@ -144,8 +144,8 @@ exhaustive sweep.
 **Tested end-to-end, both retrieval and generation, against real indexed courses** — this section
 previously said generation remained untested for lack of an LLM key; that's long since resolved.
 `scripts/generation_smoke_test.py` runs real, billed OpenAI calls against a real course's index,
-verifying citations, the not-covered case (a deliberately off-topic query returns zero source
-nodes, not a hallucinated answer), and Socratic mode. The real `/ask` endpoint has been exercised
+verifying citations and the not-covered case (a deliberately off-topic query returns zero source
+nodes, not a hallucinated answer). The real `/ask` endpoint has been exercised
 end-to-end through the actual app UI (implementation-plan.md's Q&A frontend wiring and every step
 after it), not just via scripts.
 
@@ -160,9 +160,9 @@ onboarding, but no backend code ever reads it). The design intent — LlamaIndex
 provider LLM abstraction, selected by `llm_provider` with the matching key pulled from Keychain —
 is still the plan, just not built; real multi-provider support is future work, not implemented
 despite `config.json` already carrying a field that implies it is. The system prompt is what
-actually encodes the grounding rules from design spec §7 — answer-first by default, Socratic mode
-as a toggle, cite every factual claim, never blend in open-domain knowledge unless the (separately
-labeled) web-search path was explicitly used.
+actually encodes the grounding rules from design spec §7 — answer-first, cite every factual claim,
+never blend in open-domain knowledge unless the (separately labeled) web-search path was
+explicitly used.
 
 **Streaming by default** (NFR5, design spec §5) — a Q&A response starts rendering as tokens arrive
 rather than waiting for the full completion, which is what makes retrieval-augmented generation

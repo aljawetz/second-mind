@@ -105,8 +105,6 @@ export interface Citation {
   item_id: string;
 }
 
-export type AskMode = "answer" | "socratic";
-
 // main.py's /ask streams newline-delimited JSON over a chunked response:
 // one {citations, grounded} line first (known once retrieval finishes,
 // before the LLM starts), then one {delta} line per token, then {done}.
@@ -116,12 +114,11 @@ export type AskMode = "answer" | "socratic";
 export async function askQuestion(
   courseId: number,
   question: string,
-  mode: AskMode,
   onEvent: (event: { citations?: Citation[]; grounded?: boolean; delta?: string; done?: boolean }) => void
 ): Promise<void> {
   const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/ask`, {
     method: "POST",
-    body: JSON.stringify({ question, mode }),
+    body: JSON.stringify({ question }),
   });
 
   if (!res.ok || !res.body) {

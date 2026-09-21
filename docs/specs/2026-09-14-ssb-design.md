@@ -56,8 +56,7 @@ parity and should not.
 
 **MVP (Sprints 4–6):**
 
-1. **Grounded Q&A** over the student's indexed course material. Answer-first with citations;
-   Socratic mode as a toggle.
+1. **Grounded Q&A** over the student's indexed course material. Answer-first with citations.
 2. **Lecture capture** — transcription plus an auto-created per-session page with the recording
    and a notes editor embedded.
 3. **Study artifacts** — mock test, mindmap, slides, flashcards, generated from indexed material
@@ -99,7 +98,7 @@ parity and should not.
 │ SSB backend                                                  │
 │   ingest     Canvas → parse → chunk → embed                  │
 │   retrieve   Retriever interface (hybrid BM25 + vector)      │
-│   answer     answer-first + citations │ Socratic toggle      │
+│   answer     answer-first + citations                        │
 │   artifacts  mock test / mindmap / slides / flashcards       │
 │   sessions   scheduler: class time → page + start recording  │
 │   live       Canvas personal data — passthrough, never indexed│
@@ -270,11 +269,7 @@ recordings, transcripts, or notes.
 traceable to a specific indexed page, file, or transcript segment. This matches what students
 actually want under time pressure and matches the UniFlow behavior we are positioned against.
 
-**Socratic mode is a toggle**, not the default — guiding questions first, answer on request. It
-stays in the product because it is genuinely better for exam prep, and because it is the feature
-the professor has seen since Sprint 1. Making it opt-in is the change.
-
-**Grounding is non-negotiable in both modes.** If indexed material does not support an answer, SSB
+**Grounding is non-negotiable.** If indexed material does not support an answer, SSB
 says so rather than falling back to open-domain knowledge. Optional web search is a *separate,
 visibly-labeled* path — never silently blended into a course-grounded answer.
 

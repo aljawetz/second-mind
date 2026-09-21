@@ -1,23 +1,34 @@
 :root{
-  --paper:#FAF7F1;
+  --wallpaper-1:#7DB2F0;
+  --wallpaper-2:#F3C6A0;
+  --wallpaper-3:#C79EEA;
+  --wallpaper-4:#F6E27A;
+  --paper:#F6F6F4;
   --surface:#FFFFFF;
-  --ink:#201D18;
-  --ink-dim:#6E6759;
-  --ink-faint:#A39C89;
-  --line:#E7E0D2;
-  --line-strong:#D8CFBB;
-  --indigo:#33538E;
-  --indigo-ink:#EAF0FC;
-  --ochre:#AD7229;
-  --ochre-ink:#FBEFDD;
-  --moss:#436C50;
-  --moss-ink:#E7F1E9;
-  --danger:#9D2F2F;
-  --shadow: 0 1px 2px rgba(32,29,24,.04), 0 6px 20px -8px rgba(32,29,24,.10);
+  --ink:#15161A;
+  --ink-dim:#5B5E66;
+  --ink-faint:#9BA0A8;
+  --line:#E9E9EC;
+  --line-strong:#D6D7DC;
+  --indigo:#2563EB;
+  --indigo-ink:#E8F0FE;
+  --ochre:#B7791F;
+  --ochre-ink:#FCF1DC;
+  --moss:#1F8A57;
+  --moss-ink:#E3F6EC;
+  --violet:#7C3AED;
+  --violet-ink:#F1E9FE;
+  --danger:#C0392B;
+  --danger-ink:#FBEAE8;
+  --shadow: 0 1px 2px rgba(21,22,26,.05), 0 10px 30px -10px rgba(21,22,26,.18);
+  --card-shadow: 0 30px 70px -20px rgba(30,20,45,.42), 0 8px 22px -10px rgba(30,20,45,.3);
 }
 
 *{box-sizing:border-box}
 html,body,#root{height:100%}
+#root{display:flex;flex-direction:column}
+#titlebar-drag{height:2rem;flex:none;background:var(--surface)}
+#app-content{flex:1;min-height:0}
 body{
   margin:0;
   background:var(--paper);
@@ -25,7 +36,7 @@ body{
   font-family:'Public Sans',ui-sans-serif,system-ui,sans-serif;
   -webkit-font-smoothing:antialiased;
 }
-h1,h2,h3{font-family:'Fraunces',Georgia,serif;text-wrap:balance;margin:0}
+h1,h2,h3{font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif;text-wrap:balance;margin:0}
 .mono{font-family:'IBM Plex Mono',ui-monospace,'SF Mono',monospace}
 button{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--indigo);outline-offset:2px}
@@ -55,24 +66,39 @@ button{font:inherit;color:inherit}
   font-size:.65rem;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-faint);
   padding:0 .5rem;margin-bottom:.35rem;font-weight:600;
 }
-.nav-label-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem}
-.nav-label-row .nav-label{margin-bottom:0}
-.nav-add{width:20px;height:20px;font-size:.95rem;line-height:1;border-radius:6px}
-.nav-group{display:flex;flex-direction:column;gap:.15rem}
+.nav-group{display:flex;flex-direction:column;gap:.2rem}
+/* Sessions belong to a course, so they nest under it in the sidebar
+   instead of sitting in their own flat list — only the active course's
+   sessions are ever fetched, so only it ever renders expanded. */
+.course-group{display:flex;flex-direction:column}
 .course-btn, .session-btn{
   display:flex;align-items:center;gap:.55rem;
   width:100%;text-align:left;
-  background:none;border:none;border-radius:8px;
-  padding:.5rem .5rem;cursor:pointer;
+  background:none;border:none;border-radius:10px;
+  padding:.5rem .55rem;cursor:pointer;
   font-size:.86rem;color:var(--ink-dim);
 }
 .course-btn:hover, .session-btn:hover{background:var(--paper)}
 .course-btn .dot{width:6px;height:6px;border-radius:50%;background:var(--line-strong);flex:none}
-.course-btn.active{background:var(--indigo-ink);color:var(--indigo);font-weight:600}
-.course-btn.active .dot{background:var(--indigo)}
-.session-btn{font-size:.82rem;padding-left:.5rem}
+.course-btn .chevron{margin-left:auto;font-size:.62rem;color:var(--ink-faint);flex:none}
+.course-btn.active{background:var(--indigo);color:var(--indigo-ink);font-weight:600}
+.course-btn.active .dot{background:var(--indigo-ink)}
+.course-btn.active .chevron{color:var(--indigo-ink);opacity:.7}
+.session-group{
+  display:flex;flex-direction:column;gap:.15rem;
+  margin:.2rem 0 .35rem 1.05rem;padding-left:.6rem;
+  border-left:1px solid var(--line-strong);
+}
+.session-btn{font-size:.82rem;padding:.4rem .55rem}
 .session-btn .sdate{margin-left:auto;color:var(--ink-faint);font-size:.72rem;font-family:'IBM Plex Mono',monospace}
-.session-btn.active{background:var(--ochre-ink);color:var(--ochre);font-weight:600}
+.session-btn.active{background:var(--paper);color:var(--ink);font-weight:600;box-shadow:inset 0 0 0 1px var(--line-strong)}
+.session-add{
+  display:flex;align-items:center;gap:.4rem;
+  background:none;border:none;border-radius:8px;cursor:pointer;text-align:left;
+  padding:.4rem .55rem;font-size:.78rem;color:var(--ink-faint);
+}
+.session-add:hover{background:var(--paper);color:var(--ink)}
+.session-add .plus{font-size:.9rem;line-height:1}
 .sidebar-foot{
   margin-top:auto;padding-top:.7rem;border-top:1px solid var(--line);
   display:flex;align-items:center;gap:.6rem;
@@ -87,21 +113,34 @@ button{font:inherit;color:inherit}
 .who-name{font-size:.8rem;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .who-sub{display:flex;align-items:center;gap:.32rem;font-size:.66rem;color:var(--ink-faint)}
 .who-sub .lock{color:var(--moss);font-size:.6rem}
+.settings-anchor{position:relative;flex:none}
+.settings-menu{
+  position:absolute;bottom:calc(100% + 8px);right:0;z-index:20;min-width:172px;
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--shadow);padding:.35rem;display:flex;flex-direction:column;gap:.1rem;
+}
+.settings-menu-item{
+  width:100%;text-align:left;background:none;border:none;border-radius:8px;
+  padding:.5rem .6rem;cursor:pointer;font-size:.84rem;color:var(--ink-dim);
+}
+.settings-menu-item:hover{background:var(--paper);color:var(--ink)}
 .icon-btn{
   flex:none;width:28px;height:28px;border-radius:8px;border:none;background:none;
   color:var(--ink-faint);display:flex;align-items:center;justify-content:center;cursor:pointer;
 }
 .icon-btn:hover{background:var(--paper);color:var(--ink)}
 .icon-btn svg{width:16px;height:16px}
+.icon-btn-danger{color:var(--danger)}
+.icon-btn-danger:hover{background:var(--danger-ink);color:var(--danger)}
 
 /* ---------- main ---------- */
 .main{flex:1;min-width:0;display:flex;flex-direction:column;height:100%}
 .topbar{
   flex:none;display:flex;align-items:center;gap:.9rem;
   padding:.85rem 1.4rem;border-bottom:1px solid var(--line);
-  background:var(--paper);
+  background:var(--surface);
 }
-.topbar h1{font-size:1.15rem;font-weight:500;flex:none}
+.topbar h1{font-size:1.2rem;font-weight:700;flex:none}
 /* A long course name must truncate, not push topbar-right off-window —
    real bug: a flex row with no min-width:0 on its text child refuses to
    shrink past the name's longest word, overflowing the topbar at narrow
@@ -112,71 +151,86 @@ button{font:inherit;color:inherit}
 }
 .pill{
   display:inline-flex;align-items:center;gap:.35rem;
-  font-size:.68rem;padding:.28rem .55rem;border-radius:99px;
-  background:var(--moss-ink);color:var(--moss);font-weight:600;white-space:nowrap;
+  font-size:.68rem;padding:.28rem .6rem;border-radius:99px;
+  background:var(--indigo);color:var(--indigo-ink);font-weight:600;white-space:nowrap;
 }
-.topbar-right{margin-left:auto;flex:none;display:flex;align-items:center;gap:.7rem}
-.toggle-wrap{display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:var(--ink-dim)}
-.toggle{
-  width:34px;height:19px;border-radius:99px;background:var(--line-strong);
-  position:relative;border:none;cursor:pointer;flex:none;
-}
-.toggle::after{
-  content:'';position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;
-  background:var(--surface);box-shadow:var(--shadow);transition:transform .16s ease;
-}
-.toggle[aria-pressed="true"]{background:var(--indigo)}
-.toggle[aria-pressed="true"]::after{transform:translateX(15px)}
 
-.view{flex:1;min-height:0;overflow-y:auto;padding:1.6rem 1.6rem 3rem}
+.view{flex:1;min-height:0;overflow-y:auto;padding:1.6rem 1.6rem 3rem;background:var(--paper)}
 .view-inner{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:1.6rem}
+/* Only the home view fills the screen edge-to-edge with two independently
+   scrolling columns — every other view (assignment, artifact, session…)
+   keeps stacking content naturally and lets .view page-scroll instead. */
+.view-inner-fill{height:100%}
 #view-new-session,#view-artifact,#view-assignment{display:flex;flex-direction:column;gap:2.1rem}
 
-#view-home{display:grid;grid-template-columns:1.15fr 1fr;gap:1.8rem;align-items:start}
+/* minmax(0, Nfr), not plain Nfr — a bare `fr` track still won't shrink
+   below its content's min-content width, so a long assignment title or
+   a nowrap due-date pill was pushing this column past the window edge
+   at narrower widths instead of wrapping inside it.
+   grid-template-rows:1fr + align-items:stretch + height:100% is what
+   makes both columns actually reach the bottom of the window instead of
+   just sizing to their own content — a fixed calc(100vh - Nrem) guess on
+   each column independently kept being wrong for one window size or the
+   other; letting the grid row itself be the full available height and
+   stretching both columns into it is the only way that isn't a guess. */
+#view-home{
+  display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);grid-template-rows:1fr;
+  gap:1.8rem;align-items:stretch;height:100%;
+}
 .chat-panel{
   display:flex;flex-direction:column;gap:1rem;
-  background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:1.2rem;
-  /* Real bug: with no height cap this panel just grows with the thread,
-     pushing the ask-bar below the window — sticky + a viewport-relative
-     max-height keeps the input reachable without scrolling the page,
-     while only the thread itself scrolls internally. */
-  position:sticky;top:0;max-height:calc(100vh - 7.5rem);
+  background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:1.2rem;
+  /* flex:1 + min-height:0, not a height/max-height guess — this panel
+     fills whatever's left in .home-left after "Study artifacts" above
+     it, however tall that column ends up being, with only .qa-thread
+     scrolling internally so the ask-bar always stays put at the bottom. */
+  flex:1;min-height:0;
+  box-shadow:var(--shadow);
 }
 .chat-head{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:600;flex:none}
 .chat-panel .qa-thread{flex:1;min-height:0;overflow-y:auto}
 .chat-panel .ask-bar{border:none;box-shadow:none;background:var(--paper);flex:none}
-.home-right{display:flex;flex-direction:column;gap:2.1rem}
+.home-left{display:flex;flex-direction:column;gap:1.6rem;min-height:0}
+.home-left .home-block:first-child{border-top:none;padding-top:0}
+.home-right{display:flex;flex-direction:column;gap:2.1rem;min-height:0}
 .home-right .home-block:first-child{border-top:none;padding-top:0}
+/* home-right only ever holds the one Assignments block — let it fill
+   the whole column, same reasoning as .chat-panel above. */
+.home-right .home-block{flex:1;min-height:0;display:flex;flex-direction:column}
 
 /* ---------- ask bar + qa ---------- */
 .ask-bar{
   display:flex;align-items:center;gap:.6rem;
-  background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;
+  background:var(--surface);border:1px solid var(--line-strong);border-radius:14px;
   padding:.7rem .9rem;box-shadow:var(--shadow);
 }
 .ask-bar input{
-  flex:1;border:none;background:none;font-size:.92rem;color:var(--ink);font-family:inherit;
+  /* min-width:0 overrides the browser's default intrinsic min-width for
+     text inputs (~170px) — without it the input refused to shrink past
+     that floor at narrower window widths, pushing the Ask button out
+     past the card's edge instead of the input just truncating. */
+  flex:1;min-width:0;border:none;background:none;font-size:.92rem;color:var(--ink);font-family:inherit;
 }
 .ask-bar input:focus{outline:none}
 .ask-bar input::placeholder{color:var(--ink-faint)}
 .ask-send{
-  background:var(--indigo);color:var(--indigo-ink);border:none;border-radius:8px;
-  padding:.4rem .8rem;font-size:.8rem;font-weight:600;cursor:pointer;
+  background:var(--indigo);color:var(--indigo-ink);border:none;border-radius:99px;
+  padding:.45rem .95rem;font-size:.8rem;font-weight:600;cursor:pointer;
 }
 .qa-thread{display:flex;flex-direction:column;gap:.7rem}
 .qa-q{
   align-self:flex-end;max-width:80%;background:var(--indigo);color:var(--indigo-ink);
-  padding:.55rem .85rem;border-radius:12px 12px 3px 12px;font-size:.88rem;
+  padding:.55rem .85rem;border-radius:14px 14px 3px 14px;font-size:.88rem;
 }
 .qa-a{
-  background:var(--surface);border:1px solid var(--line);border-radius:3px 12px 12px 12px;
+  background:var(--paper);border:1px solid var(--line);border-radius:3px 14px 14px 14px;
   padding:.85rem 1rem;font-size:.9rem;line-height:1.55;max-width:92%;
 }
 .qa-a p{margin:0 0 .6rem}
 .qa-a p:last-of-type{margin-bottom:0}
 .cite{
   font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--indigo);
-  background:var(--indigo-ink);padding:.1rem .4rem;border-radius:5px;white-space:nowrap;
+  background:var(--indigo-ink);padding:.1rem .45rem;border-radius:6px;white-space:nowrap;
 }
 .cite-link{border:none;cursor:pointer;text-decoration:none}
 .cite-link:hover{background:var(--indigo);color:var(--indigo-ink)}
@@ -195,23 +249,53 @@ button{font:inherit;color:inherit}
 .artifact-row{display:flex;gap:.6rem;flex-wrap:wrap}
 .artifact-btn{
   display:flex;flex-direction:column;gap:.15rem;align-items:flex-start;
-  background:var(--surface);border:1px solid var(--line);border-radius:10px;
-  padding:.65rem .9rem;cursor:pointer;min-width:126px;
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  border-top-width:3px;
+  padding:.6rem .95rem .65rem;cursor:pointer;min-width:126px;
 }
-.artifact-btn:hover{border-color:var(--ochre);box-shadow:var(--shadow)}
+.artifact-btn:hover{box-shadow:var(--shadow)}
 .artifact-btn .lbl{font-weight:600;font-size:.85rem}
 .artifact-btn .sub{font-size:.7rem;color:var(--ink-faint)}
+/* one accent per artifact type, so the row reads at a glance */
+.artifact-mocktest{border-top-color:var(--indigo)}
+.artifact-mocktest .lbl{color:var(--indigo)}
+.artifact-mindmap{border-top-color:var(--violet)}
+.artifact-mindmap .lbl{color:var(--violet)}
+.artifact-cards{border-top-color:var(--moss)}
+.artifact-cards .lbl{color:var(--moss)}
 
 .pill-ochre{background:var(--ochre-ink);color:var(--ochre)}
 .pill-neutral{background:var(--paper);color:var(--ink-dim);border:1px solid var(--line);font-weight:500}
 .pill-green{background:var(--moss-ink);color:var(--moss)}
-.pill-red{background:#F7E3E3;color:var(--danger)}
+.pill-red{background:var(--danger-ink);color:var(--danger)}
 
-.assign-list{display:flex;flex-direction:column;gap:.55rem;max-height:340px;overflow-y:auto;padding-right:.15rem}
+/* One scroll container (.assign-scroll) holds both collapsible groups —
+   .assign-list itself no longer scrolls, or expanding a group would nest
+   a scrollbar inside a scrollbar. flex:1 + min-height:0 (not a height
+   guess) fills whatever .home-right leaves after the "Assignments" label
+   above it, so this reaches the bottom of the window like .chat-panel does. */
+.assign-scroll{
+  display:flex;flex-direction:column;gap:1.1rem;overflow-y:auto;padding-right:.15rem;
+  flex:1;min-height:0;
+}
+.assign-group{display:flex;flex-direction:column;gap:.6rem}
+.assign-group-head{
+  display:flex;align-items:center;gap:.4rem;width:100%;text-align:left;
+  background:none;border:none;cursor:pointer;padding:0;
+  font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:600;
+}
+.assign-group-head:hover{color:var(--ink)}
+.assign-group-head .chevron{font-size:.6rem;flex:none}
+.assign-group-head .count{
+  margin-left:auto;font-family:'IBM Plex Mono',monospace;font-weight:500;letter-spacing:0;
+  text-transform:none;font-size:.66rem;color:var(--ink-faint);background:var(--paper);
+  border:1px solid var(--line);border-radius:99px;padding:.05rem .45rem;
+}
+.assign-list{display:flex;flex-direction:column;gap:.55rem}
 .assign-card{
   display:flex;align-items:center;gap:.9rem;width:100%;text-align:left;
-  background:var(--surface);border:1px solid var(--line);border-radius:10px;
-  padding:.8rem 1rem;cursor:pointer;
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:.8rem 1.05rem;cursor:pointer;
 }
 .assign-card:hover{border-color:var(--ochre)}
 .assign-card .main{flex:1;min-width:0}
@@ -222,7 +306,7 @@ button{font:inherit;color:inherit}
 .session-list{display:flex;flex-direction:column;gap:.5rem}
 .session-card{
   display:flex;align-items:center;gap:.8rem;background:var(--surface);
-  border:1px solid var(--line);border-radius:10px;padding:.7rem .9rem;
+  border:1px solid var(--line);border-radius:14px;padding:.7rem .9rem;
   cursor:pointer;text-align:left;
 }
 .session-card:hover{border-color:var(--indigo)}
@@ -244,9 +328,9 @@ button{font:inherit;color:inherit}
 
 /* ---------- session view ---------- */
 .session-head{display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap}
-.session-head h2{font-size:1.3rem;font-weight:500}
-.split{display:grid;grid-template-columns:1.15fr 1fr;gap:1.2rem;align-items:start}
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:1rem;}
+.session-head h2{font-size:1.3rem;font-weight:600}
+.split{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:1.2rem;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:1rem;}
 .panel h3{font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:.7rem}
 .player{display:flex;flex-direction:column;gap:.6rem}
 .waveform{display:flex;align-items:flex-end;gap:2px;height:44px}
@@ -273,7 +357,7 @@ button{font:inherit;color:inherit}
 
 /* ---------- artifact view ---------- */
 .artifact-head{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap}
-.artifact-head h2{font-size:1.3rem;font-weight:500}
+.artifact-head h2{font-size:1.3rem;font-weight:600}
 .tabs{display:flex;gap:.4rem;border-bottom:1px solid var(--line);padding-bottom:0}
 .tab{
   background:none;border:none;padding:.5rem .2rem;margin-right:1rem;font-size:.85rem;color:var(--ink-faint);
@@ -283,7 +367,7 @@ button{font:inherit;color:inherit}
 .ground-pill{margin-left:auto}
 
 .mocktest{display:flex;flex-direction:column;gap:.7rem}
-.mq{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.9rem 1rem}
+.mq{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:.9rem 1rem}
 .mq .qn{font-size:.68rem;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace}
 .mq .qtext{font-size:.92rem;margin:.3rem 0 .5rem;font-weight:500}
 .mq summary{cursor:pointer;color:var(--indigo);font-size:.8rem;font-weight:600;list-style:none}
@@ -298,7 +382,7 @@ button{font:inherit;color:inherit}
 .flip-inner{position:relative;width:100%;height:100%;transition:transform .45s cubic-bezier(.22,1,.36,1);transform-style:preserve-3d;cursor:pointer}
 .flip input:checked ~ .flip-inner{transform:rotateY(180deg)}
 .flip-face{
-  position:absolute;inset:0;backface-visibility:hidden;border-radius:12px;border:1px solid var(--line);
+  position:absolute;inset:0;backface-visibility:hidden;border-radius:16px;border:1px solid var(--line);
   background:var(--surface);padding:.9rem;display:flex;flex-direction:column;
 }
 .flip-face .k{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:.4rem}
@@ -306,16 +390,7 @@ button{font:inherit;color:inherit}
 .flip-back{transform:rotateY(180deg);background:var(--ochre-ink)}
 .flip-hint{margin-top:auto;font-size:.66rem;color:var(--ink-faint)}
 
-.slidestrip{display:flex;gap:.9rem;overflow-x:auto;padding-bottom:.4rem}
-.slide{
-  flex:none;width:230px;aspect-ratio:4/3;background:var(--surface);border:1px solid var(--line);
-  border-radius:10px;padding:.9rem;display:flex;flex-direction:column;gap:.5rem;
-}
-.slide .sn{font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--ink-faint)}
-.slide h4{font-family:'Fraunces',serif;font-size:1rem;font-weight:500;line-height:1.25}
-.slide ul{margin:0;padding-left:1rem;font-size:.74rem;color:var(--ink-dim);line-height:1.45}
-
-.mindmap{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:.5rem}
+.mindmap{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:.5rem}
 .mindmap svg{width:100%;height:auto;display:block}
 .mm-node rect{fill:var(--paper);stroke:var(--line-strong)}
 .mm-node.center rect{fill:var(--indigo);stroke:var(--indigo)}
@@ -325,13 +400,14 @@ button{font:inherit;color:inherit}
 
 /* ---------- assignment view ---------- */
 .assign-head{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap}
-.assign-head h2{font-size:1.3rem;font-weight:500;cursor:default}
-.session-title-input{font-size:1.3rem;font-weight:500;font-family:inherit;border:1px solid var(--line-strong);border-radius:8px;padding:.15rem .5rem;background:var(--surface);color:var(--ink)}
+.assign-head h2{font-size:1.3rem;font-weight:600;cursor:default}
+.session-title-input{font-size:1.3rem;font-weight:600;font-family:inherit;border:1px solid var(--line-strong);border-radius:10px;padding:.15rem .5rem;background:var(--surface);color:var(--ink)}
+.session-actions{margin-left:auto;flex:none;display:flex;gap:.3rem}
 .assign-pills{display:flex;gap:.5rem;flex-wrap:wrap}
 .assign-prompt{font-size:.9rem;line-height:1.65;color:var(--ink-dim)}
 .explain-btn{
   align-self:flex-start;display:flex;align-items:center;gap:.45rem;
-  background:var(--indigo);color:var(--indigo-ink);border:none;border-radius:10px;
+  background:var(--indigo);color:var(--indigo-ink);border:none;border-radius:14px;
   padding:.65rem 1.05rem;font-size:.85rem;font-weight:600;cursor:pointer;
 }
 .explain-btn:hover{opacity:.92}
@@ -361,9 +437,19 @@ button{font:inherit;color:inherit}
   min-height:100%;display:flex;align-items:center;justify-content:center;
   padding:2.4rem 1.2rem;background:var(--paper);
 }
+/* Only the startup/loading screen gets the wallpaper — every other
+   onboarding step (keys, courses, indexing) keeps the plain paper
+   background above. */
+.onboard-loading{
+  background:
+    radial-gradient(1000px 620px at 8% -10%, var(--wallpaper-1), transparent 58%),
+    radial-gradient(900px 620px at 100% 0%, var(--wallpaper-3), transparent 56%),
+    radial-gradient(700px 480px at 85% 95%, var(--wallpaper-4), transparent 55%),
+    linear-gradient(160deg, var(--wallpaper-1), var(--wallpaper-2) 50%, var(--wallpaper-3));
+}
 .onboard-card{
   width:100%;max-width:440px;background:var(--surface);border:1px solid var(--line);
-  border-radius:16px;padding:2.1rem 2rem;box-shadow:var(--shadow);
+  border-radius:20px;padding:2.1rem 2rem;box-shadow:var(--card-shadow);
   display:flex;flex-direction:column;gap:1.3rem;
 }
 .onboard-steps{display:flex;gap:.4rem;justify-content:center}
@@ -371,7 +457,7 @@ button{font:inherit;color:inherit}
 .onboard-dot.active{background:var(--indigo);width:18px}
 .onboard-dot.done{background:var(--moss)}
 .onboard-icon{
-  width:52px;height:52px;border-radius:14px;background:var(--indigo);color:var(--indigo-ink);
+  width:52px;height:52px;border-radius:18px;background:var(--indigo);color:var(--indigo-ink);
   display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;
   font-weight:600;font-size:1.2rem;margin:0 auto;
 }
@@ -385,16 +471,22 @@ button{font:inherit;color:inherit}
 .platform-chip.active{border-color:var(--indigo);color:var(--indigo);background:var(--indigo-ink);font-weight:600}
 .onboard-meta{font-size:.7rem;color:var(--ink-faint);text-align:center;font-family:'IBM Plex Mono',monospace}
 .btn-primary{
-  background:var(--indigo);color:var(--indigo-ink);border:none;border-radius:10px;
+  background:var(--indigo);color:var(--indigo-ink);border:none;border-radius:14px;
   padding:.75rem 1rem;font-size:.88rem;font-weight:600;cursor:pointer;width:100%;
 }
 .btn-primary:hover{opacity:.93}
 .btn-primary:disabled{opacity:.4;cursor:not-allowed}
 .btn-secondary{
-  background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);border-radius:10px;
+  background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);border-radius:14px;
   padding:.75rem 1rem;font-size:.88rem;font-weight:600;cursor:pointer;width:100%;
 }
 .btn-secondary:hover{border-color:var(--indigo);color:var(--indigo)}
+.btn-danger{
+  background:var(--danger);color:var(--danger-ink);border:none;border-radius:10px;
+  padding:.5rem .85rem;font-size:.8rem;font-weight:600;cursor:pointer;flex:none;
+}
+.btn-danger:hover{opacity:.92}
+.btn-danger:disabled{opacity:.4;cursor:not-allowed}
 .recording-actions{display:flex;gap:.6rem}
 .recording-actions .btn-primary,.recording-actions .btn-secondary{width:auto;flex:1}
 .back-mini{
@@ -405,7 +497,7 @@ button{font:inherit;color:inherit}
 .field{display:flex;flex-direction:column;gap:.35rem}
 .field label{font-size:.76rem;font-weight:600;color:var(--ink)}
 .field input{
-  border:1px solid var(--line-strong);border-radius:8px;padding:.55rem .7rem;
+  border:1px solid var(--line-strong);border-radius:10px;padding:.55rem .7rem;
   font-family:'IBM Plex Mono',monospace;font-size:.8rem;color:var(--ink);background:var(--paper);
 }
 .field input:focus{outline:none;border-color:var(--indigo)}
@@ -413,7 +505,7 @@ button{font:inherit;color:inherit}
 .field .field-error{font-size:.7rem;color:var(--danger)}
 .course-pick{display:flex;flex-direction:column;gap:.5rem;max-height:260px;overflow-y:auto}
 .course-row{
-  display:flex;align-items:center;gap:.7rem;border:1px solid var(--line);border-radius:10px;
+  display:flex;align-items:center;gap:.7rem;border:1px solid var(--line);border-radius:14px;
   padding:.6rem .8rem;cursor:pointer;flex-wrap:wrap;
 }
 .course-row:hover{border-color:var(--indigo)}
@@ -422,15 +514,16 @@ button{font:inherit;color:inherit}
 .course-row .ccode{font-size:.84rem;font-weight:600}
 .course-row .cname{font-size:.72rem;color:var(--ink-faint)}
 .manage-actions{display:flex;gap:.4rem;flex:none}
-.manage-actions .icon-btn{width:auto;padding:.3rem .6rem;font-size:.75rem;border:1px solid var(--line)}
+.manage-actions .icon-btn,.manage-confirm .icon-btn{width:auto;padding:.3rem .6rem;font-size:.75rem;border:1px solid var(--line);gap:.35rem}
+.manage-actions .icon-btn-danger{border-color:var(--danger-ink)}
 .manage-confirm{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;min-width:0}
 .manage-confirm input{
-  font-size:.78rem;border:1px solid var(--line-strong);border-radius:6px;padding:.3rem .5rem;
+  font-size:.78rem;border:1px solid var(--line-strong);border-radius:8px;padding:.3rem .5rem;
   background:var(--surface);color:var(--ink);width:150px;min-width:0;flex:1 1 120px;
 }
 .course-count{font-size:.75rem;color:var(--ink-faint);text-align:center}
 .index-list{display:flex;flex-direction:column;gap:.8rem;max-height:280px;overflow-y:auto}
-.index-course{border:1px solid var(--line);border-radius:10px;padding:.75rem .85rem}
+.index-course{border:1px solid var(--line);border-radius:14px;padding:.75rem .85rem}
 .index-course .icname{font-size:.84rem;font-weight:600;margin-bottom:.5rem}
 .index-row{display:flex;align-items:center;gap:.55rem;font-size:.78rem;color:var(--ink-dim);padding:.18rem 0}
 .index-row .stat{
@@ -459,6 +552,7 @@ button{font:inherit;color:inherit}
      wildly instead of laying out as compact horizontal pills. Real bug
      hit by actually shrinking the window below this breakpoint. */
   .course-btn,.session-btn{width:auto;flex:none;white-space:nowrap}
+  .session-group{margin:0;padding-left:0;border-left:none;flex-direction:row}
   .sidebar-foot{display:none}
   .split{grid-template-columns:1fr}
   #view-home{grid-template-columns:1fr}

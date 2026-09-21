@@ -1,30 +1,24 @@
 export default function Topbar({
   courseCode,
   courseName,
-  socratic,
-  onToggleSocratic,
+  overrideTitle,
 }: {
   courseCode: string;
   courseName: string;
-  socratic: boolean;
-  onToggleSocratic: () => void;
+  overrideTitle?: string;
 }) {
+  if (overrideTitle) {
+    return (
+      <div className="topbar">
+        <h1>{overrideTitle}</h1>
+      </div>
+    );
+  }
+
   return (
     <div className="topbar">
       <h1>{courseCode}</h1>
       <span className="code mono">{courseName}</span>
-      <div className="topbar-right">
-        <span className="pill">◆ grounded</span>
-        <div className="toggle-wrap">
-          <span>Socratic mode</span>
-          <button
-            className="toggle"
-            aria-pressed={socratic}
-            title="Toggle Socratic mode"
-            onClick={onToggleSocratic}
-          ></button>
-        </div>
-      </div>
     </div>
   );
 }

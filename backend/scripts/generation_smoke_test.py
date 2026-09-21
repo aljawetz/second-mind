@@ -1,6 +1,6 @@
 """Generation smoke test — implementation-plan.md Step 8. Verifies real
-citations, the not-covered case, and Socratic mode against a real index
-with a real LLM call.
+citations and the not-covered case against a real index with a real LLM
+call.
 
 Not a pytest test: makes real, billed OpenAI API calls and needs live
 Canvas access. Run directly:
@@ -70,7 +70,7 @@ def main():
         index = build_real_index(db_path, f"course_{COURSE_ID}")
 
         log("on-topic query (answer-first)")
-        engine = generation.build_query_engine(index, socratic=False, streaming=False)
+        engine = generation.build_query_engine(index, streaming=False)
         r = engine.query("What is a test double and how does Mockito help isolate components?")
         assert r.source_nodes, "expected citations for an on-topic query"
         assert all(n.score >= generation.SIMILARITY_CUTOFF for n in r.source_nodes)
@@ -81,12 +81,6 @@ def main():
         r2 = engine.query("What is the recipe for a chocolate souffle?")
         assert not r2.source_nodes, f"expected zero source nodes for an off-topic query, got {len(r2.source_nodes)}"
         log(f"  response: {r2.response!r}, source_nodes={len(r2.source_nodes)}")
-
-        log("Socratic mode (expect a guiding question, not a direct answer)")
-        socratic_engine = generation.build_query_engine(index, socratic=True, streaming=False)
-        r3 = socratic_engine.query("What is spec-based testing?")
-        assert "?" in r3.response, "expected Socratic mode to ask a guiding question"
-        log(f"  answer: {r3.response[:150]!r}")
 
         log("ALL CHECKS PASSED")
 

@@ -384,7 +384,6 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(400, {"error": {"code": "bad_request", "message": "invalid JSON"}})
             return
         question = data.get("question", "").strip()
-        mode = data.get("mode", "answer")
         if not question:
             self._send_json(400, {"error": {"code": "bad_request", "message": "question is required"}})
             return
@@ -399,7 +398,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             db_path = SSB_HOME / "index.lancedb"
             index = indexing.load_index(db_path, f"course_{course_id}")
-            engine = generation.build_query_engine(index, socratic=(mode == "socratic"), streaming=True)
+            engine = generation.build_query_engine(index, streaming=True)
             response = engine.query(question)
         except TableNotFoundError:
             # Course not indexed yet — indistinguishable from "nothing

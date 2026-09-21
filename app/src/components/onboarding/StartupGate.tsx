@@ -46,7 +46,7 @@ export default function StartupGate({ onReady }: { onReady: () => void }) {
   }, [onReady, retryTick]);
 
   return (
-    <div className="onboard">
+    <div className="onboard onboard-loading">
       <div className="onboard-card">
         <div className="onboard-icon">SSB</div>
         <div>

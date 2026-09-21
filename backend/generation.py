@@ -2,8 +2,8 @@
 
 Wires CitationQueryEngine + SimilarityPostprocessor + a pluggable LLM
 client around a real index. The system prompt encodes design spec §7's
-grounding rules: answer-first by default, Socratic mode as an opt-in
-toggle, cite every factual claim, never blend in open-domain knowledge.
+grounding rules: answer-first, cite every factual claim, never blend in
+open-domain knowledge.
 """
 
 import keyring
@@ -76,20 +76,6 @@ ANSWER_FIRST_TEMPLATE = PromptTemplate(
     "Answer: "
 )
 
-SOCRATIC_TEMPLATE = PromptTemplate(
-    "You are SSB, a study assistant in Socratic mode. Instead of "
-    "answering directly, ask one or two guiding questions that lead the "
-    "student toward the answer, using only the numbered sources below. "
-    "Reference sources by number, e.g. [1], when pointing to relevant "
-    "material. If the sources don't contain enough information to help, "
-    "say so explicitly instead of guessing.\n"
-    "------\n"
-    "{context_str}\n"
-    "------\n"
-    "Query: {query_str}\n"
-    "Guiding questions: "
-)
-
 
 def _get_llm_key() -> str:
     key = keyring.get_password(CREDENTIAL_SERVICE, "openai-key")
@@ -144,14 +130,13 @@ class HybridRetriever(BaseRetriever):
         return vector_nodes + fts_nodes
 
 
-def build_query_engine(index, socratic: bool = False, streaming: bool = True) -> CitationQueryEngine:
+def build_query_engine(index, streaming: bool = True) -> CitationQueryEngine:
     llm = OpenAI(model=DEFAULT_MODEL, api_key=_get_llm_key())
-    template = SOCRATIC_TEMPLATE if socratic else ANSWER_FIRST_TEMPLATE
     return CitationQueryEngine.from_args(
         index,
         llm=llm,
         retriever=HybridRetriever(index),
-        citation_qa_template=template,
+        citation_qa_template=ANSWER_FIRST_TEMPLATE,
         streaming=streaming,
     )
 

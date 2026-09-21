@@ -71,7 +71,7 @@ synced/stored. Courses with no name (some real accounts have these) are filtered
 
 ### `POST /courses/{course_id}/ask`
 ```
-Request:  { "question": string, "mode": "answer" | "socratic" }
+Request:  { "question": string }
 Response: { "answer": string,
             "citations": [ { "source_type": "page"|"file"|"transcript"|"notes",
                               "label": string,        // e.g. "Lecture 6 · 14:22"
