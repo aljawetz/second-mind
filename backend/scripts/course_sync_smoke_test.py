@@ -1,8 +1,12 @@
 """Course sync smoke test — docs/superpowers/specs/2026-09-20-course-sync-phase1-design.md.
-Supersedes the old integration_smoke_test.py: same real-Canvas proof (new
--> unchanged on a re-diff) plus real coverage that one never had — a
-genuinely changed item and a genuinely removed item, both against real
-data, not mocks.
+Real Canvas course, real files, real embedding — proves the new -> unchanged
+round-trip end-to-end against live data (the same proof the old
+integration_smoke_test.py provided, which this script supersedes and
+replaces). Changed-item and removed-item branching logic is NOT re-proven
+here against live data — mutating or deleting real Canvas content as part
+of a test is out of scope for this project. That logic is already covered,
+with real assertions (not just mocks recording calls), by
+tests/test_course_sync.py's mocked unit tests.
 
 Not a pytest test: needs live Canvas access and takes real time
 (embedding + OCR on real files). Run directly:
