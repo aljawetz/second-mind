@@ -9,6 +9,7 @@ import AssignmentView from "./AssignmentView";
 import NewSessionView from "./NewSessionView";
 import SessionDetailView from "./SessionDetailView";
 import ManageCoursesView from "./ManageCoursesView";
+import OnboardingIndexing from "../onboarding/OnboardingIndexing";
 
 export default function AppShell({
   courses,
@@ -30,6 +31,7 @@ export default function AppShell({
   const [assignments, setAssignments] = useState<CanvasAssignment[]>([]);
   const [assignmentsError, setAssignmentsError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [pendingIndexCourse, setPendingIndexCourse] = useState<AvailableCourse | null>(null);
 
   // The active course can disappear out from under this view (unselected
   // or deleted via Manage Courses) — fall back to whatever's left rather
@@ -117,8 +119,22 @@ export default function AppShell({
   function handleCourseRemoved(removedId: number) {
     onCourseRemoved(removedId);
   }
+  // Selecting a course (ManageCoursesView.handleAdd's writeConfig) and
+  // actually indexing its Canvas content are separate steps — this used
+  // to skip straight to onCourseAdded, which made the course show up
+  // everywhere (sidebar, /ask) while its manifest.db and LanceDB table
+  // never got created, since syncCourse is only ever called from here.
+  // Routing through the same indexing screen onboarding uses, scoped to
+  // just this course, keeps that guarantee for every course, not only
+  // the ones selected on first run.
   function handleCourseAdded(course: AvailableCourse) {
-    onCourseAdded(course);
+    setPendingIndexCourse(course);
+    setView("indexingCourse");
+  }
+  function handleCourseIndexed() {
+    if (pendingIndexCourse) onCourseAdded(pendingIndexCourse);
+    setPendingIndexCourse(null);
+    setView("manageCourses");
   }
 
   const selectedAssignment = assignments.find((a) => a.id === assignmentId) ?? null;
@@ -147,7 +163,9 @@ export default function AppShell({
           <Topbar
             courseCode={course.code}
             courseName={course.name}
-            overrideTitle={view === "manageCourses" ? "Manage courses" : undefined}
+            overrideTitle={
+              view === "manageCourses" ? "Manage courses" : view === "indexingCourse" ? "Manage courses" : undefined
+            }
           />
           <div className={"view" + (view === "home" ? " view-fill" : "")}>
             <div className={"view-inner" + (view === "home" ? " view-inner-fill" : "")}>
@@ -187,6 +205,16 @@ export default function AppShell({
                   onBack={goHome}
                   onCourseRemoved={handleCourseRemoved}
                   onCourseAdded={handleCourseAdded}
+                />
+              )}
+              {view === "indexingCourse" && pendingIndexCourse && (
+                <OnboardingIndexing
+                  courses={[pendingIndexCourse]}
+                  onNext={handleCourseIndexed}
+                  title={`Indexing ${pendingIndexCourse.code}`}
+                  subtitle="This runs once for this course — after this, everything stays local."
+                  showSteps={false}
+                  continueLabel="Done →"
                 />
               )}
             </div>

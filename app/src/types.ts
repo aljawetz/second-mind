@@ -1,6 +1,13 @@
 export type ArtifactType = "mocktest" | "mindmap" | "cards";
 
-export type ViewName = "home" | "artifact" | "assignment" | "newSession" | "sessionDetail" | "manageCourses";
+export type ViewName =
+  | "home"
+  | "artifact"
+  | "assignment"
+  | "newSession"
+  | "sessionDetail"
+  | "manageCourses"
+  | "indexingCourse";
 
 export type OnboardStage = "startup" | "keys" | "courses" | "indexing" | "app";
 

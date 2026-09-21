@@ -11,9 +11,17 @@ interface CourseProgress {
 export default function OnboardingIndexing({
   courses,
   onNext,
+  title = "Indexing your courses",
+  subtitle = "This runs once — after this, everything stays local.",
+  showSteps = true,
+  continueLabel = "Continue to SSB →",
 }: {
   courses: AvailableCourse[];
   onNext: () => void;
+  title?: string;
+  subtitle?: string;
+  showSteps?: boolean;
+  continueLabel?: string;
 }) {
   const [progress, setProgress] = useState<CourseProgress[]>(courses.map(() => ({ items: [], error: null, done: false })));
   const allDone = progress.every((p) => p.done);
@@ -73,14 +81,16 @@ export default function OnboardingIndexing({
   return (
     <div className="onboard">
       <div className="onboard-card">
-        <div className="onboard-steps">
-          <span className="onboard-dot done"></span>
-          <span className="onboard-dot done"></span>
-          <span className="onboard-dot active"></span>
-        </div>
+        {showSteps && (
+          <div className="onboard-steps">
+            <span className="onboard-dot done"></span>
+            <span className="onboard-dot done"></span>
+            <span className="onboard-dot active"></span>
+          </div>
+        )}
         <div>
-          <h2 className="onboard-title">Indexing your courses</h2>
-          <p className="onboard-sub">This runs once — after this, everything stays local.</p>
+          <h2 className="onboard-title">{title}</h2>
+          <p className="onboard-sub">{subtitle}</p>
         </div>
         <div className="index-list">
           {courses.map((course, ci) => {
@@ -104,7 +114,7 @@ export default function OnboardingIndexing({
           })}
         </div>
         <button className="btn-primary" disabled={!allDone} onClick={onNext}>
-          Continue to SSB →
+          {continueLabel}
         </button>
       </div>
     </div>
