@@ -4,12 +4,16 @@ import type { Citation } from "./sidecar";
 // Citation click-through (implementation-plan.md's UI feedback round):
 // a "transcript"/"notes" citation's item_id is the real session_id
 // (indexing.py's _with_ref_doc, Step 12) — navigate in-app. Everything
-// else is Canvas course material, whose item_id is the real Canvas
-// content id, opened in the system browser via the same web-preview URL
-// Canvas itself uses. "file" is the only Canvas-material item_type
-// actually reachable today (generation.py: real Canvas sync/ingestion —
-// implementation-plan.md Step 11 — is deferred, so "page" is unreached);
-// this still opens the right URL shape for it once that lands.
+// else is Canvas course material, opened in the system browser via the
+// same web URL Canvas itself uses. Both "file" and "page" citations are
+// live now that course_sync.py indexes real Canvas files and wiki pages,
+// and they take different URL shapes (/files/{id} vs /pages/{url}).
+//
+// course_sync.py prefixes every indexed item's id by type ("file:12345",
+// "page:week-1-overview") — files and pages share one flat ref_doc_id
+// namespace per course table — and that prefixed id is what arrives here
+// as citation.item_id, so the prefix has to come back off before it goes
+// into a URL.
 //
 // canvasBaseUrl comes from the student's own configured Canvas origin
 // (config.json's canvas_base_url, set during onboarding) — never a
@@ -28,5 +32,11 @@ export async function openCitation(
     return;
   }
   const origin = canvasBaseUrl || "https://canvas.cmu.edu";
-  await open(`${origin}/courses/${courseId}/files/${citation.item_id}`);
+  if (citation.source_type === "page") {
+    const pageUrl = citation.item_id.replace(/^page:/, "");
+    await open(`${origin}/courses/${courseId}/pages/${pageUrl}`);
+    return;
+  }
+  const fileId = citation.item_id.replace(/^file:/, "");
+  await open(`${origin}/courses/${courseId}/files/${fileId}`);
 }

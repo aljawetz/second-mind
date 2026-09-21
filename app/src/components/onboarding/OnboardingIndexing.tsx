@@ -34,8 +34,15 @@ export default function OnboardingIndexing({
             setProgress((prev) =>
               prev.map((p, j) => {
                 if (j !== courseIndex) return p;
-                if (event.error) return { ...p, error: event.error, done: true };
-                if (event.done) return { ...p, done: true };
+                // `done` first, not `error`: a per-item failure event also
+                // carries an `error` field ({item, status: "failed", error})
+                // but no `done`, so checking `error` first would hide the
+                // whole course's progress behind one bad file and unlock
+                // Continue while the stream is still running. Only a
+                // terminal event's `error` means the course itself failed.
+                if (event.done) {
+                  return event.error ? { ...p, error: event.error, done: true } : { ...p, done: true };
+                }
                 if (event.item) return { ...p, items: [...p.items, { name: event.item, failed: event.status === "failed" }] };
                 return p;
               })
@@ -46,6 +53,13 @@ export default function OnboardingIndexing({
           const message = err instanceof Error ? err.message : "Sync failed";
           setProgress((prev) => prev.map((p, j) => (j === courseIndex ? { ...p, error: message, done: true } : p)));
         }
+        // Defense in depth: the backend guarantees a terminal event, but if
+        // a stream is ever truncated without one, this course's row would
+        // stay non-done forever and Continue would never unlock. Once the
+        // request has settled there's nothing more coming either way, so
+        // mark it done — without clobbering an error already recorded.
+        if (cancelled) return;
+        setProgress((prev) => prev.map((p, j) => (j === courseIndex ? { ...p, done: true } : p)));
       }
     }
 

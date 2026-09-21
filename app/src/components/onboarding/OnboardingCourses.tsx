@@ -36,14 +36,20 @@ export default function OnboardingCourses({
     onChange(courses.map((c, i) => (i === idx ? { ...c, checked: !c.checked } : c)));
   }
 
-  function handleImport() {
-    // Persisted so a future launch can skip onboarding (App.tsx's
-    // returning-user check) — best-effort: if this write fails, onboarding
-    // just runs again next time, which is a safe fallback, not a blocker.
+  async function handleImport() {
+    // Awaited, not best-effort: the next step (OnboardingIndexing) fires
+    // POST /courses/{id}/sync immediately on mount, and main.py gates that
+    // endpoint on _course_selected(), which reads exactly the config this
+    // write produces. Advancing before the write lands means every course
+    // 404s and nothing gets indexed — so a failure here stops onboarding
+    // with a visible error instead of silently continuing.
     const selectedIds = courses.filter((c) => c.checked).map((c) => c.id);
-    writeConfig({ selected_courses: selectedIds, llm_provider: "openai", onboarding_complete: true }).catch(
-      (e) => console.error("failed to persist course selection", e)
-    );
+    try {
+      await writeConfig({ selected_courses: selectedIds, llm_provider: "openai", onboarding_complete: true });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save your course selection");
+      return;
+    }
     onNext();
   }
 
