@@ -274,7 +274,7 @@ actual right pages (scores 0.704/0.752, both above the calibrated cutoff). A del
 off-topic query returned zero source nodes — the `SimilarityPostprocessor` filtered every node
 below cutoff, so `CitationQueryEngine` never called the LLM at all; not "the LLM declined to
 guess," structurally incapable of hallucinating since there was no context to synthesize from.
-Socratic mode correctly produced a guiding question instead of a direct answer, still cited.
+(Socratic mode was also verified at the time; it has since been dropped from the product — commit `7cf3a35`.)
 **Cutoff calibrated against real data, not guessed:** on-topic queries against confirmed-indexed
 content scored 0.6555-0.7524; deliberately off-topic queries scored 0.3077-0.3967 — a clean,
 non-overlapping gap. First attempt used topically-plausible-but-not-actually-indexed queries (e.g.

@@ -20,6 +20,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS manifest (
   canvas_item_id    TEXT NOT NULL,
   item_type         TEXT NOT NULL,
+  display_name      TEXT NOT NULL,
   canvas_updated_at TEXT NOT NULL,
   content_hash      TEXT NOT NULL,
   last_synced_at    TEXT NOT NULL,
@@ -66,15 +67,23 @@ def diff(conn: sqlite3.Connection, item_type: str, remote_items: list[dict]) -> 
     }
 
 
-def mark_synced(conn: sqlite3.Connection, canvas_item_id: str, item_type: str, canvas_updated_at: str, hash_: str):
+def mark_synced(
+    conn: sqlite3.Connection,
+    canvas_item_id: str,
+    item_type: str,
+    display_name: str,
+    canvas_updated_at: str,
+    hash_: str,
+):
     conn.execute(
-        """INSERT INTO manifest (canvas_item_id, item_type, canvas_updated_at, content_hash, last_synced_at)
-           VALUES (?, ?, ?, ?, ?)
+        """INSERT INTO manifest (canvas_item_id, item_type, display_name, canvas_updated_at, content_hash, last_synced_at)
+           VALUES (?, ?, ?, ?, ?, ?)
            ON CONFLICT (canvas_item_id, item_type) DO UPDATE SET
+             display_name = excluded.display_name,
              canvas_updated_at = excluded.canvas_updated_at,
              content_hash = excluded.content_hash,
              last_synced_at = excluded.last_synced_at""",
-        (canvas_item_id, item_type, canvas_updated_at, hash_, datetime.now(timezone.utc).isoformat()),
+        (canvas_item_id, item_type, display_name, canvas_updated_at, hash_, datetime.now(timezone.utc).isoformat()),
     )
     conn.commit()
 

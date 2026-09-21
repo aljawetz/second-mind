@@ -9,6 +9,7 @@ real even though the call itself isn't yet.
 
 from pathlib import Path
 
+from bs4 import BeautifulSoup
 import pdfplumber
 import pytesseract
 from pptx import Presentation
@@ -22,6 +23,17 @@ def needs_fallback(char_count: int, has_image: bool) -> bool:
     being trusted as complete, since the image is more likely load-bearing
     when text alone is modest rather than absent)."""
     return char_count < 100 or (char_count < 400 and has_image)
+
+
+def extract_html_page(html: str) -> str:
+    """Canvas Page body -> plain text. No page/slide concept here (unlike
+    extract_pdf/extract_pptx) — a Canvas Page is one flat document."""
+    if not html.strip():
+        return ""
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup(["script", "style"]):
+        tag.decompose()
+    return soup.get_text(separator=" ", strip=True)
 
 
 def extract_pdf(path: Path) -> list[dict]:

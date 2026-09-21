@@ -24,19 +24,19 @@ def test_diff_new_item(conn):
 
 
 def test_diff_unchanged_item(conn):
-    sync.mark_synced(conn, "1", "page", "2026-01-01", "hash-a")
+    sync.mark_synced(conn, "1", "page", "Test Page", "2026-01-01", "hash-a")
     result = sync.diff(conn, "page", [{"id": "1", "updated_at": "2026-01-01"}])
     assert result == {"new": [], "changed": [], "deleted": [], "unchanged": ["1"]}
 
 
 def test_diff_changed_item(conn):
-    sync.mark_synced(conn, "1", "page", "2026-01-01", "hash-a")
+    sync.mark_synced(conn, "1", "page", "Test Page", "2026-01-01", "hash-a")
     result = sync.diff(conn, "page", [{"id": "1", "updated_at": "2026-01-02"}])
     assert result == {"new": [], "changed": ["1"], "deleted": [], "unchanged": []}
 
 
 def test_diff_deleted_item(conn):
-    sync.mark_synced(conn, "1", "page", "2026-01-01", "hash-a")
+    sync.mark_synced(conn, "1", "page", "Test Page", "2026-01-01", "hash-a")
     result = sync.diff(conn, "page", [])
     assert result == {"new": [], "changed": [], "deleted": ["1"], "unchanged": []}
 
@@ -45,7 +45,7 @@ def test_diff_item_types_are_independent(conn):
     """A page and a file can share the same canvas_item_id namespace-wise
     (schema §4's PRIMARY KEY is (canvas_item_id, item_type)) without
     colliding."""
-    sync.mark_synced(conn, "1", "page", "2026-01-01", "hash-a")
+    sync.mark_synced(conn, "1", "page", "Test Page", "2026-01-01", "hash-a")
     result = sync.diff(conn, "file", [{"id": "1", "updated_at": "2026-01-01"}])
     assert result["new"] == ["1"]  # "1" is new for item_type "file", unrelated to the page row
 
@@ -69,8 +69,8 @@ def test_changed_and_deleted_items_end_to_end(tmp_path):
         nodes = indexing.pages_to_nodes(old_a_pages, "doc_a", "item_a")
         nodes += indexing.pages_to_nodes(old_b_pages, "doc_b", "item_b")
         index = indexing.build_index(nodes, db_path, "course")
-        sync.mark_synced(conn, "item_a", "page", "2026-01-01", sync.content_hash(old_a_pages[0]["text"]))
-        sync.mark_synced(conn, "item_b", "page", "2026-01-01", sync.content_hash(old_b_pages[0]["text"]))
+        sync.mark_synced(conn, "item_a", "page", "Doc A", "2026-01-01", sync.content_hash(old_a_pages[0]["text"]))
+        sync.mark_synced(conn, "item_b", "page", "Doc B", "2026-01-01", sync.content_hash(old_b_pages[0]["text"]))
 
         table = index.vector_store.table
         assert table.count_rows() == 2
@@ -87,7 +87,7 @@ def test_changed_and_deleted_items_end_to_end(tmp_path):
         index.delete_ref_doc("item_a", delete_from_docstore=True)
         for node in indexing.pages_to_nodes(new_a_pages, "doc_a", "item_a"):
             index.insert_nodes([node])
-        sync.mark_synced(conn, "item_a", "page", "2026-01-02", new_hash)
+        sync.mark_synced(conn, "item_a", "page", "Doc A", "2026-01-02", new_hash)
 
         # Process "deleted": remove chunks, drop the manifest row.
         index.delete_ref_doc("item_b", delete_from_docstore=True)

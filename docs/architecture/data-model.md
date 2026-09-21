@@ -114,12 +114,21 @@ One `manifest.db` per course, one row per Canvas item ever seen for that course:
 CREATE TABLE manifest (
   canvas_item_id   TEXT NOT NULL,
   item_type        TEXT NOT NULL,   -- 'page' | 'assignment' | 'announcement' | 'file'
+  display_name     TEXT NOT NULL,   -- the item's human-readable name (file display_name, page title)
   canvas_updated_at TEXT NOT NULL,
   content_hash     TEXT NOT NULL,   -- hash of extracted text, not raw bytes — see rag-pipeline.md
   last_synced_at   TEXT NOT NULL,
   PRIMARY KEY (canvas_item_id, item_type)
 );
 ```
+
+**`canvas_item_id` is type-prefixed**: values are stored as `file:{canvas file id}` and
+`page:{canvas page url}`, never as the bare Canvas id. The same prefixed value is reused verbatim
+as the LanceDB `ref_doc_id` for that item's indexed chunks, which is why the prefix exists at all:
+files and pages share one flat `ref_doc_id` namespace per course's vector table, and a numeric
+file id and a page's URL slug could otherwise theoretically collide. Anything consuming an item id
+downstream (citation click-through, for instance) has to strip the prefix before building a
+Canvas URL from it.
 
 Kept separate from the vector store itself (rather than as extra columns on the LanceDB table) so
 the diff step (§5.5) never needs to touch the vector store at all for unchanged items — it's a
