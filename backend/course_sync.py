@@ -72,7 +72,10 @@ def _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed):
     if is_changed:
         indexing.delete_ref_doc_nodes(db_path, table_name, prefixed_id)
 
-    full = canvas.get_page(course_id, page_summary["url"])
+    # Pages found via Modules or the front page were already fetched in full
+    # (body included) to learn their updated_at; only list_pages summaries,
+    # which never carry a body, need fetching here.
+    full = page_summary if "body" in page_summary else canvas.get_page(course_id, page_summary["url"])
     title = (full or {}).get("title") or page_summary.get("title") or page_summary["url"]
     text = ingestion.extract_html_page((full or {}).get("body") or "")
     # item_type="page": a Canvas wiki page is a flat document, not
@@ -87,6 +90,23 @@ def _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed):
         indexing.add_nodes(nodes, db_path, table_name)
     sync.mark_synced(conn, prefixed_id, "page", title, updated_at, sync.content_hash(text))
     return title
+
+
+def _sync_syllabus(conn, db_path, table_name, course_id, syllabus_html, version, is_changed):
+    prefixed_id = f"syllabus:{course_id}"
+    if is_changed:
+        indexing.delete_ref_doc_nodes(db_path, table_name, prefixed_id)
+
+    text = ingestion.extract_html_page(syllabus_html)
+    # Own item_type so citations.ts can open Canvas's syllabus URL
+    # (/assignments/syllabus), which isn't under /pages/.
+    nodes = indexing.pages_to_nodes(
+        [{"page": None, "text": text, "needs_fallback": False}], "Syllabus", prefixed_id, item_type="syllabus"
+    )
+    if nodes:
+        indexing.add_nodes(nodes, db_path, table_name)
+    sync.mark_synced(conn, prefixed_id, "syllabus", "Syllabus", version, sync.content_hash(text))
+    return "Syllabus"
 
 
 def _deletable(remote_items: list[dict], deleted_ids: list[str], unresolved_ids: set[str]) -> list[str]:
@@ -134,6 +154,8 @@ def sync_course(course_id: int, ssb_home: Path):
     try:
         structure = canvas.get_course_structure(course_id)
         pages_list = canvas.list_pages(course_id)
+        front_page = canvas.get_front_page(course_id)
+        syllabus_html = canvas.get_syllabus(course_id)
     except (canvas.CanvasError, httpx.HTTPStatusError, httpx.TransportError) as e:
         yield {"done": True, "error": str(e)}
         return
@@ -181,23 +203,61 @@ def sync_course(course_id: int, ssb_home: Path):
         file_remote = [
             {"id": f"file:{fid}", "updated_at": meta.get("updated_at", "")} for fid, meta in file_metas.items()
         ]
-        page_remote = [{"id": f"page:{p['url']}", "updated_at": p.get("updated_at", "")} for p in pages_list]
+        # Pages come from three places, merged by url slug. list_pages is
+        # the Pages-tab listing, which 404s for students in most courses
+        # (8 of 10 surveyed) — yet every Page item in those courses' Modules
+        # opened fine individually (211 of 211), and five courses had no
+        # other content at all. Module items carry no updated_at, so each
+        # one is fetched in full here; the body is kept for _sync_page. A
+        # fetch that fails or 404s is unresolved, not deleted — same guard
+        # as files above.
         pages_by_url = {p["url"]: p for p in pages_list}
-        # Pages have no listing-time per-item fetch to fail: canvas.get_page
-        # is only called later, inside _sync_page, for new/changed items. So
-        # the empty-listing guard in _deletable is the only one they need.
+        if front_page and front_page.get("url"):
+            pages_by_url.setdefault(front_page["url"], front_page)
         unresolved_page_ids: set[str] = set()
+        module_page_urls = [
+            item["page_url"] for module in structure for item in module.get("items", [])
+            if item.get("type") == "Page" and item.get("page_url")
+        ]
+        for url in dict.fromkeys(module_page_urls):
+            if url in pages_by_url:
+                continue
+            try:
+                full = canvas.get_page(course_id, url)
+            except Exception as e:
+                failed_count += 1
+                unresolved_page_ids.add(f"page:{url}")
+                yield {"item": url, "status": "failed", "error": str(e)}
+                continue
+            if full is None:
+                unresolved_page_ids.add(f"page:{url}")
+                continue
+            pages_by_url[url] = full
+        page_remote = [{"id": f"page:{url}", "updated_at": p.get("updated_at", "")} for url, p in pages_by_url.items()]
+
+        # The syllabus has no updated_at of its own: its content hash stands
+        # in as the version, so an edit reads as "changed".
+        syllabus_remote = []
+        if syllabus_html and ingestion.extract_html_page(syllabus_html).strip():
+            syllabus_remote = [{"id": f"syllabus:{course_id}", "updated_at": sync.content_hash(syllabus_html)}]
 
         file_diff = sync.diff(conn, "file", file_remote)
         page_diff = sync.diff(conn, "page", page_remote)
+        syllabus_diff = sync.diff(conn, "syllabus", syllabus_remote)
 
         file_deleted = _deletable(file_remote, file_diff["deleted"], unresolved_file_ids)
         page_deleted = _deletable(page_remote, page_diff["deleted"], unresolved_page_ids)
+        # Like the other empty-listing guards: a syllabus that comes back
+        # empty or 403 is never taken as "removed".
+        syllabus_deleted = _deletable(syllabus_remote, syllabus_diff["deleted"], set())
 
         for event in _sync_deleted(conn, db_path, table_name, "file", file_deleted):
             removed_count += 1
             yield event
         for event in _sync_deleted(conn, db_path, table_name, "page", page_deleted):
+            removed_count += 1
+            yield event
+        for event in _sync_deleted(conn, db_path, table_name, "syllabus", syllabus_deleted):
             removed_count += 1
             yield event
 
@@ -226,6 +286,19 @@ def sync_course(course_id: int, ssb_home: Path):
                 except Exception as e:
                     failed_count += 1
                     yield {"item": page_summary.get("title", url), "status": "failed", "error": str(e)}
+
+        for ids, is_changed in ((syllabus_diff["new"], False), (syllabus_diff["changed"], True)):
+            for _ in ids:
+                try:
+                    name = _sync_syllabus(
+                        conn, db_path, table_name, course_id, syllabus_html, syllabus_remote[0]["updated_at"], is_changed
+                    )
+                    yield {"item": name, "status": "done"}
+                    changed_count += is_changed
+                    new_count += not is_changed
+                except Exception as e:
+                    failed_count += 1
+                    yield {"item": "Syllabus", "status": "failed", "error": str(e)}
     except Exception as e:
         yield {"done": True, "error": str(e)}
         return

@@ -126,6 +126,24 @@ def get_page(course_id: int, page_url: str) -> dict | None:
         return r.json() if r else None
 
 
+def get_front_page(course_id: int) -> dict | None:
+    """The course home page, when the course uses a wiki page as its home
+    — a regular page (url slug, body, updated_at), often not in Modules.
+    None (404) for courses whose home is Modules or the syllabus."""
+    with _client() as client:
+        r = _get(client, f"/courses/{course_id}/front_page")
+        return r.json() if r else None
+
+
+def get_syllabus(course_id: int) -> str | None:
+    """syllabus_body HTML — where due dates and grading rules live. Not a
+    wiki page and has no updated_at of its own; course_sync.py diffs it by
+    content hash instead."""
+    with _client() as client:
+        r = _get(client, f"/courses/{course_id}", params={"include[]": "syllabus_body"})
+        return r.json().get("syllabus_body") if r else None
+
+
 def get_course_structure(course_id: int) -> list[dict]:
     """Modules + items — navigation metadata and the file-discovery path
     (list_course_files 403s under a student token; individual files stay

@@ -32,6 +32,11 @@ export async function openCitation(
     return;
   }
   const origin = canvasBaseUrl || "https://canvas.cmu.edu";
+  if (citation.source_type === "syllabus") {
+    // Not a wiki page — Canvas serves it under assignments, not /pages/.
+    await open(`${origin}/courses/${courseId}/assignments/syllabus`);
+    return;
+  }
   if (citation.source_type === "page") {
     const pageUrl = citation.item_id.replace(/^page:/, "");
     await open(`${origin}/courses/${courseId}/pages/${pageUrl}`);

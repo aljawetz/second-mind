@@ -47,6 +47,15 @@ def _manifest_ids(ssb_home, course_id=1):
         conn.close()
 
 
+@pytest.fixture(autouse=True)
+def no_front_page_or_syllabus(monkeypatch):
+    """Every test here stubs canvas per function; these two default to
+    "course has neither" so no test can reach real Canvas through them.
+    Tests about front pages or syllabi override them."""
+    monkeypatch.setattr(course_sync.canvas, "get_front_page", lambda course_id: None)
+    monkeypatch.setattr(course_sync.canvas, "get_syllabus", lambda course_id: None)
+
+
 @pytest.fixture
 def stub_canvas(monkeypatch):
     monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: _structure_with_one_file())
@@ -285,3 +294,152 @@ def test_unsupported_file_extension_is_skipped_not_synced(tmp_path, stub_extract
 
     assert events == [{"done": True, "new": 0, "changed": 0, "removed": 0, "failed": 0}]
     assert "notes.docx" in capsys.readouterr().out
+
+
+# --- Pages from Modules / front page / syllabus -----------------------------
+# Real data behind these: the Pages-tab listing 404s for students in 8 of 10
+# surveyed courses, while every module Page item opened individually (211 of
+# 211) — five courses had no other content, so a sync indexed nothing.
+
+
+def _module_pages(*urls):
+    return [{"items": [{"type": "Page", "page_url": u, "title": u} for u in urls]}]
+
+
+def _full_page(url, updated_at="2026-01-01"):
+    return {"url": url, "title": url.replace("-", " ").title(), "updated_at": updated_at, "body": f"<p>{url}</p>"}
+
+
+@pytest.fixture
+def module_pages_only(monkeypatch):
+    """A course like 55016: pages list 404s (empty), content is Page items
+    in Modules. Returns the list of get_page calls made."""
+    fetched = []
+
+    def get_page(course_id, url):
+        fetched.append(url)
+        return _full_page(url)
+
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: _module_pages("intro", "week-1"))
+    monkeypatch.setattr(course_sync.canvas, "list_pages", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "get_page", get_page)
+    return fetched
+
+
+def test_module_page_items_are_indexed_when_the_pages_list_404s(tmp_path, stub_extraction, module_pages_only):
+    events = run(1, tmp_path)
+
+    assert events[-1] == {"done": True, "new": 2, "changed": 0, "removed": 0, "failed": 0}
+    assert {e["item"] for e in events if e.get("status") == "done"} == {"Intro", "Week 1"}
+    assert _manifest_ids(tmp_path) == {"page:intro", "page:week-1"}
+    # Fetched once each while listing; _sync_page reuses that body.
+    assert module_pages_only == ["intro", "week-1"]
+
+
+def test_unchanged_module_pages_are_not_reindexed(tmp_path, stub_extraction, module_pages_only):
+    run(1, tmp_path)
+    baseline = len(stub_extraction)
+
+    events = run(1, tmp_path)
+
+    assert events == [{"done": True, "new": 0, "changed": 0, "removed": 0, "failed": 0}]
+    assert stub_extraction[baseline:] == []
+
+
+def test_an_edited_module_page_is_resynced(tmp_path, stub_extraction, module_pages_only, monkeypatch):
+    run(1, tmp_path)
+    baseline = len(stub_extraction)
+    monkeypatch.setattr(
+        course_sync.canvas, "get_page", lambda course_id, url: _full_page(url, "2026-02-01" if url == "intro" else "2026-01-01")
+    )
+
+    events = run(1, tmp_path)
+
+    assert events[-1] == {"done": True, "new": 0, "changed": 1, "removed": 0, "failed": 0}
+    assert [c for c in stub_extraction[baseline:] if c[0] == "delete"] == [("delete", "course_1", "page:intro")]
+
+
+def test_a_page_in_both_the_pages_list_and_modules_is_indexed_once(tmp_path, stub_extraction, monkeypatch):
+    fetched = []
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: _module_pages(PAGE_SUMMARY["url"]))
+    monkeypatch.setattr(course_sync.canvas, "list_pages", lambda course_id: [dict(PAGE_SUMMARY)])
+    monkeypatch.setattr(
+        course_sync.canvas, "get_page", lambda course_id, url: fetched.append(url) or {"title": "Week 1 Overview", "body": "<p>x</p>"}
+    )
+
+    events = run(1, tmp_path)
+
+    assert events[-1]["new"] == 1
+    assert _manifest_ids(tmp_path) == {"page:week-1-overview"}
+    assert fetched == ["week-1-overview"]  # only _sync_page's fetch — a listed summary has no body
+
+
+def test_the_front_page_is_indexed_and_deduped_with_modules(tmp_path, stub_extraction, module_pages_only, monkeypatch):
+    monkeypatch.setattr(course_sync.canvas, "get_front_page", lambda course_id: _full_page("welcome"))
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: _module_pages("welcome", "week-1"))
+
+    events = run(1, tmp_path)
+
+    assert events[-1]["new"] == 2
+    assert _manifest_ids(tmp_path) == {"page:welcome", "page:week-1"}
+    assert module_pages_only == ["week-1"]  # the front page body was already in hand
+
+
+def test_a_module_page_that_404s_is_not_deleted(tmp_path, stub_extraction, module_pages_only, monkeypatch):
+    run(1, tmp_path)
+    baseline = len(stub_extraction)
+    monkeypatch.setattr(course_sync.canvas, "get_page", lambda course_id, url: None if url == "intro" else _full_page(url))
+
+    events = run(1, tmp_path)
+
+    assert events[-1] == {"done": True, "new": 0, "changed": 0, "removed": 0, "failed": 0}
+    assert [c for c in stub_extraction[baseline:] if c[0] == "delete"] == []
+    assert _manifest_ids(tmp_path) == {"page:intro", "page:week-1"}
+
+
+def test_a_module_page_fetch_error_fails_that_page_only(tmp_path, stub_extraction, module_pages_only, monkeypatch):
+    run(1, tmp_path)
+
+    def get_page(course_id, url):
+        if url == "intro":
+            raise RuntimeError("handshake timed out")
+        return _full_page(url, "2026-02-01")
+
+    monkeypatch.setattr(course_sync.canvas, "get_page", get_page)
+    events = run(1, tmp_path)
+
+    assert events[-1] == {"done": True, "new": 0, "changed": 1, "removed": 0, "failed": 1}
+    assert {"item": "intro", "status": "failed", "error": "handshake timed out"} in events
+    assert _manifest_ids(tmp_path) == {"page:intro", "page:week-1"}
+
+
+def test_syllabus_is_indexed_then_resynced_only_when_it_changes(tmp_path, stub_extraction, monkeypatch):
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_pages", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "get_syllabus", lambda course_id: "<p>Midterm is Oct 10.</p>")
+
+    first = run(1, tmp_path)
+    second = run(1, tmp_path)
+    baseline = len(stub_extraction)
+    monkeypatch.setattr(course_sync.canvas, "get_syllabus", lambda course_id: "<p>Midterm moved to Oct 17.</p>")
+    third = run(1, tmp_path)
+
+    assert first[-1]["new"] == 1 and {"item": "Syllabus", "status": "done"} in first
+    assert second == [{"done": True, "new": 0, "changed": 0, "removed": 0, "failed": 0}]
+    assert third[-1] == {"done": True, "new": 0, "changed": 1, "removed": 0, "failed": 0}
+    assert [c for c in stub_extraction[baseline:] if c[0] == "delete"] == [("delete", "course_1", "syllabus:1")]
+    assert _manifest_ids(tmp_path) == {"syllabus:1"}
+
+
+def test_empty_or_unavailable_syllabus_is_skipped_and_never_deletes(tmp_path, stub_extraction, monkeypatch):
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_pages", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "get_syllabus", lambda course_id: "<p>Office hours: Tue.</p>")
+    run(1, tmp_path)
+
+    for unavailable in (None, "", "<p> </p>"):
+        monkeypatch.setattr(course_sync.canvas, "get_syllabus", lambda course_id, v=unavailable: v)
+        monkeypatch.setattr(course_sync.ingestion, "extract_html_page", lambda html: (html or "").replace("<p>", "").replace("</p>", ""))
+        events = run(1, tmp_path)
+        assert events == [{"done": True, "new": 0, "changed": 0, "removed": 0, "failed": 0}]
+    assert _manifest_ids(tmp_path) == {"syllabus:1"}
