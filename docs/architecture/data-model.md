@@ -113,7 +113,7 @@ One `manifest.db` per course, one row per Canvas item ever seen for that course:
 ```sql
 CREATE TABLE manifest (
   canvas_item_id   TEXT NOT NULL,
-  item_type        TEXT NOT NULL,   -- 'page' | 'assignment' | 'announcement' | 'file'
+  item_type        TEXT NOT NULL,   -- 'file' | 'page' | 'syllabus' | 'assignment'
   display_name     TEXT NOT NULL,   -- the item's human-readable name (file display_name, page title)
   canvas_updated_at TEXT NOT NULL,
   content_hash     TEXT NOT NULL,   -- hash of extracted text, not raw bytes — see rag-pipeline.md
@@ -122,13 +122,22 @@ CREATE TABLE manifest (
 );
 ```
 
-**`canvas_item_id` is type-prefixed**: values are stored as `file:{canvas file id}` and
-`page:{canvas page url}`, never as the bare Canvas id. The same prefixed value is reused verbatim
-as the LanceDB `ref_doc_id` for that item's indexed chunks, which is why the prefix exists at all:
-files and pages share one flat `ref_doc_id` namespace per course's vector table, and a numeric
-file id and a page's URL slug could otherwise theoretically collide. Anything consuming an item id
-downstream (citation click-through, for instance) has to strip the prefix before building a
-Canvas URL from it.
+**`canvas_item_id` is type-prefixed**: values are stored as `file:{canvas file id}`,
+`page:{canvas page url}`, `assignment:{canvas assignment id}`, and `syllabus:{course id}` (one per
+course), never as the bare Canvas id. The same prefixed value is reused verbatim as the LanceDB
+`ref_doc_id` for that item's indexed chunks, which is why the prefix exists at all: every item type
+shares one flat `ref_doc_id` namespace per course's vector table, and a numeric file id and an
+assignment id could otherwise collide. Anything consuming an item id downstream (citation
+click-through, for instance) has to strip the prefix before building a Canvas URL from it.
+
+**The syllabus has no Canvas `updated_at`**, so its `canvas_updated_at` column holds a content hash
+of the syllabus HTML instead; an edit changes the hash and reads as "changed" in the diff.
+
+**Each course's LanceDB table has a fixed schema** (`indexing.TABLE_SCHEMA`: `page`/`slide` int64,
+`timestamp` string), created empty before the first write. Tables are no longer typed by inference
+from their first batch, which once locked a lecture-first course's `page` column to type null and
+made it reject every PDF. Tables built before that are repaired in place on their next write
+(`indexing.repair_table_schema`).
 
 Kept separate from the vector store itself (rather than as extra columns on the LanceDB table) so
 the diff step (§5.5) never needs to touch the vector store at all for unchanged items — it's a

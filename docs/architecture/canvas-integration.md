@@ -24,7 +24,7 @@ access restriction in §2 below.
 | --- | --- | --- |
 | `list_course_files` (the Files-tab listing endpoint) 403s under a student token | Sprint 3 PoC, course 56350 | Files are still reachable individually through module items (`get_course_structure` → items of type `File` → fetch by `content_id`) even when the bulk listing endpoint is blocked |
 | Privileged assignment fields (`assignment_visibility`, `overrides`) 403 | Original Sprint 3 Onyx-era finding | Don't request them; they're instructor-only fields with no student-facing equivalent needed |
-| Disabled Pages tabs 404 the whole course's page listing | Original Sprint 3 finding | Treat a 404 on one content type as "this course doesn't expose that type," not a fatal ingestion error — degrade to the content types that did resolve |
+| Disabled Pages tabs 404 the whole course's page listing | Original Sprint 3 finding; re-surveyed across 10 real courses: the listing 404'd in 8 | The pages themselves still open one by one: sync reads Page items from Modules (by `page_url`) and the front page, merged with the listing when it works. All 211 of 211 module Page items in the survey opened; five courses had no other content and indexed nothing before this |
 | No calendar/schedule endpoint is exposed at all | Checked directly this sprint, course 56350 | Not worked around — this is why §9.1 makes manual schedule entry the primary path, not a fallback |
 | `get_course_structure` itself can 403 for an entire course/section, not just the Files listing | Checked directly this sprint — one of two Canvas IDs for the same nominal course (18654-SV) 403'd on this call entirely, the other didn't | Degrade per-endpoint, not just per-item: a course whose module/file tree is blocked should still sync via its assignment and page listings, which are separate calls |
 
@@ -66,8 +66,11 @@ against a real course before being assumed to work.
 
 Each course sync:
 
-1. Pull the current listing (ID + `updated_at`) for pages, assignments, announcements, and the
-   module/file tree — a handful of calls, metadata only.
+1. Pull the current listing (ID + `updated_at`) for pages, assignments, the syllabus, and the
+   module/file tree — a handful of calls, metadata only. Two exceptions: Page items found only in
+   Modules carry no `updated_at`, so each is fetched in full while listing (its body is reused for
+   indexing), and the syllabus has no `updated_at` at all, so its content hash stands in.
+   Announcements aren't synced.
 2. Diff against `manifest.db` for that course ([data-model.md](data-model.md) §4) — new / changed /
    deleted / unchanged, exactly as specified in §5.5.
 3. For **new** and **changed** items only, fetch full content and run it through ingestion.
@@ -82,3 +85,7 @@ small number of requests and won't come close to any limit — but the sync engi
 off and retry on a 403/429 rather than hammering the API in a tight loop, both because it's the
 respectful default and because a single misbehaving student install shouldn't be able to look like
 abuse traffic against a shared institutional Canvas instance.
+
+`canvas._get` and `canvas.download` also retry transport errors and 5xx responses, up to three
+attempts with backoff: a real sync lost a file to one `_ssl.c: The handshake operation timed out`
+on a metadata fetch that succeeded moments later. A 403/404 is never retried.

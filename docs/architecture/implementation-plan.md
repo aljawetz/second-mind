@@ -742,6 +742,33 @@ it. The "clean machine, no dev tooling" test above is real and still the bar, ju
 unsigned `.dmg` for now — a first install needs the Gatekeeper bypass (right-click → Open), not a
 seamless double-click, until this step's other half lands.
 
+### 15. Hardening from first real use
+**Owner:** Arthur.
+**Do:** Fix what broke once the app ran daily against three real courses: a sync that reported
+"sync failed", two courses with no Canvas material indexed, and a backend that took ~35s to start.
+**Test:** `tests/test_main_lifecycle.py`, `tests/test_index_schema.py`,
+`tests/test_explain_pointers.py`, and the page/syllabus/assignment cases in
+`tests/test_course_sync.py`, each written to fail against the code it fixes; then real re-syncs
+of all three courses with zero failures, and timed launches of the packaged `.app`.
+**Real findings:**
+- **The backend outlived the app.** `lib.rs` dropped the sidecar handle right after spawning it, so
+  every quit left `ssb-backend` holding port 8756; the next launch's backend died with "Address
+  already in use" and the app talked to the stale one. Fixed with stdin-EOF exit plus a per-launch
+  instance token (overview.md §1). A first version of the EOF exit still hung in the real app:
+  flushing course_sync's buffered stdout into the closed pipe raised `BrokenPipeError` before
+  `os._exit` ran. Only reproduced once the test also left unflushed stdout behind.
+- **Column types locked to null** made lecture-first courses reject every PDF
+  (rag-pipeline.md §6). 18654-SV went from 28 of 29 PDFs failing to all 29 indexed, with its 23
+  existing transcript chunks kept.
+- **The Pages listing 404s for students in 8 of 10 courses**, but module Page items open
+  (canvas-integration.md §2). 18658-SV went from 1 indexed chunk to 45.
+- **The launch sync discarded its own events**, so per-item failures never reached the UI; only
+  an HTTP-level failure did.
+- **Single-file PyInstaller cost ~35s on every launch** (unpack + macOS rescan); onedir starts in
+  ~2s after its first launch (overview.md §3).
+- **Indexing assignment descriptions broke Explain's pointers** until they filtered assignments
+  out: the pointer query is the assignment's own text, so its indexed copy always ranked first.
+
 ## What this plan deliberately leaves open
 
 - **Generation faithfulness verification** (does the LLM's answer stay faithful to its cited

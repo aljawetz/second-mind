@@ -51,6 +51,12 @@ awkwardly, Tauri's Rust shell manages a bundled Python backend as a sidecar proc
 stopped with the app — the student never sees "Python," they see one app icon. The backend binds
 to loopback (`127.0.0.1`) only; nothing about this port is reachable from outside the machine.
 
+**How "stopped with the app" is enforced.** The app holds the write end of the backend's stdin for
+as long as it runs, and the backend exits on EOF, which covers quit, crash, and force quit alike.
+Each launch also passes a random instance token that `/ping` echoes; the startup screen refuses a
+backend with the wrong token. Both exist because, before them, a quit left the backend running on
+port 8756 and the next launch silently talked to that stale process.
+
 **Why not a plugin/library architecture instead of an HTTP boundary between frontend and backend:**
 a process boundary keeps a Python crash (a bad PDF, a flaky embedding call) from taking the UI down
 with it, and keeps the interface between UI and logic explicit and testable independently — the
@@ -73,7 +79,7 @@ synced/stored. Courses with no name (some real accounts have these) are filtered
 ```
 Request:  { "question": string }
 Response: { "answer": string,
-            "citations": [ { "source_type": "page"|"file"|"transcript"|"notes",
+            "citations": [ { "source_type": "page"|"file"|"syllabus"|"assignment"|"transcript"|"notes",
                               "label": string,        // e.g. "Lecture 6 · 14:22"
                               "item_id": string } ],
             "grounded": boolean }     // false when nothing relevant was retrieved (§7)
@@ -151,9 +157,12 @@ textarea loses focus, not on every keystroke.
 ### `POST /courses/{course_id}/sync`
 Streamed (chunked NDJSON, same shape as `/ask`) — one line per Canvas item as it's processed, so
 the frontend can show real per-item progress instead of a spinner with no feedback. Covers Canvas
-Files (`.pdf`/`.pptx` only) and Canvas Pages; incremental via `sync.py`'s manifest diff, so an
-unchanged item is skipped entirely. Triggered explicitly (onboarding's indexing step, and later a
-manual re-sync action) — not an automatic background sync on every app launch.
+Files (`.pdf`/`.pptx` only, found through module items), Canvas Pages (merged from the Pages
+listing, Page items in Modules, and the front page: the listing alone 404s for students in most
+courses), the syllabus, and assignment descriptions. Incremental via `sync.py`'s manifest diff, so
+an unchanged item is skipped entirely. Runs from onboarding's indexing step, when a course is added
+from Manage Courses, and once per app launch for every selected course; the launch sync's per-item
+failures surface in the top bar (count in the pill, each item and reason on hover).
 ```
 Response (chunked NDJSON):
   {"item": string, "status": "done"} |
@@ -219,9 +228,14 @@ knows or cares that LanceDB is the concrete store.
 
 ## 3. Deployment
 
-**Packaging.** A single Tauri `.app` bundle for macOS. The Python backend is frozen into a
-standalone binary (e.g. PyInstaller) and bundled as a Tauri sidecar — the student installs one
-app, never a Python environment, never `pip install` anything themselves.
+**Packaging.** A single Tauri `.app` bundle for macOS. The Python backend is frozen with
+PyInstaller into a folder (an executable plus `_internal/`) at `Contents/Resources/ssb-backend/` —
+the student installs one app, never a Python environment, never `pip install` anything themselves.
+A folder, not a single file: the single-file build unpacked ~900 MB to a fresh temp dir on every
+launch and macOS rescanned it each time (~35s to first `/ping`, every launch, vs ~2s). Tauri can't
+bundle that folder itself (`externalBin` takes one file; its resource copier fails on the folder's
+symlinks), so `scripts/package-macos.sh` copies it into the `.app` after `tauri build`, then
+re-signs the bundle.
 
 **Keeping torch out of the shipped bundle is a real, verified constraint on this, not a nice-to-have.**
 PyInstaller bundling torch is a confirmed, widely-reported problem (3–5GB executables, a

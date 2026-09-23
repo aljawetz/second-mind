@@ -202,6 +202,16 @@ node-creation function (`pages_to_nodes`, `slides_to_nodes`, `transcript_to_node
 omitted — a schema-compatibility constraint from the storage layer, not a design preference, and
 the reason every node in this pipeline carries keys it doesn't use.
 
+**Consistent keys weren't enough: LanceDB also inferred each column's type from the first batch.**
+A key that's `None` in every node of a table's first write became type null for good. A course
+whose first write was a recorded lecture (`page=None`) then rejected every PDF with "cannot cast
+field 'page' from Int64 to Null"; a PDF-first course rejected transcripts and pptx slides. Two of
+three real courses had no Canvas files indexed because of it. Fixed by creating each table empty
+with an explicit schema (`indexing.TABLE_SCHEMA`) before the first write, and by repairing older
+tables on their next write (`indexing.repair_table_schema`: rows are read back, null-typed or
+missing fields cast or filled, table overwritten; nothing is re-embedded, and LanceDB keeps the
+previous version).
+
 ## 7. Study artifacts and the assignment explainer
 
 Both reuse this same retrieval-then-generate shape, not a separate pipeline:

@@ -129,6 +129,10 @@ an empty, executable placeholder at that exact path before `cargo check` — pre
 functional, which is all a compile-only check needs. Backend and frontend jobs passed on the real
 first run; the `rust` job passed after this fix, confirmed on a second real run.
 
+*Later:* the stub is gone. The backend now ships as a PyInstaller onedir folder placed by
+`scripts/package-macos.sh`, not an `externalBin`, so there's no resource path for `cargo check` to
+validate (see [overview.md](overview.md) §3).
+
 ## 6. Repo hygiene — done
 
 **Do:** `.github/ISSUE_TEMPLATE/bug_report.md` and `feature_request.md`, plus
