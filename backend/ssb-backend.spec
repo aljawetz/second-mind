@@ -3,8 +3,8 @@
 # by the default flag once this backend grows beyond stdlib. Trivial today, same
 # pipeline reused when LlamaIndex/onnxruntime/faster-whisper are added.
 #
-# Output name matches Tauri's <name>-<target-triple> sidecar convention directly,
-# so no manual rename step is needed after building.
+# Output is a folder (see the onedir note at the bottom), copied as-is to
+# app/src-tauri/binaries/ssb-backend/.
 #
 # BUILD FROM `uv sync --group build`, NEVER a plain `uv sync`. PyInstaller
 # bundles whatever's importable in the venv it runs from, not just what
@@ -34,17 +34,22 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
+# onedir, not onefile: a onefile build unpacked its ~900 MB payload into a
+# fresh temp dir on every launch, and macOS then scanned every newly written
+# dylib — measured 34.5s to first /ping on a repeat launch, vs 2.2s for this
+# layout (both pay a one-time ~35s scan on a never-seen build). The output
+# is dist/ssb-backend/ (the executable plus _internal/), shipped as a Tauri
+# bundle resource rather than an externalBin, which only takes one file.
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
-    name="ssb-backend-aarch64-apple-darwin",
+    exclude_binaries=True,
+    name="ssb-backend",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
     console=True,
-    onefile=True,
 )
+coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="ssb-backend")

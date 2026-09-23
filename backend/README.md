@@ -12,7 +12,8 @@ uv sync --all-groups
 ```
 
 Installs everything: runtime deps, tests, build tooling, and the one-time model-conversion tools.
-Fine for day-to-day dev. **Don't use this to build the shipping binary** — see below.
+Fine for day-to-day dev. The app's backend build never uses this venv; it has its own (see
+"Building the backend for the app" below), so syncing here can't leak anything into the binary.
 
 ### Dependency groups aren't additive across separate `uv sync` calls
 
@@ -136,25 +137,27 @@ a `ThreadingHTTPServer` so it doesn't block other requests while streaming (impl
 Step 9). A course with no index yet doesn't error — it returns the same shape with
 `grounded: false` and the real not-covered copy, same as a genuinely off-topic query.
 
-## Building the sidecar binary
+## Building the backend for the app
 
 ```bash
-uv sync --group build
-uv run --group build pyinstaller ssb-backend.spec --distpath dist --workpath build
+./scripts/build_sidecar.sh
 ```
 
-**Must be `--group build` alone, never `--all-groups` or a plain `uv sync`.** PyInstaller bundles
-whatever's importable in the venv it's run from, not just what `main.py` actually reaches — an
-environment that also has `convert` installed (`optimum`, needed only for the ONNX conversion
-above) silently bundled real `torch` submodules into the shipped binary once, confirmed by
-checking the build's own analysis output:
+Builds with PyInstaller and installs the result at `app/src-tauri/binaries/ssb-backend/`, where
+`npm run tauri dev` runs it from. Rerun it after changing backend code you want to see in the app.
+
+It builds from its own venv, `backend/.venv-build`, holding only the main deps plus the `build`
+group, so your everyday `.venv` stays free for tests and conversion tools. That split matters:
+PyInstaller bundles whatever's importable in the venv it runs from, not just what `main.py`
+reaches, and an environment that also had `convert` installed (`optimum`) once shipped real
+`torch` submodules in the binary. The script fails the build if any torch module was bundled.
+
+The output is a folder, not a single file (PyInstaller "onedir"): the single-file build unpacked
+~900 MB to a fresh temp dir on every launch, and macOS rescanned it each time, so the backend took
+~35s to answer on every launch instead of ~2s. Tauri can't bundle that folder itself (see
+`scripts/package-macos.sh` at the repo root), so a release is packaged in two steps:
 
 ```bash
-grep -c "^  ('torch\." build/ssb-backend/Analysis-00.toc   # must print 0
-```
-
-Copy the result into the Tauri bundle:
-
-```bash
-cp dist/ssb-backend-aarch64-apple-darwin ../app/src-tauri/binaries/
+cd ../app && npm run tauri build -- --bundles app
+cd .. && ./scripts/package-macos.sh   # adds the backend, re-signs, builds the .dmg
 ```

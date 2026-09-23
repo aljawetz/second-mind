@@ -70,15 +70,33 @@ pub fn run() {
             // Spawn the Python backend when the app starts, started/stopped
             // with the app (overview.md §1; stopping is the Backend state
             // above). Stdout/stderr are logged, not wired to the frontend.
+            //
+            // It's a PyInstaller onedir build (backend/ssb-backend.spec says
+            // why: ~2s startup instead of ~35s) — a folder, so not an
+            // externalBin/sidecar, which can only be a single file. Nor a
+            // tauri.conf.json resource: Tauri's resource copier fails on the
+            // folder's symlinks ("Not a directory (os error 20)"), and
+            // flattening them would duplicate ~160 MB of dylibs and risk
+            // loading one library twice. So: dev runs it in place from
+            // binaries/, and a release gets it copied into
+            // Contents/Resources/ by scripts/package-macos.sh (ditto keeps
+            // the symlinks) before the bundle is re-signed.
+            #[cfg(debug_assertions)]
+            let backend_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("binaries/ssb-backend/ssb-backend");
+            #[cfg(not(debug_assertions))]
+            let backend_path = app
+                .path()
+                .resource_dir()
+                .expect("failed to resolve the app's resource directory")
+                .join("ssb-backend/ssb-backend");
             let instance_token = new_instance_token();
             let (mut rx, child) = app
                 .shell()
-                .sidecar("ssb-backend")
-                .expect("failed to create sidecar command")
+                .command(backend_path)
                 .env("SSB_INSTANCE_TOKEN", &instance_token)
                 .env("SSB_EXIT_ON_STDIN_EOF", "1")
                 .spawn()
-                .expect("failed to spawn ssb-backend sidecar");
+                .expect("failed to spawn ssb-backend");
             app.manage(Backend {
                 _child: child,
                 instance_token,

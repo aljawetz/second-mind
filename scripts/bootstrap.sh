@@ -38,6 +38,10 @@ uv run python3 scripts/fetch_whisper_model.py
 echo "==> Backend: running the test suite to confirm the environment is sound"
 uv run pytest tests/ -q
 
+# After the model steps: the spec bundles both models into the build.
+echo "==> Backend: building it for the app (PyInstaller, in its own .venv-build)"
+./scripts/build_sidecar.sh
+
 echo "==> Frontend: installing npm dependencies"
 cd "$repo_root/app"
 npm install
@@ -49,7 +53,7 @@ cat <<'EOF'
     cd app
     PATH="$HOME/.cargo/bin:$PATH" npm run tauri dev
 
-First launch of a freshly built binary can take a few minutes while macOS
-Gatekeeper scans it (implementation-plan.md step 1) — this is expected, not
-a hang.
+The first launch after a fresh backend build takes ~35s while macOS scans
+the new files; later launches start in ~2s. Rerun backend/scripts/build_sidecar.sh
+after changing backend code you want to see in the app.
 EOF

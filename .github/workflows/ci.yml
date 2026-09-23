@@ -83,19 +83,6 @@ jobs:
         working-directory: app
         run: npm run build
 
-      - name: Stub the sidecar binary
-        # Tauri's build.rs validates that every externalBin resource exists
-        # on disk before it'll even `cargo check` — real finding, this
-        # failed on the first real CI run without it. The PyInstaller
-        # binary itself is gitignored and only produced by the (much
-        # heavier) release build, step 5 of contribution-and-distribution-
-        # plan.md; a plain type-check doesn't need it to be functional,
-        # just present.
-        run: |
-          mkdir -p app/src-tauri/binaries
-          touch app/src-tauri/binaries/ssb-backend-aarch64-apple-darwin
-          chmod +x app/src-tauri/binaries/ssb-backend-aarch64-apple-darwin
-
       - name: cargo check
         working-directory: app/src-tauri
         run: cargo check

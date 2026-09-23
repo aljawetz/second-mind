@@ -57,44 +57,24 @@ jobs:
         working-directory: backend
         run: uv run python3 scripts/fetch_whisper_model.py
 
-      - name: Build the sidecar binary
+      - name: Build the backend
         working-directory: backend
-        run: |
-          uv sync --group build
-          uv run --group build pyinstaller ssb-backend.spec --distpath dist --workpath build
+        run: ./scripts/build_sidecar.sh
 
       - name: Install frontend dependencies
         working-directory: app
         run: npm ci
 
-      - name: Copy sidecar into the Tauri bundle
-        run: |
-          mkdir -p app/src-tauri/binaries
-          cp backend/dist/ssb-backend-aarch64-apple-darwin app/src-tauri/binaries/ssb-backend-aarch64-apple-darwin
-
-      - name: Build the Tauri app (.dmg)
+      - name: Build the Tauri app (.app)
         working-directory: app
-        run: npm run tauri build
+        run: npm run tauri build -- --bundles app
 
-      # Real bug found in v0.1.0: Tauri's bundler never re-signs the
-      # assembled .app after copying in Contents/Resources (icon.icns) --
-      # the only signature present is the Rust linker's automatic ad-hoc
-      # signature from compile time, whose CodeDirectory claims resources
-      # are sealed when no _CodeSignature dir actually exists. That
-      # mismatch is exactly what macOS reports as "SSB is damaged and
-      # can't be opened" -- not a Gatekeeper false positive, an actually
-      # invalid signature on the shipped bundle. Fix: ad-hoc re-sign the
-      # finished bundle, then rebuild the .dmg from the corrected .app
-      # instead of trusting Tauri's already-broken .dmg output.
-      - name: Fix the code signature and repackage the .dmg
-        working-directory: app
-        run: |
-          APP="src-tauri/target/release/bundle/macos/SSB.app"
-          DMG_DIR="src-tauri/target/release/bundle/dmg"
-          codesign --force --deep --sign - "$APP"
-          codesign --verify --deep --strict --verbose=4 "$APP"
-          rm -f "$DMG_DIR"/*.dmg
-          hdiutil create -volname SSB -srcfolder "$APP" -ov -format UDZO "$DMG_DIR/SSB.dmg"
+      # Copies the onedir backend into Contents/Resources (Tauri can't
+      # bundle a folder with symlinks itself), ad-hoc re-signs the finished
+      # bundle (the v0.1.0 "SSB is damaged" signature bug), and builds the
+      # .dmg from the corrected .app. The script documents each step.
+      - name: Add the backend, fix the code signature, build the .dmg
+        run: ./scripts/package-macos.sh
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
