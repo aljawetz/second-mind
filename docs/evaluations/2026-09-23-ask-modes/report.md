@@ -6,7 +6,25 @@ Model: gpt-4o-mini for every option
 Script: `backend/scripts/ask_modes_eval.py` (`--set first` or `--set heldout`)
 Grades: `heldout-grades.json`, `shipped-grades.json` (this folder). The raw answers aren't in git: they quote course material, including staff names and emails. Rerun the script to regenerate them (it writes them to this folder, where `.gitignore` keeps them local).
 
-## Final result: the shipped version (read this first)
+## Update: indexing fix (2026-09-23, later)
+
+The "Still wrong" item below is fixed. The slide text was never unreadable: OCR was overwriting
+the PDF's correct text, and the syllabus grading table sat past the embedding model's 512-token
+window. After fixing both and re-indexing, graded blind against the previous run:
+
+| | Before | After |
+|---|---|---|
+| Good, first set (of 34) | 29 | **32** |
+| Bad, first set | 4 | **0** |
+| Good, held-out set (of 33) | 29 | 28 |
+
+"Which part is worth the most?" now gets the real weights in 3 of 3 runs, and "And the final?" gets
+December 2nd in 3 of 3. The one held-out loss ("How recent should papers be?") is a page whose
+score moved from ~0.52 to 0.494, under the 0.5 similarity cutoff: a cutoff problem, not an
+extraction one. (The "before" first-set count is 29 here and 28 in the table below: the same
+answers graded twice, one call apart.) Grades: `reindexed-grades.json`.
+
+## Final result: the shipped version
 
 Option D was built into the app (`backend/chat.py`) with the fixes this report asked for, plus two
 more found while testing it. It was then run through both question sets and graded blind again
