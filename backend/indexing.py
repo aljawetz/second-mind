@@ -196,9 +196,6 @@ TABLE_SCHEMA = pa.schema(
 )
 
 
-def _field_types(struct_type: pa.StructType) -> list[tuple[str, pa.DataType]]:
-    return [(f.name, f.type) for f in struct_type]
-
 
 class _PatchedLanceDBVectorStore(LanceDBVectorStore):
     """llama-index-vector-stores-lancedb 0.6.0's delete(), delete_nodes(),
@@ -294,51 +291,11 @@ def add_nodes(nodes: list[TextNode], db_path: Path, table_name: str) -> None:
     yet at all (a session recorded before any Canvas sync), so this can't
     assume load_index's table already exists the way /ask and /explain do."""
     if index_exists(db_path, table_name):
-        repair_table_schema(db_path, table_name)
         index = load_index(db_path, table_name)
         index.insert_nodes(nodes)
         ensure_fts_index(index.vector_store.table)
     else:
         build_index(nodes, db_path, table_name)
-
-
-def repair_table_schema(db_path: Path, table_name: str) -> bool:
-    """Rewrites a table created before TABLE_SCHEMA existed, whose metadata
-    columns got locked to type null (or are missing, for tables older than
-    _metadata()'s full key set), so the next insert can succeed. Returns
-    whether a rewrite happened.
-
-    Nothing is re-embedded or re-extracted: rows are read back, the metadata
-    struct is rebuilt field by field (a null-typed column casts losslessly
-    to any type — every value in it is null), and the table is overwritten.
-    LanceDB's overwrite commits a new version and keeps the old one, so a
-    crash mid-rewrite leaves the previous version intact. Runs on the write
-    path (add_nodes), so an installed app heals each course the next time
-    anything is indexed into it — no separate migration step."""
-    db = lancedb.connect(str(db_path))
-    table = db.open_table(table_name)
-    current = table.schema.field("metadata").type
-    if _field_types(current) == _field_types(_METADATA_TYPE):
-        return False
-    unknown = {f.name for f in current} - {f.name for f in _METADATA_TYPE}
-    if unknown:
-        # Would be dropped by the rewrite — refuse rather than lose data.
-        raise ValueError(f"{table_name} has metadata fields TABLE_SCHEMA doesn't know: {sorted(unknown)}")
-
-    data = table.to_arrow()
-    old_metadata = data.column("metadata").combine_chunks()
-    children = [
-        old_metadata.field(f.name).cast(f.type)
-        if current.get_field_index(f.name) != -1
-        else pa.nulls(len(old_metadata), f.type)
-        for f in _METADATA_TYPE
-    ]
-    metadata = pa.StructArray.from_arrays(children, fields=list(_METADATA_TYPE))
-    columns = [data.column(f.name).cast(f.type) for f in TABLE_SCHEMA if f.name != "metadata"] + [metadata]
-    repaired = pa.Table.from_arrays(columns, schema=TABLE_SCHEMA)
-
-    ensure_fts_index(db.create_table(table_name, repaired, mode="overwrite"))
-    return True
 
 
 def delete_ref_doc_nodes(db_path: Path, table_name: str, ref_doc_id: str) -> None:

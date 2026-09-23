@@ -24,48 +24,6 @@ fn set_credential(key: String, value: String) -> Result<(), String> {
     entry.set_password(&value).map_err(|e| e.to_string())
 }
 
-// The app was called SSB before it became Second Mind, and its Keychain
-// items live under this service. The data-folder half of the rename is
-// moved by the backend (config.py's migrate_legacy_home).
-const LEGACY_CREDENTIAL_SERVICE: &str = "com.ssb.app";
-const CREDENTIAL_KEYS: [&str; 2] = ["canvas-token", "openai-key"];
-
-// Copies each pre-rename credential to CREDENTIAL_SERVICE so nobody has to
-// re-enter keys. Runs before the backend starts, since the backend reads
-// the new service directly. Never overwrites an entry the renamed app
-// already has, and deletes the old one only after reading the copy back
-// intact. Failures are logged, not fatal: the worst case is onboarding
-// asking for the key again, which is how a fresh install behaves anyway.
-fn migrate_legacy_credentials() {
-    use keyring::v1::{Entry, Error};
-    for key in CREDENTIAL_KEYS {
-        let result = (|| -> Result<bool, Error> {
-            let new = Entry::new(CREDENTIAL_SERVICE, key)?;
-            match new.get_password() {
-                Ok(_) => return Ok(false),
-                Err(Error::NoEntry) => {}
-                Err(e) => return Err(e),
-            }
-            let old = Entry::new(LEGACY_CREDENTIAL_SERVICE, key)?;
-            let value = match old.get_password() {
-                Ok(value) => value,
-                Err(Error::NoEntry) => return Ok(false),
-                Err(e) => return Err(e),
-            };
-            new.set_password(&value)?;
-            if new.get_password()? == value {
-                old.delete_credential()?;
-            }
-            Ok(true)
-        })();
-        match result {
-            Ok(true) => eprintln!("[credentials] moved '{key}' from {LEGACY_CREDENTIAL_SERVICE} to {CREDENTIAL_SERVICE}"),
-            Ok(false) => {}
-            Err(e) => eprintln!("[credentials] couldn't migrate '{key}' from {LEGACY_CREDENTIAL_SERVICE}: {e}"),
-        }
-    }
-}
-
 // Held for the app's whole lifetime. Dropping the CommandChild closes the
 // write end of the backend's stdin, which the backend treats as "the app
 // is gone" and exits (main.py's _exit_when_app_closes) — so the child
@@ -109,8 +67,6 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            migrate_legacy_credentials();
-
             // Spawn the Python backend when the app starts, started/stopped
             // with the app (overview.md §1; stopping is the Backend state
             // above). Stdout/stderr are logged, not wired to the frontend.

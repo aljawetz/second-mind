@@ -13,23 +13,6 @@ import keyring
 
 CREDENTIAL_SERVICE = "com.secondmind.app"
 
-# The app was called SSB before it became Second Mind; installs from then
-# keep their data here. The Keychain half of that rename is migrated by the
-# Tauri app (lib.rs's migrate_legacy_credentials), before this process starts.
-LEGACY_HOME = Path.home() / ".ssb"
-
-
-def migrate_legacy_home(sm_home: Path, legacy_home: Path = LEGACY_HOME) -> bool:
-    """Moves the pre-rename data folder to sm_home, once. Only when sm_home
-    doesn't exist yet, so it can never merge into or overwrite data the
-    renamed app already wrote. A rename, not a copy: same volume, atomic,
-    and nothing inside stores an absolute path (checked against real data:
-    LanceDB, manifest.db and session meta.json are all relative)."""
-    if sm_home.exists() or not legacy_home.is_dir():
-        return False
-    legacy_home.rename(sm_home)
-    return True
-
 
 def config_path(sm_home: Path) -> Path:
     return sm_home / "config.json"

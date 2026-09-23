@@ -207,10 +207,7 @@ A key that's `None` in every node of a table's first write became type null for 
 whose first write was a recorded lecture (`page=None`) then rejected every PDF with "cannot cast
 field 'page' from Int64 to Null"; a PDF-first course rejected transcripts and pptx slides. Two of
 three real courses had no Canvas files indexed because of it. Fixed by creating each table empty
-with an explicit schema (`indexing.TABLE_SCHEMA`) before the first write, and by repairing older
-tables on their next write (`indexing.repair_table_schema`: rows are read back, null-typed or
-missing fields cast or filled, table overwritten; nothing is re-embedded, and LanceDB keeps the
-previous version).
+with an explicit schema (`indexing.TABLE_SCHEMA`) before the first write.
 
 ## 7. Study artifacts and the assignment explainer
 

@@ -136,8 +136,7 @@ of the syllabus HTML instead; an edit changes the hash and reads as "changed" in
 **Each course's LanceDB table has a fixed schema** (`indexing.TABLE_SCHEMA`: `page`/`slide` int64,
 `timestamp` string), created empty before the first write. Tables are no longer typed by inference
 from their first batch, which once locked a lecture-first course's `page` column to type null and
-made it reject every PDF. Tables built before that are repaired in place on their next write
-(`indexing.repair_table_schema`).
+made it reject every PDF.
 
 Kept separate from the vector store itself (rather than as extra columns on the LanceDB table) so
 the diff step (§5.5) never needs to touch the vector store at all for unchanged items — it's a

@@ -50,25 +50,3 @@ def test_normalize_canvas_base_url_keeps_explicit_http():
 def test_normalize_canvas_base_url_empty_stays_empty():
     assert config.normalize_canvas_base_url("   ") == ""
 
-
-# --- SSB → Second Mind data-folder migration ---------------------------------
-
-
-def test_migrate_legacy_home_moves_the_old_folder(tmp_path):
-    legacy, new = tmp_path / ".ssb", tmp_path / ".secondmind"
-    (legacy / "index.lancedb").mkdir(parents=True)
-    assert config.migrate_legacy_home(new, legacy) is True
-    assert not legacy.exists() and (new / "index.lancedb").is_dir()
-
-
-def test_migrate_legacy_home_never_touches_an_existing_new_folder(tmp_path):
-    legacy, new = tmp_path / ".ssb", tmp_path / ".secondmind"
-    legacy.mkdir(); (legacy / "config.json").write_text("old")
-    new.mkdir(); (new / "config.json").write_text("new")
-    assert config.migrate_legacy_home(new, legacy) is False
-    assert (new / "config.json").read_text() == "new" and (legacy / "config.json").read_text() == "old"
-
-
-def test_migrate_legacy_home_is_a_no_op_on_a_fresh_install(tmp_path):
-    assert config.migrate_legacy_home(tmp_path / ".secondmind", tmp_path / ".ssb") is False
-    assert not (tmp_path / ".secondmind").exists()

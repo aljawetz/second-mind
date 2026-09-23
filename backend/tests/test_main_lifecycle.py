@@ -12,7 +12,6 @@ import signal
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.request
 from pathlib import Path
@@ -31,15 +30,7 @@ def _free_port() -> int:
 
 
 def _spawn(port: int, *, pending_stdout: bool = False, **extra_env) -> subprocess.Popen:
-    # A throwaway HOME: main.py's startup moves ~/.ssb to ~/.secondmind
-    # (config.migrate_legacy_home), and must never do that to the real one.
-    env = {
-        **os.environ,
-        "HOME": extra_env.pop("HOME", tempfile.mkdtemp()),
-        "SM_PORT": str(port),
-        "SM_INSTANCE_TOKEN": "test-token",
-        **extra_env,
-    }
+    env = {**os.environ, "SM_PORT": str(port), "SM_INSTANCE_TOKEN": "test-token", **extra_env}
     argv = [sys.executable, "main.py"]
     if pending_stdout:
         # Leaves unflushed bytes in main.py's block-buffered stdout pipe
@@ -161,17 +152,3 @@ def test_port_in_use_exits_with_a_readable_message(backend):
     assert f"port {port} is already in use" in stderr
     assert "Traceback" not in stderr
 
-
-def test_startup_moves_pre_rename_data_to_the_new_folder(backend, tmp_path):
-    # Installs from when the app was SSB keep their data in ~/.ssb.
-    legacy = tmp_path / ".ssb"
-    (legacy / "courses" / "1").mkdir(parents=True)
-    (legacy / "config.json").write_text('{"onboarding_complete": true}')
-    port = _free_port()
-
-    proc = backend(port, HOME=str(tmp_path))
-    _wait_for_ping(proc, port)
-
-    assert not legacy.exists()
-    assert (tmp_path / ".secondmind" / "config.json").read_text() == '{"onboarding_complete": true}'
-    assert (tmp_path / ".secondmind" / "courses" / "1").is_dir()

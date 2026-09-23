@@ -555,11 +555,6 @@ if __name__ == "__main__":
     # fork bomb during Step 12's development, not a theoretical risk.
     multiprocessing.freeze_support()
 
-    # Before anything reads SM_HOME: an install from before the SSB → Second
-    # Mind rename still has its data at ~/.ssb.
-    if config.migrate_legacy_home(SM_HOME):
-        print(f"moved {config.LEGACY_HOME} to {SM_HOME} (app renamed from SSB to Second Mind)", file=sys.stderr)
-
     # stdout is a pipe to the Tauri app, so Python block-buffers it: sync's
     # "[course_sync] skipping ..." lines sat unseen in the buffer instead of
     # reaching the app's [backend] log. Line buffering delivers each line.
