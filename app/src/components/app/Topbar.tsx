@@ -7,10 +7,15 @@ export default function Topbar({
   courseCode: string;
   courseName: string;
   overrideTitle?: string;
-  syncStatus?: { label: string; error?: boolean };
+  // detail: the full per-item failure list, shown on hover — the label
+  // stays short enough for the pill.
+  syncStatus?: { label: string; detail?: string; error?: boolean };
 }) {
   const pill = syncStatus && (
-    <span className={"pill ground-pill " + (syncStatus.error ? "pill-red" : "pill-neutral")} title={syncStatus.label}>
+    <span
+      className={"pill ground-pill " + (syncStatus.error ? "pill-red" : "pill-neutral")}
+      title={syncStatus.detail || syncStatus.label}
+    >
       {syncStatus.label}
     </span>
   );

@@ -63,18 +63,50 @@ def _next_link(link_header: str | None) -> str | None:
 
 
 def _get(client: httpx.Client, url: str, params: dict | None = None, max_retries: int = 3) -> httpx.Response | None:
-    """GET with 429 backoff; 403/404 returns None (not available)."""
+    """GET with backoff on 429, 5xx, and transport errors; 403/404 returns
+    None (not available). Transport errors are retried because they're
+    usually momentary — a real sync lost a file to one "_ssl.c: The
+    handshake operation timed out" on a metadata fetch that would have
+    succeeded a second later."""
     for attempt in range(max_retries):
-        r = client.get(url, params=params)
-        if r.status_code == 429:
-            wait = float(r.headers.get("Retry-After", 2**attempt))
-            time.sleep(wait)
+        last = attempt == max_retries - 1
+        try:
+            r = client.get(url, params=params)
+        except httpx.TransportError:
+            if last:
+                raise
+            time.sleep(2**attempt)
+            continue
+        if r.status_code == 429 or (r.status_code >= 500 and not last):
+            time.sleep(float(r.headers.get("Retry-After", 2**attempt)))
             continue
         if r.status_code in (403, 404):
             return None
         r.raise_for_status()
         return r
     raise CanvasError(f"rate limited after {max_retries} retries: {url}")
+
+
+def download(url: str, max_retries: int = 3) -> bytes:
+    """A file's bytes from its Canvas download URL (which redirects to
+    storage — no auth header needed or sent), with the same transport-error
+    and 5xx retry as _get."""
+    with httpx.Client(follow_redirects=True, timeout=60) as client:
+        for attempt in range(max_retries):
+            last = attempt == max_retries - 1
+            try:
+                r = client.get(url)
+            except httpx.TransportError:
+                if last:
+                    raise
+                time.sleep(2**attempt)
+                continue
+            if r.status_code >= 500 and not last:
+                time.sleep(2**attempt)
+                continue
+            r.raise_for_status()
+            return r.content
+    raise AssertionError("unreachable")
 
 
 def _get_all(client: httpx.Client, path: str, params: dict | None = None) -> list:

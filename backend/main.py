@@ -555,6 +555,12 @@ if __name__ == "__main__":
     # fork bomb during Step 12's development, not a theoretical risk.
     multiprocessing.freeze_support()
 
+    # stdout is a pipe to the Tauri app, so Python block-buffers it: sync's
+    # "[course_sync] skipping ..." lines sat unseen in the buffer instead of
+    # reaching the app's [backend] log. Line buffering delivers each line.
+    if sys.stdout is not None:
+        sys.stdout.reconfigure(line_buffering=True)
+
     # SIGTERM (which PyInstaller's bootloader forwards) exits the same way.
     signal.signal(signal.SIGTERM, lambda *_: _exit_now(0))
 

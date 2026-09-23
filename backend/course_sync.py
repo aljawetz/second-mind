@@ -41,7 +41,7 @@ def _sync_file(conn, db_path, table_name, file_meta, is_changed):
     if is_changed:
         indexing.delete_ref_doc_nodes(db_path, table_name, prefixed_id)
 
-    raw = httpx.get(file_meta["url"], follow_redirects=True, timeout=60).content
+    raw = canvas.download(file_meta["url"])
     tmp_path = Path(tempfile.mktemp(suffix=suffix))
     tmp_path.write_bytes(raw)
     try:

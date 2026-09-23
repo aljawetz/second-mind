@@ -34,6 +34,7 @@ export default function AppShell({
   const [pendingIndexCourse, setPendingIndexCourse] = useState<AvailableCourse | null>(null);
   const [launchSyncing, setLaunchSyncing] = useState(false);
   const [launchSyncErrors, setLaunchSyncErrors] = useState<string[]>([]);
+  const [launchSyncDetails, setLaunchSyncDetails] = useState<string[]>([]);
 
   // sync.py's own docstring states the design intent — "Runs once per app
   // launch, not a background daemon" — but nothing actually called
@@ -49,18 +50,39 @@ export default function AppShell({
     async function syncOnLaunch() {
       setLaunchSyncing(true);
       const errors: string[] = [];
+      const details: string[] = [];
       // Sequential — same reason as OnboardingIndexing: keeps each course's
       // manifest.db usage simple and avoids hammering Canvas at once.
       for (const c of courses) {
         if (cancelled) return;
+        // The stream reports problems as events, not as a thrown error: a
+        // terminal {done, error} when the course couldn't sync at all, and
+        // {item, status: "failed", error} per item. Ignoring them hid a sync
+        // where 28 of 29 PDFs failed behind a clean-looking launch.
+        let courseError: string | null = null;
+        const failed: string[] = [];
         try {
-          await syncCourse(c.id, () => {});
+          await syncCourse(c.id, (event) => {
+            if (event.done) {
+              if (event.error) courseError = event.error;
+            } else if (event.status === "failed") {
+              failed.push(`${event.item ?? "?"}: ${event.error ?? "unknown error"}`);
+            }
+          });
         } catch (err) {
-          errors.push(`${c.code}: ${err instanceof Error ? err.message : "sync failed"}`);
+          courseError = err instanceof Error ? err.message : "sync failed";
+        }
+        if (courseError) {
+          errors.push(`${c.code}: ${courseError}`);
+          details.push(`${c.code}: ${courseError}`);
+        } else if (failed.length > 0) {
+          errors.push(`${c.code}: ${failed.length} ${failed.length === 1 ? "item" : "items"} failed`);
+          details.push(`${c.code}:`, ...failed.map((f) => `  ${f}`));
         }
       }
       if (!cancelled) {
         setLaunchSyncErrors(errors);
+        setLaunchSyncDetails(details);
         setLaunchSyncing(false);
       }
     }
@@ -208,7 +230,7 @@ export default function AppShell({
               launchSyncing
                 ? { label: "Syncing courses…" }
                 : launchSyncErrors.length > 0
-                  ? { label: `Sync issue: ${launchSyncErrors.join("; ")}`, error: true }
+                  ? { label: `Sync issue: ${launchSyncErrors.join("; ")}`, detail: launchSyncDetails.join("\n"), error: true }
                   : undefined
             }
           />

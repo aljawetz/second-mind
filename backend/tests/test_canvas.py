@@ -101,3 +101,76 @@ def test_list_course_files_403_degrades_to_empty():
     respx.get(f"{BASE}/courses/56350/files").mock(return_value=httpx.Response(fx["status"], json=fx["body"]))
     files = canvas.list_course_files(56350)
     assert files == []
+
+
+# --- Retries on transient failures -------------------------------------------
+# A real sync lost a file to one "_ssl.c: The handshake operation timed out"
+# on get_file; the same request succeeded moments later.
+
+
+@pytest.fixture
+def no_sleep(monkeypatch):
+    slept = []
+    monkeypatch.setattr(canvas.time, "sleep", slept.append)
+    return slept
+
+
+@respx.mock
+def test_transport_error_is_retried_then_succeeds(no_sleep):
+    route = respx.get(f"{BASE}/files/1").mock(
+        side_effect=[httpx.ConnectTimeout("handshake timed out"), httpx.Response(200, json={"id": 1})]
+    )
+    assert canvas.get_file(1) == {"id": 1}
+    assert route.call_count == 2
+    assert no_sleep == [1]
+
+
+@respx.mock
+def test_server_error_is_retried_then_succeeds(no_sleep):
+    route = respx.get(f"{BASE}/files/1").mock(side_effect=[httpx.Response(503), httpx.Response(200, json={"id": 1})])
+    assert canvas.get_file(1) == {"id": 1}
+    assert route.call_count == 2
+
+
+@respx.mock
+def test_persistent_transport_error_raises_after_three_attempts(no_sleep):
+    route = respx.get(f"{BASE}/files/1").mock(side_effect=httpx.ReadTimeout("timed out"))
+    with pytest.raises(httpx.ReadTimeout):
+        canvas.get_file(1)
+    assert route.call_count == 3
+
+
+@respx.mock
+def test_persistent_server_error_raises_after_three_attempts(no_sleep):
+    route = respx.get(f"{BASE}/files/1").mock(return_value=httpx.Response(502))
+    with pytest.raises(httpx.HTTPStatusError):
+        canvas.get_file(1)
+    assert route.call_count == 3
+
+
+@respx.mock
+def test_403_is_not_retried(no_sleep):
+    route = respx.get(f"{BASE}/files/1").mock(return_value=httpx.Response(403))
+    assert canvas.get_file(1) is None
+    assert route.call_count == 1 and no_sleep == []
+
+
+@respx.mock
+def test_download_follows_redirect_and_retries_transport_errors(no_sleep):
+    respx.get("https://canvas.example/files/9/download").mock(
+        side_effect=[
+            httpx.ConnectError("reset"),
+            httpx.Response(302, headers={"location": "https://storage.example/f9.pdf"}),
+        ]
+    )
+    respx.get("https://storage.example/f9.pdf").mock(return_value=httpx.Response(200, content=b"%PDF-1.7"))
+    assert canvas.download("https://canvas.example/files/9/download") == b"%PDF-1.7"
+
+
+@respx.mock
+def test_download_raises_on_an_error_status_instead_of_returning_the_error_page(no_sleep):
+    # The old httpx.get call never checked the status: a 403 HTML page would
+    # have been written to disk and handed to the PDF extractor.
+    respx.get("https://canvas.example/files/9/download").mock(return_value=httpx.Response(403, text="<html>denied</html>"))
+    with pytest.raises(httpx.HTTPStatusError):
+        canvas.download("https://canvas.example/files/9/download")

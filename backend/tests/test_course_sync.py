@@ -73,7 +73,7 @@ def stub_extraction(monkeypatch):
     which ref_doc_ids got deleted) instead of only trusting the final
     new/changed/removed counts."""
     calls = []
-    monkeypatch.setattr(course_sync.httpx, "get", lambda *a, **k: type("R", (), {"content": b"raw bytes"})())
+    monkeypatch.setattr(course_sync.canvas, "download", lambda url: b"raw bytes")
     monkeypatch.setattr(
         course_sync.ingestion,
         "extract_pdf",
@@ -210,7 +210,7 @@ def test_file_whose_metadata_fetch_degrades_to_none_is_not_deleted(tmp_path, stu
 
 
 def test_one_failing_item_does_not_abort_the_rest(tmp_path, stub_canvas, monkeypatch):
-    monkeypatch.setattr(course_sync.httpx, "get", lambda *a, **k: type("R", (), {"content": b"raw bytes"})())
+    monkeypatch.setattr(course_sync.canvas, "download", lambda url: b"raw bytes")
     monkeypatch.setattr(
         course_sync.ingestion, "extract_pdf", lambda path: (_ for _ in ()).throw(RuntimeError("corrupt pdf"))
     )
