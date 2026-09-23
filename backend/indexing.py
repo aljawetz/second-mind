@@ -25,8 +25,14 @@ from tokenizers import Tokenizer
 
 from embeddings import EMBEDDING_DIM, MODEL_DIR, OnnxBgeEmbedding
 
-CHUNK_SIZE = 700  # tokens, rag-pipeline.md §2's ~500-800 target
-CHUNK_OVERLAP = 100  # ~15% of 700
+# Tokens, counted with BGE's own tokenizer (below). Must stay under the
+# embedding model's 512-token window (embeddings.MAX_SEQ_LENGTH), with room
+# for sections_to_nodes()'s heading line: the embedding silently truncates
+# anything past 512. At the old 700, 23% of real chunks ran over, and the
+# part past the cut was invisible to vector search — 18-654's grading table
+# started at token 513 of its syllabus chunk, and search never found it.
+CHUNK_SIZE = 450
+CHUNK_OVERLAP = 60  # ~15%, same ratio as before
 
 # SentenceSplitter's default tokenizer is tiktoken (GPT-style) — two real
 # problems found by actually running this frozen: (1) it doesn't bundle
@@ -91,6 +97,35 @@ def pages_to_nodes(pages: list[dict], source: str, canvas_item_id: str, item_typ
         for chunk in _splitter.split_text(text):
             node = TextNode(text=chunk, metadata=_metadata(source, item_type, page=page["page"]))
             nodes.append(_with_ref_doc(node, canvas_item_id))
+    return nodes
+
+
+def sections_to_nodes(sections: list[dict], source: str, canvas_item_id: str, item_type: str) -> list[TextNode]:
+    """Canvas HTML sections (ingestion.extract_html_sections) -> nodes, one
+    section at a time so a chunk never mixes sections (a syllabus's grading
+    table no longer shares a chunk with its staff list).
+
+    Every chunk starts with a "Syllabus › Grading Algorithm" line, so both
+    the embedding and the chat model see what the chunk is part of even when
+    the section's own text is just "12.5% | Project" rows. A heading with no
+    text of its own ("Class Schedule" directly followed by another bold
+    line) becomes a line of the next section instead of a near-empty chunk."""
+    nodes = []
+    pending: list[str] = []
+    for section in sections:
+        if not section["text"]:
+            if section["heading"]:
+                pending.append(section["heading"])
+            continue
+        path = f"{source} › {section['heading']}" if section["heading"] else source
+        body = "\n".join([*pending, section["text"]])
+        pending = []
+        for chunk in _splitter.split_text(body):
+            node = TextNode(text=f"{path}\n{chunk}", metadata=_metadata(source, item_type))
+            nodes.append(_with_ref_doc(node, canvas_item_id))
+    if pending:
+        node = TextNode(text=f"{source}\n" + "\n".join(pending), metadata=_metadata(source, item_type))
+        nodes.append(_with_ref_doc(node, canvas_item_id))
     return nodes
 
 

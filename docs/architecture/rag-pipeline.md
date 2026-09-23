@@ -42,17 +42,42 @@ as-is. Files go through the tiered extraction validated in Sprint 3:
      one, and the exact cutoffs (100, 400) want revisiting once more courses are indexed in
      Sprint 5.
 3. Flagged pages get OCR (Tesseract) by default — free, fast, a real ~3x recovery per Sprint 3.
+   **OCR adds to a page's own text; it never replaces it** (`ingestion.merge_ocr_text`, since
+   2026-09-23). It used to replace it, and the flag fires on most slides with a picture on them
+   (25 of 43 pages in 18-654's course-info deck). On 9 of those OCR read *less* than the PDF
+   already had: the grading slide's "12.5% Project, 17.5% Labs, 30% Assignments…" became just
+   "12.5% 17.5%", and "December 2nd" became `December 2"4`. The chat then invented grading weights
+   and an exam date from that text. Now only OCR lines made mostly of new words are added, under
+   a "[Text read from images on this page]" line, and only when they add at least 5 new words
+   in total. That keeps what OCR is actually good for (diagrams, calendars, logos) and drops its
+   misreads of text the PDF already had. OCR alone is used only for pages with no text of their
+   own.
 4. A vision-model pass (the same pluggable LLM client as §3 below) is reserved for pages where OCR
    quality is still poor, or where structural understanding matters (a slide's visual callout, per
    Sprint 3's red-box finding) — opt-in fallback, not a default tier, given its per-page cost.
 
 ## 2. Chunking
 
+**Chunks are at most 450 tokens** (`indexing.CHUNK_SIZE`, BGE's own tokenizer), under the
+embedding model's 512-token window with room for a heading line. They used to be 700, and the
+embedding silently truncates at 512: 23% of real chunks ran past it, and whatever came after
+token 512 was invisible to vector search. 18-654's grading table started at token 513 of its
+syllabus chunk.
+
+**Canvas HTML (pages, syllabus, assignment descriptions) is split at its own headings**
+(`ingestion.extract_html_sections` → `indexing.sections_to_nodes`). A section starts at an
+`<h1>`–`<h6>` or at a paragraph that is bold and nothing else, which is how most instructors mark
+sections in Canvas's editor ("**Grading Algorithm:**"). Tables stay one row per line with cells
+joined by " | " ("12.5% | Project"), list items stay one per line, and every chunk starts with a
+path line like `Syllabus › Grading Algorithm`. It used to be flattened into one run of prose, so
+the grading table shared a chunk with the staff list and textbooks and never ranked for grading
+questions.
+
 A custom `NodeParser` (LlamaIndex's chunking abstraction) that respects the source's natural
 structure — a page or a slide is a node, not an arbitrary token window that can split a slide's
 content across two chunks. For running prose (pages, the syllabus body, long assignment
 descriptions) that exceeds a reasonable node size, LlamaIndex's standard `SentenceSplitter` handles
-recursive splitting with overlap (target ~500–800 tokens, ~15% overlap) so a citation never lands
+recursive splitting with overlap (450 tokens, ~15% overlap) so a citation never lands
 mid-sentence. Transcripts chunk along natural speech-segment boundaries (Whisper's own segment
 timestamps), which is also what makes a citation like "Lecture 6 · 14:22" possible — the timestamp
 is the node's own metadata, not something reconstructed after the fact.
@@ -188,11 +213,13 @@ first code on the path to multi-provider support described above. The similarity
 (`main.CHAT_SIMILARITY_CUTOFF`) stays 0.5: 0.4 gave the same number of good answers with one more
 made-up fact.
 
-**Known weakness: garbled or buried facts.** The model can still invent course facts when the only
-matching text is garbled. The 18-654 grading slide's text extraction kept "12.5%" and "17.5%"
-without their labels, while the real breakdown sits deep inside a long syllabus chunk that search
-never ranks; asked which component is worth the most, chat invented weights in 3 of 3 runs. That
-needs better slide extraction and smaller syllabus chunks (§1, §2), not a prompt change.
+**Fixed: garbled and buried facts.** Chat used to invent 18-654's grading weights in 3 of 3 runs,
+because OCR had stripped the grading slide's labels and the syllabus table sat past the embedding
+window. After the §1 and §2 fixes and a re-index, it answers with the real weights, citing both the
+slide and the syllabus, in 3 of 3 runs. Two weaknesses remain. Relevant chunks often score just
+around the 0.5 similarity cutoff (0.49–0.52), so a small change in how a page is chunked can drop
+one below it; that needs a better cutoff strategy, not an extraction change. And session
+transcripts still have chunks over 512 tokens, because they use their own segment-based chunking.
 
 **Streaming by default** (NFR5, design spec §5) — a Q&A response starts rendering as tokens arrive
 rather than waiting for the full completion, which is what makes retrieval-augmented generation

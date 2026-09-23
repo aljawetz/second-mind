@@ -33,7 +33,9 @@ def retriever():
     zotero_pages = ingestion.extract_pdf(FIXTURES / "sprint3_zotero_tutorial.pdf")
     for p in zotero_pages:
         if p["needs_fallback"]:
-            p["text"] = ingestion.ocr_pdf_page(FIXTURES / "sprint3_zotero_tutorial.pdf", p["page"])
+            p["text"] = ingestion.merge_ocr_text(
+                p["text"], ingestion.ocr_pdf_page(FIXTURES / "sprint3_zotero_tutorial.pdf", p["page"])
+            )
     nodes += indexing.pages_to_nodes(zotero_pages, "zotero", "file_zotero")
 
     slides = ingestion.extract_pptx(FIXTURES / "sprint3_ai_research.pptx")

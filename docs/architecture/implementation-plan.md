@@ -790,6 +790,26 @@ both question sets and graded blind.
 - **Still open:** invented grading weights when the only matching text is a garbled slide
   (rag-pipeline.md §5, "Known weakness").
 
+### 17. Reading slides and Canvas pages without losing facts
+**Owner:** Arthur.
+**Do:** Stop OCR from overwriting good slide text, split Canvas HTML at its own headings with
+tables kept as rows, and keep every chunk inside the embedding model's 512-token window
+(rag-pipeline.md §1, §2). Then re-index the existing courses with
+`scripts/reindex_canvas_content.py`, which keeps session recordings and notes.
+**Test:** `tests/test_ocr_merge.py` (real native/OCR pairs from 18-654's slides),
+`tests/test_html_sections.py` (the shapes of two real syllabi), `tests/test_section_nodes.py`;
+then the chat evaluation rerun on the re-indexed courses and graded blind against the previous run.
+**Real findings:**
+- **The slides were never unreadable.** pdfplumber read the grading slide perfectly; the OCR
+  fallback replaced that with a worse read on 9 of 25 flagged pages in one deck.
+- **Chunks longer than the embedding window were partly invisible.** 267 of 1,161 chunks ran past
+  512 tokens; the syllabus grading table started at token 513. After the fix, only 18 (all from one
+  session transcript) do.
+- **First question set: 4 bad answers to 0**, including the invented grading weights and a wrong
+  "TBD" for TA office hours. Held-out set: one answer lost, because a page's new chunking moved its
+  score from ~0.52 to 0.494, just under the similarity cutoff. The cutoff, not extraction, is the
+  next thing to fix.
+
 ## What this plan deliberately leaves open
 
 - **Generation faithfulness verification** (does the LLM's answer stay faithful to its cited

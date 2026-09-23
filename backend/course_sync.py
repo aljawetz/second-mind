@@ -49,7 +49,7 @@ def _sync_file(conn, db_path, table_name, file_meta, is_changed):
             pages = ingestion.extract_pdf(tmp_path)
             for p in pages:
                 if p["needs_fallback"]:
-                    p["text"] = ingestion.ocr_pdf_page(tmp_path, p["page"])
+                    p["text"] = ingestion.merge_ocr_text(p["text"], ingestion.ocr_pdf_page(tmp_path, p["page"]))
             nodes = indexing.pages_to_nodes(pages, display_name, prefixed_id)
             full_text = "".join(p["text"] for p in pages)
         else:  # .pptx
@@ -77,14 +77,13 @@ def _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed):
     # which never carry a body, need fetching here.
     full = page_summary if "body" in page_summary else canvas.get_page(course_id, page_summary["url"])
     title = (full or {}).get("title") or page_summary.get("title") or page_summary["url"]
-    text = ingestion.extract_html_page((full or {}).get("body") or "")
-    # item_type="page": a Canvas wiki page is a flat document, not
-    # paginated like a PDF — generation.py's citation formatting reads
-    # item_type back as source_type, so this must say "page", not "file",
-    # and carries no fabricated page number.
-    nodes = indexing.pages_to_nodes(
-        [{"page": None, "text": text, "needs_fallback": False}], title, prefixed_id, item_type="page"
-    )
+    sections = ingestion.extract_html_sections((full or {}).get("body") or "")
+    text = ingestion.sections_text(sections)
+    # item_type="page": a Canvas wiki page isn't paginated like a PDF —
+    # generation.py's citation formatting reads item_type back as
+    # source_type, so this must say "page", not "file", and carries no
+    # fabricated page number.
+    nodes = indexing.sections_to_nodes(sections, title, prefixed_id, item_type="page")
 
     if nodes:
         indexing.add_nodes(nodes, db_path, table_name)
@@ -98,12 +97,11 @@ def _sync_assignment(conn, db_path, table_name, assignment, is_changed):
     if is_changed:
         indexing.delete_ref_doc_nodes(db_path, table_name, prefixed_id)
 
-    text = ingestion.extract_html_page(assignment.get("description") or "")
+    sections = ingestion.extract_html_sections(assignment.get("description") or "")
+    text = ingestion.sections_text(sections)
     # Own item_type: citations.ts opens /assignments/<id>, and explain.py's
     # pointers exclude these (see build_pointers).
-    nodes = indexing.pages_to_nodes(
-        [{"page": None, "text": text, "needs_fallback": False}], name, prefixed_id, item_type="assignment"
-    )
+    nodes = indexing.sections_to_nodes(sections, name, prefixed_id, item_type="assignment")
     if nodes:
         indexing.add_nodes(nodes, db_path, table_name)
     sync.mark_synced(conn, prefixed_id, "assignment", name, assignment.get("updated_at", ""), sync.content_hash(text))
@@ -115,12 +113,11 @@ def _sync_syllabus(conn, db_path, table_name, course_id, syllabus_html, version,
     if is_changed:
         indexing.delete_ref_doc_nodes(db_path, table_name, prefixed_id)
 
-    text = ingestion.extract_html_page(syllabus_html)
+    sections = ingestion.extract_html_sections(syllabus_html)
+    text = ingestion.sections_text(sections)
     # Own item_type so citations.ts can open Canvas's syllabus URL
     # (/assignments/syllabus), which isn't under /pages/.
-    nodes = indexing.pages_to_nodes(
-        [{"page": None, "text": text, "needs_fallback": False}], "Syllabus", prefixed_id, item_type="syllabus"
-    )
+    nodes = indexing.sections_to_nodes(sections, "Syllabus", prefixed_id, item_type="syllabus")
     if nodes:
         indexing.add_nodes(nodes, db_path, table_name)
     sync.mark_synced(conn, prefixed_id, "syllabus", "Syllabus", version, sync.content_hash(text))
