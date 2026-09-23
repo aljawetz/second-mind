@@ -24,8 +24,41 @@ fn set_credential(key: String, value: String) -> Result<(), String> {
     entry.set_password(&value).map_err(|e| e.to_string())
 }
 
+// Held for the app's whole lifetime. Dropping the CommandChild closes the
+// write end of the backend's stdin, which the backend treats as "the app
+// is gone" and exits (main.py's _exit_when_app_closes) — so the child
+// must live in managed state, not a local that dies at the end of setup.
+// The OS closes that same pipe when this process ends for any reason
+// (quit, crash, force quit), which is what stops the backend outliving
+// the app and holding port 8756 for the next launch.
+struct Backend {
+    _child: tauri_plugin_shell::process::CommandChild,
+    instance_token: String,
+}
+
+#[tauri::command]
+fn backend_instance_token(backend: tauri::State<Backend>) -> String {
+    backend.instance_token.clone()
+}
+
+// Identity, not a secret: only has to differ between launches so the
+// frontend can reject a stale backend answering on 8756. RandomState is
+// seeded randomly per process, which avoids pulling in a rand crate.
+fn new_instance_token() -> String {
+    use std::hash::{BuildHasher, Hasher};
+    let mut hasher = std::collections::hash_map::RandomState::new().build_hasher();
+    hasher.write_u128(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or_default(),
+    );
+    format!("{:016x}", hasher.finish())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    use tauri::Manager;
     use tauri_plugin_shell::process::CommandEvent;
     use tauri_plugin_shell::ShellExt;
 
@@ -34,16 +67,22 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            // Step 1 sidecar PoC: spawn the Python backend when the app starts,
-            // started/stopped with the app (overview.md §1). Stdout/stderr are
-            // logged, not wired to the frontend yet — that's real endpoint work,
-            // not part of proving the sidecar mechanism itself.
-            let (mut rx, _child) = app
+            // Spawn the Python backend when the app starts, started/stopped
+            // with the app (overview.md §1; stopping is the Backend state
+            // above). Stdout/stderr are logged, not wired to the frontend.
+            let instance_token = new_instance_token();
+            let (mut rx, child) = app
                 .shell()
                 .sidecar("ssb-backend")
                 .expect("failed to create sidecar command")
+                .env("SSB_INSTANCE_TOKEN", &instance_token)
+                .env("SSB_EXIT_ON_STDIN_EOF", "1")
                 .spawn()
                 .expect("failed to spawn ssb-backend sidecar");
+            app.manage(Backend {
+                _child: child,
+                instance_token,
+            });
 
             tauri::async_runtime::spawn(async move {
                 while let Some(event) = rx.recv().await {
@@ -61,7 +100,11 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_credential, set_credential])
+        .invoke_handler(tauri::generate_handler![
+            get_credential,
+            set_credential,
+            backend_instance_token
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

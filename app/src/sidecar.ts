@@ -1,12 +1,20 @@
+import { invoke } from "@tauri-apps/api/core";
 import { fetch } from "@tauri-apps/plugin-http";
 
 // Routed through the Rust backend via IPC, not the webview's own fetch:
 // WKWebView blocks a plain fetch() to http://127.0.0.1 from this app's
 // custom-scheme origin regardless of CORS headers, since the request never
 // reaches the webview's network stack at all with this plugin.
-export async function pingSidecar(): Promise<{ status: string; source: string }> {
+export async function pingSidecar(): Promise<{ status: string; source: string; instance?: string }> {
   const res = await fetch("http://127.0.0.1:8756/ping");
   return res.json();
+}
+
+// The per-launch value lib.rs passed to the backend it spawned. A /ping
+// answer carrying a different one (or none) came from a stale backend
+// still holding port 8756, not ours.
+export function getBackendInstanceToken(): Promise<string> {
+  return invoke("backend_instance_token");
 }
 
 export type CredentialKind = "canvas" | "openai";

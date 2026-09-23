@@ -1,9 +1,14 @@
 """Sidecar backend — see docs/architecture/implementation-plan.md."""
 
+import errno
 import json
 import multiprocessing
+import os
 import re
+import signal
 import socketserver
+import sys
+import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -22,7 +27,14 @@ import indexing
 import sessions
 
 HOST = "127.0.0.1"
-PORT = 8756
+# SSB_PORT exists for tests/test_main_lifecycle.py only — the app always
+# uses 8756 (app/src/sidecar.ts and the http capability scope hardcode it).
+PORT = int(os.environ.get("SSB_PORT", "8756"))
+
+# Random per-launch value the Tauri app passes in and checks against
+# /ping, so the frontend can tell its own backend apart from a stale one
+# left over from an earlier launch still holding the port.
+INSTANCE_TOKEN = os.environ.get("SSB_INSTANCE_TOKEN", "")
 
 # data-model.md §1: no per-student subdirectory — SSB is a local sidecar,
 # one student per machine, one OS user account per student, so ~/.ssb/
@@ -97,7 +109,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/ping":
-            self._send_json(200, {"status": "ok", "source": "ssb-backend"})
+            self._send_json(200, {"status": "ok", "source": "ssb-backend", "instance": INSTANCE_TOKEN})
         elif self.path == "/courses":
             self._handle_list_courses()
         elif self.path == "/credentials/status":
@@ -505,6 +517,36 @@ class Handler(BaseHTTPRequestHandler):
         pass  # keep stdout quiet; this is a sidecar, not a dev console
 
 
+def _exit_now(code: int) -> None:
+    """os._exit, not sys.exit: skips interpreter teardown, where ONNX
+    Runtime's and Arrow's native destructors can race on macOS and abort
+    with "recursive_mutex lock failed" (seen in the Copilot SDK spike).
+    Nothing needs flushing beyond stdio — every write this backend makes
+    (LanceDB, manifest.db, config.json) completes inside its request.
+
+    Flushing is best-effort: when the app died, it closed the stdout/stderr
+    pipes it was reading too, so flushing buffered output (course_sync's
+    print()) raises BrokenPipeError — which must not stop the exit."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except (OSError, ValueError, AttributeError):
+            pass
+    os._exit(code)
+
+
+def _exit_when_app_closes() -> None:
+    """The Tauri app holds the write end of our stdin for as long as it
+    runs and never writes to it, so EOF means the app is gone — quit,
+    crash, or force quit alike. Without this the backend outlived the app
+    and kept port 8756, and the next launch talked to the stale process."""
+    try:
+        while sys.stdin.buffer.read(4096):
+            pass
+    finally:
+        _exit_now(0)
+
+
 if __name__ == "__main__":
     # Required before anything that might use multiprocessing (faster-whisper's
     # transcription backend does) — without this, the frozen PyInstaller binary
@@ -512,5 +554,22 @@ if __name__ == "__main__":
     # which recursively re-spawns more workers. Confirmed as a real, genuine
     # fork bomb during Step 12's development, not a theoretical risk.
     multiprocessing.freeze_support()
-    server = ThreadingHTTPServer((HOST, PORT), Handler)
+
+    # SIGTERM (which PyInstaller's bootloader forwards) exits the same way.
+    signal.signal(signal.SIGTERM, lambda *_: _exit_now(0))
+
+    if os.environ.get("SSB_EXIT_ON_STDIN_EOF") == "1" and sys.stdin is not None:
+        threading.Thread(target=_exit_when_app_closes, name="app-watchdog", daemon=True).start()
+
+    try:
+        server = ThreadingHTTPServer((HOST, PORT), Handler)
+    except OSError as e:
+        if e.errno != errno.EADDRINUSE:
+            raise
+        print(
+            f"ssb-backend: port {PORT} is already in use, most likely by another "
+            "SSB backend that is still running; exiting",
+            file=sys.stderr,
+        )
+        _exit_now(1)
     server.serve_forever()

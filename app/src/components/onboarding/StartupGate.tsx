@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { pingSidecar } from "../../sidecar";
+import { getBackendInstanceToken, pingSidecar } from "../../sidecar";
 
 const POLL_MS = 2000;
 const GRACE_MS = 5000; // switch to "first launch" copy after this long
@@ -20,9 +20,18 @@ export default function StartupGate({ onReady }: { onReady: () => void }) {
     setShowRetry(false);
 
     function poll() {
-      pingSidecar()
-        .then(() => {
-          if (!cancelled) onReady();
+      Promise.all([pingSidecar(), getBackendInstanceToken()])
+        .then(([ping, token]) => {
+          if (cancelled) return;
+          if (ping.instance !== token) {
+            // Something answered on 8756, but not the backend this launch
+            // spawned (ours exits when its port is taken) — continuing would
+            // silently run every request against stale code and state. No
+            // Retry: our own backend already exited, so only a relaunch helps.
+            setMessage("Another copy of SSB is already running. Quit it, then reopen SSB.");
+            return;
+          }
+          onReady();
         })
         .catch(() => {
           if (cancelled) return;
