@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ArtifactType, AvailableCourse, ViewName } from "../../types";
-import { listAssignments, listSessions, type CanvasAssignment, type SessionSummary } from "../../sidecar";
+import { listAssignments, listSessions, syncCourse, type CanvasAssignment, type SessionSummary } from "../../sidecar";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import HomeView from "./HomeView";
@@ -32,6 +32,44 @@ export default function AppShell({
   const [assignmentsError, setAssignmentsError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [pendingIndexCourse, setPendingIndexCourse] = useState<AvailableCourse | null>(null);
+  const [launchSyncing, setLaunchSyncing] = useState(false);
+  const [launchSyncErrors, setLaunchSyncErrors] = useState<string[]>([]);
+
+  // sync.py's own docstring states the design intent — "Runs once per app
+  // launch, not a background daemon" — but nothing actually called
+  // syncCourse for already-selected courses on launch; only onboarding and
+  // the single-course add flow did. AppShell mounting *is* "entering the
+  // app" for both a first-run and a returning user, so re-diffing every
+  // selected course's manifest here (cheap when nothing changed — sync.diff
+  // only re-embeds new/changed items) is what actually delivers that
+  // intent. Runs once per mount, not per `courses` change, so it doesn't
+  // refire while the single-course add flow's own indexing screen is open.
+  useEffect(() => {
+    let cancelled = false;
+    async function syncOnLaunch() {
+      setLaunchSyncing(true);
+      const errors: string[] = [];
+      // Sequential — same reason as OnboardingIndexing: keeps each course's
+      // manifest.db usage simple and avoids hammering Canvas at once.
+      for (const c of courses) {
+        if (cancelled) return;
+        try {
+          await syncCourse(c.id, () => {});
+        } catch (err) {
+          errors.push(`${c.code}: ${err instanceof Error ? err.message : "sync failed"}`);
+        }
+      }
+      if (!cancelled) {
+        setLaunchSyncErrors(errors);
+        setLaunchSyncing(false);
+      }
+    }
+    syncOnLaunch();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // The active course can disappear out from under this view (unselected
   // or deleted via Manage Courses) — fall back to whatever's left rather
@@ -165,6 +203,13 @@ export default function AppShell({
             courseName={course.name}
             overrideTitle={
               view === "manageCourses" ? "Manage courses" : view === "indexingCourse" ? "Manage courses" : undefined
+            }
+            syncStatus={
+              launchSyncing
+                ? { label: "Syncing courses…" }
+                : launchSyncErrors.length > 0
+                  ? { label: `Sync issue: ${launchSyncErrors.join("; ")}`, error: true }
+                  : undefined
             }
           />
           <div className={"view" + (view === "home" ? " view-fill" : "")}>
