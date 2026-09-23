@@ -48,12 +48,14 @@ def _manifest_ids(ssb_home, course_id=1):
 
 
 @pytest.fixture(autouse=True)
-def no_front_page_or_syllabus(monkeypatch):
-    """Every test here stubs canvas per function; these two default to
-    "course has neither" so no test can reach real Canvas through them.
-    Tests about front pages or syllabi override them."""
+def no_front_page_syllabus_or_assignments(monkeypatch):
+    """Every test here stubs canvas per function; these default to "course
+    has none" so no test can reach real Canvas through them (before this,
+    unstubbed calls quietly hit the live API with the dev's own token).
+    Tests about these sources override them."""
     monkeypatch.setattr(course_sync.canvas, "get_front_page", lambda course_id: None)
     monkeypatch.setattr(course_sync.canvas, "get_syllabus", lambda course_id: None)
+    monkeypatch.setattr(course_sync.canvas, "list_assignments", lambda course_id: [])
 
 
 @pytest.fixture
@@ -443,3 +445,62 @@ def test_empty_or_unavailable_syllabus_is_skipped_and_never_deletes(tmp_path, st
         events = run(1, tmp_path)
         assert events == [{"done": True, "new": 0, "changed": 0, "removed": 0, "failed": 0}]
     assert _manifest_ids(tmp_path) == {"syllabus:1"}
+
+
+# --- Assignment descriptions -------------------------------------------------
+
+
+def _assignment(aid, name, description, updated_at="2026-01-01"):
+    return {"id": aid, "name": name, "description": description, "updated_at": updated_at}
+
+
+@pytest.fixture
+def assignments_only(monkeypatch):
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_pages", lambda course_id: [])
+    monkeypatch.setattr(course_sync.ingestion, "extract_html_page", lambda html: (html or "").replace("<p>", "").replace("</p>", ""))
+
+    def set_assignments(*items):
+        monkeypatch.setattr(course_sync.canvas, "list_assignments", lambda course_id: [dict(a) for a in items])
+
+    return set_assignments
+
+
+def test_assignment_descriptions_are_indexed_and_empty_ones_skipped(tmp_path, stub_extraction, assignments_only):
+    assignments_only(
+        _assignment(1, "Task 1: Personas", "<p>Write two personas.</p>"),
+        _assignment(2, "Task 2: Interviews", "<p>Interview three users.</p>"),
+        _assignment(3, "Quiz 1", None),
+        _assignment(4, "Participation", "<p> </p>"),
+    )
+
+    events = run(1, tmp_path)
+
+    assert events[-1] == {"done": True, "new": 2, "changed": 0, "removed": 0, "failed": 0}
+    assert {e["item"] for e in events if e.get("status") == "done"} == {"Task 1: Personas", "Task 2: Interviews"}
+    assert _manifest_ids(tmp_path) == {"assignment:1", "assignment:2"}
+
+
+def test_an_edited_assignment_is_resynced_and_a_cleared_one_removed(tmp_path, stub_extraction, assignments_only):
+    assignments_only(_assignment(1, "Task 1", "<p>v1</p>"), _assignment(2, "Task 2", "<p>keep</p>"))
+    run(1, tmp_path)
+    baseline = len(stub_extraction)
+
+    assignments_only(_assignment(1, "Task 1", "<p>v2</p>", "2026-02-01"), _assignment(2, "Task 2", None))
+    events = run(1, tmp_path)
+
+    assert events[-1] == {"done": True, "new": 0, "changed": 1, "removed": 1, "failed": 0}
+    deleted = [c[2] for c in stub_extraction[baseline:] if c[0] == "delete"]
+    assert sorted(deleted) == ["assignment:1", "assignment:2"]  # delete-before-add for 1, removal for 2
+    assert _manifest_ids(tmp_path) == {"assignment:1"}
+
+
+def test_an_empty_assignment_listing_deletes_nothing(tmp_path, stub_extraction, assignments_only):
+    assignments_only(_assignment(1, "Task 1", "<p>text</p>"))
+    run(1, tmp_path)
+
+    assignments_only()  # a 403 degrades to [] — indistinguishable from "all removed"
+    events = run(1, tmp_path)
+
+    assert events == [{"done": True, "new": 0, "changed": 0, "removed": 0, "failed": 0}]
+    assert _manifest_ids(tmp_path) == {"assignment:1"}

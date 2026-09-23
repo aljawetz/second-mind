@@ -92,6 +92,24 @@ def _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed):
     return title
 
 
+def _sync_assignment(conn, db_path, table_name, assignment, is_changed):
+    prefixed_id = f"assignment:{assignment['id']}"
+    name = assignment.get("name") or f"Assignment {assignment['id']}"
+    if is_changed:
+        indexing.delete_ref_doc_nodes(db_path, table_name, prefixed_id)
+
+    text = ingestion.extract_html_page(assignment.get("description") or "")
+    # Own item_type: citations.ts opens /assignments/<id>, and explain.py's
+    # pointers exclude these (see build_pointers).
+    nodes = indexing.pages_to_nodes(
+        [{"page": None, "text": text, "needs_fallback": False}], name, prefixed_id, item_type="assignment"
+    )
+    if nodes:
+        indexing.add_nodes(nodes, db_path, table_name)
+    sync.mark_synced(conn, prefixed_id, "assignment", name, assignment.get("updated_at", ""), sync.content_hash(text))
+    return name
+
+
 def _sync_syllabus(conn, db_path, table_name, course_id, syllabus_html, version, is_changed):
     prefixed_id = f"syllabus:{course_id}"
     if is_changed:
@@ -156,6 +174,7 @@ def sync_course(course_id: int, ssb_home: Path):
         pages_list = canvas.list_pages(course_id)
         front_page = canvas.get_front_page(course_id)
         syllabus_html = canvas.get_syllabus(course_id)
+        assignments = canvas.list_assignments(course_id)
     except (canvas.CanvasError, httpx.HTTPStatusError, httpx.TransportError) as e:
         yield {"done": True, "error": str(e)}
         return
@@ -241,15 +260,30 @@ def sync_course(course_id: int, ssb_home: Path):
         if syllabus_html and ingestion.extract_html_page(syllabus_html).strip():
             syllabus_remote = [{"id": f"syllabus:{course_id}", "updated_at": sync.content_hash(syllabus_html)}]
 
+        # Assignment instructions, so chat can answer "what does Task 2 ask
+        # for?" (Explain only ever read one assignment at a time). Ones with
+        # no text are left out; an assignment whose description was cleared
+        # then reads as deleted, which matches what the student can see.
+        assignments_by_id = {
+            str(a["id"]): a
+            for a in assignments
+            if a.get("description") and ingestion.extract_html_page(a["description"]).strip()
+        }
+        assignment_remote = [
+            {"id": f"assignment:{aid}", "updated_at": a.get("updated_at", "")} for aid, a in assignments_by_id.items()
+        ]
+
         file_diff = sync.diff(conn, "file", file_remote)
         page_diff = sync.diff(conn, "page", page_remote)
         syllabus_diff = sync.diff(conn, "syllabus", syllabus_remote)
+        assignment_diff = sync.diff(conn, "assignment", assignment_remote)
 
         file_deleted = _deletable(file_remote, file_diff["deleted"], unresolved_file_ids)
         page_deleted = _deletable(page_remote, page_diff["deleted"], unresolved_page_ids)
         # Like the other empty-listing guards: a syllabus that comes back
         # empty or 403 is never taken as "removed".
         syllabus_deleted = _deletable(syllabus_remote, syllabus_diff["deleted"], set())
+        assignment_deleted = _deletable(assignment_remote, assignment_diff["deleted"], set())
 
         for event in _sync_deleted(conn, db_path, table_name, "file", file_deleted):
             removed_count += 1
@@ -258,6 +292,9 @@ def sync_course(course_id: int, ssb_home: Path):
             removed_count += 1
             yield event
         for event in _sync_deleted(conn, db_path, table_name, "syllabus", syllabus_deleted):
+            removed_count += 1
+            yield event
+        for event in _sync_deleted(conn, db_path, table_name, "assignment", assignment_deleted):
             removed_count += 1
             yield event
 
@@ -299,6 +336,18 @@ def sync_course(course_id: int, ssb_home: Path):
                 except Exception as e:
                     failed_count += 1
                     yield {"item": "Syllabus", "status": "failed", "error": str(e)}
+
+        for ids, is_changed in ((assignment_diff["new"], False), (assignment_diff["changed"], True)):
+            for prefixed_id in ids:
+                assignment = assignments_by_id[prefixed_id.removeprefix("assignment:")]
+                try:
+                    name = _sync_assignment(conn, db_path, table_name, assignment, is_changed)
+                    yield {"item": name, "status": "done"}
+                    changed_count += is_changed
+                    new_count += not is_changed
+                except Exception as e:
+                    failed_count += 1
+                    yield {"item": assignment.get("name", prefixed_id), "status": "failed", "error": str(e)}
     except Exception as e:
         yield {"done": True, "error": str(e)}
         return

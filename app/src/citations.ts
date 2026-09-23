@@ -37,6 +37,11 @@ export async function openCitation(
     await open(`${origin}/courses/${courseId}/assignments/syllabus`);
     return;
   }
+  if (citation.source_type === "assignment") {
+    const assignmentId = citation.item_id.replace(/^assignment:/, "");
+    await open(`${origin}/courses/${courseId}/assignments/${assignmentId}`);
+    return;
+  }
   if (citation.source_type === "page") {
     const pageUrl = citation.item_id.replace(/^page:/, "");
     await open(`${origin}/courses/${courseId}/pages/${pageUrl}`);

@@ -101,9 +101,18 @@ def build_breakdown(name: str, description_text: str) -> list[str]:
     return [line for line in lines if line]
 
 
+POINTER_COUNT = 5
+
+
 def build_pointers(index, name: str, description_text: str) -> list[dict]:
-    retriever = index.as_retriever(similarity_top_k=5)
+    # Assignments are indexed too (course_sync.py), and this query *is* an
+    # assignment's own text, so its indexed copy would always rank first —
+    # a pointer back to the prompt the student is already reading. Pointers
+    # are for course material, so assignment items are dropped; retrieving
+    # extra first keeps POINTER_COUNT real candidates after the filter.
+    retriever = index.as_retriever(similarity_top_k=POINTER_COUNT * 3)
     nodes = retriever.retrieve(f"{name}\n\n{description_text}")
+    nodes = [n for n in nodes if n.node.metadata.get("item_type") != "assignment"][:POINTER_COUNT]
     nodes = SimilarityPostprocessor(similarity_cutoff=generation.SIMILARITY_CUTOFF).postprocess_nodes(nodes)
     citations = generation.build_citations(nodes)
     # source_type carried through so the frontend can click-through a
