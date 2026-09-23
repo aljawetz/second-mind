@@ -1,0 +1,4 @@
+# Raw model answers quote course material (slides, staff names and emails).
+# Kept local; report.md and the *-grades.json files are what's shared.
+*.json
+!*-grades.json
