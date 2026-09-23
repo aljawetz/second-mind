@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import lancedb
+import pyarrow as pa
 from lancedb.expr import col, lit
 from llama_index.core import StorageContext, VectorStoreIndex, set_global_tokenizer
 from llama_index.core.node_parser import SentenceSplitter
@@ -22,7 +23,7 @@ from llama_index.core.schema import NodeRelationship, RelatedNodeInfo, TextNode
 from llama_index.vector_stores.lancedb import LanceDBVectorStore
 from tokenizers import Tokenizer
 
-from embeddings import MODEL_DIR, OnnxBgeEmbedding
+from embeddings import EMBEDDING_DIM, MODEL_DIR, OnnxBgeEmbedding
 
 CHUNK_SIZE = 700  # tokens, rag-pipeline.md §2's ~500-800 target
 CHUNK_OVERLAP = 100  # ~15% of 700
@@ -161,6 +162,44 @@ def notes_to_nodes(notes_text: str, source: str, session_id: str) -> list[TextNo
     return nodes
 
 
+# Every course table's layout, stated up front instead of inferred. LanceDB
+# otherwise infers column types from the first batch written, and a column
+# that's None in every node of that batch becomes type null for good — so
+# whichever material reached a course first decided what it could ever
+# hold. Real data: a course whose first write was a lecture transcript
+# (page=None) rejected every later PDF with "cannot cast field 'page' from
+# Int64 to Null"; a PDF-first course rejected transcripts and pptx slides.
+# The metadata fields are _metadata()'s keys plus the ones llama-index's
+# node_to_metadata_dict adds, in the order it writes them.
+_METADATA_TYPE = pa.struct(
+    [
+        ("source", pa.string()),
+        ("item_type", pa.string()),
+        ("page", pa.int64()),
+        ("slide", pa.int64()),
+        ("timestamp", pa.string()),
+        ("_node_content", pa.string()),
+        ("_node_type", pa.string()),
+        ("document_id", pa.string()),
+        ("doc_id", pa.string()),
+        ("ref_doc_id", pa.string()),
+    ]
+)
+TABLE_SCHEMA = pa.schema(
+    [
+        ("id", pa.string()),
+        ("doc_id", pa.string()),
+        ("vector", pa.list_(pa.float32(), EMBEDDING_DIM)),
+        ("text", pa.string()),
+        ("metadata", _METADATA_TYPE),
+    ]
+)
+
+
+def _field_types(struct_type: pa.StructType) -> list[tuple[str, pa.DataType]]:
+    return [(f.name, f.type) for f in struct_type]
+
+
 class _PatchedLanceDBVectorStore(LanceDBVectorStore):
     """llama-index-vector-stores-lancedb 0.6.0's delete(), delete_nodes(),
     and get_nodes() all build SQL predicates by string-concatenating raw
@@ -180,6 +219,14 @@ class _PatchedLanceDBVectorStore(LanceDBVectorStore):
 
     def delete(self, ref_doc_id: str, **delete_kwargs: Any) -> None:
         self.table.delete(col(self.doc_id_key) == lit(ref_doc_id))
+
+    def add(self, nodes, **add_kwargs: Any) -> list[str]:
+        # The base class creates a missing table from the first batch's
+        # inferred types; creating it empty with TABLE_SCHEMA first turns
+        # that into a plain append against the right layout.
+        if self._table is None and nodes:
+            self._table = self._connection.create_table(self._table_name, schema=TABLE_SCHEMA, mode=self.mode)
+        return super().add(nodes, **add_kwargs)
 
 
 def build_index(nodes: list[TextNode], db_path: Path, table_name: str) -> VectorStoreIndex:
@@ -247,11 +294,51 @@ def add_nodes(nodes: list[TextNode], db_path: Path, table_name: str) -> None:
     yet at all (a session recorded before any Canvas sync), so this can't
     assume load_index's table already exists the way /ask and /explain do."""
     if index_exists(db_path, table_name):
+        repair_table_schema(db_path, table_name)
         index = load_index(db_path, table_name)
         index.insert_nodes(nodes)
         ensure_fts_index(index.vector_store.table)
     else:
         build_index(nodes, db_path, table_name)
+
+
+def repair_table_schema(db_path: Path, table_name: str) -> bool:
+    """Rewrites a table created before TABLE_SCHEMA existed, whose metadata
+    columns got locked to type null (or are missing, for tables older than
+    _metadata()'s full key set), so the next insert can succeed. Returns
+    whether a rewrite happened.
+
+    Nothing is re-embedded or re-extracted: rows are read back, the metadata
+    struct is rebuilt field by field (a null-typed column casts losslessly
+    to any type — every value in it is null), and the table is overwritten.
+    LanceDB's overwrite commits a new version and keeps the old one, so a
+    crash mid-rewrite leaves the previous version intact. Runs on the write
+    path (add_nodes), so an installed app heals each course the next time
+    anything is indexed into it — no separate migration step."""
+    db = lancedb.connect(str(db_path))
+    table = db.open_table(table_name)
+    current = table.schema.field("metadata").type
+    if _field_types(current) == _field_types(_METADATA_TYPE):
+        return False
+    unknown = {f.name for f in current} - {f.name for f in _METADATA_TYPE}
+    if unknown:
+        # Would be dropped by the rewrite — refuse rather than lose data.
+        raise ValueError(f"{table_name} has metadata fields TABLE_SCHEMA doesn't know: {sorted(unknown)}")
+
+    data = table.to_arrow()
+    old_metadata = data.column("metadata").combine_chunks()
+    children = [
+        old_metadata.field(f.name).cast(f.type)
+        if current.get_field_index(f.name) != -1
+        else pa.nulls(len(old_metadata), f.type)
+        for f in _METADATA_TYPE
+    ]
+    metadata = pa.StructArray.from_arrays(children, fields=list(_METADATA_TYPE))
+    columns = [data.column(f.name).cast(f.type) for f in TABLE_SCHEMA if f.name != "metadata"] + [metadata]
+    repaired = pa.Table.from_arrays(columns, schema=TABLE_SCHEMA)
+
+    ensure_fts_index(db.create_table(table_name, repaired, mode="overwrite"))
+    return True
 
 
 def delete_ref_doc_nodes(db_path: Path, table_name: str, ref_doc_id: str) -> None:
