@@ -19,10 +19,10 @@ import sync
 SUPPORTED_FILE_SUFFIXES = {".pdf", ".pptx"}
 
 
-def _course_paths(ssb_home: Path, course_id: int) -> tuple[Path, Path]:
-    course_dir = ssb_home / "courses" / str(course_id)
+def _course_paths(sm_home: Path, course_id: int) -> tuple[Path, Path]:
+    course_dir = sm_home / "courses" / str(course_id)
     course_dir.mkdir(parents=True, exist_ok=True)
-    return course_dir / "manifest.db", ssb_home / "index.lancedb"
+    return course_dir / "manifest.db", sm_home / "index.lancedb"
 
 
 def _sync_deleted(conn, db_path, table_name, item_type, deleted_ids):
@@ -155,7 +155,7 @@ def _deletable(remote_items: list[dict], deleted_ids: list[str], unresolved_ids:
     return [i for i in deleted_ids if i not in unresolved_ids]
 
 
-def sync_course(course_id: int, ssb_home: Path):
+def sync_course(course_id: int, sm_home: Path):
     """Generator — see module docstring and the design spec for the full
     contract. Yields {"item", "status", "error"?} per processed item, then
     exactly one final {"done": True, "new", "changed", "removed", "failed"}
@@ -165,7 +165,7 @@ def sync_course(course_id: int, ssb_home: Path):
     the 200 and streaming headers by the time this generator's body runs,
     so an uncaught exception here would leave the connection dying
     mid-stream with no terminating event for the frontend to act on."""
-    manifest_path, db_path = _course_paths(ssb_home, course_id)
+    manifest_path, db_path = _course_paths(sm_home, course_id)
     table_name = f"course_{course_id}"
     conn = sync.open_manifest(manifest_path)
 

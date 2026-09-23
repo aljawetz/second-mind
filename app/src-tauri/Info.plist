@@ -4,6 +4,6 @@
 <plist version="1.0">
 <dict>
   <key>NSMicrophoneUsageDescription</key>
-  <string>SSB records class sessions you start so it can transcribe and index them for you.</string>
+  <string>Second Mind records class sessions you start so it can transcribe and index them for you.</string>
 </dict>
 </plist>

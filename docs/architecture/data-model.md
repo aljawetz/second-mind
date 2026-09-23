@@ -1,22 +1,22 @@
 # Data Model
 
-How SSB stores everything on disk, and specifically how a course's identity and weekly schedule
+How Second Mind stores everything on disk, and specifically how a course's identity and weekly schedule
 are represented — the piece §9.1 (design spec) depends on. See [overview.md](overview.md) for how
 this fits into the running system.
 
 ## 1. On-disk layout
 
-Everything lives under `~/.ssb/` directly — no per-student subdirectory. §5.1 of the design spec's
+Everything lives under `~/.secondmind/` directly — no per-student subdirectory. §5.1 of the design spec's
 "physical isolation, not a filter on a shared store" is about a hypothetical shared multi-tenant
 backend (many students' data in one database, isolated only by a query filter that could have a
-bug); SSB is a local sidecar, one student per machine, one OS user account per student. The macOS
+bug); Second Mind is a local sidecar, one student per machine, one OS user account per student. The macOS
 home directory *is* that physical isolation boundary — a `<student_id>` subdirectory inside it
 would isolate against nothing real for this architecture. (Multiple students sharing one OS
 account, e.g. a public lab machine, would be the one scenario where it mattered — not a stated
-target for SSB today; revisit this layout if that ever becomes real.)
+target for Second Mind today; revisit this layout if that ever becomes real.)
 
 ```
-~/.ssb/
+~/.secondmind/
 ├── config.json                  # non-sensitive settings only — see §3
 ├── index.lancedb/                # one LanceDB database for this student
 │   ├── course_49797/             # one table per course (logical separation, not a security
@@ -40,13 +40,13 @@ target for SSB today; revisit this layout if that ever becomes real.)
 ```
 
 **Credentials are deliberately absent from this tree.** The Canvas token and LLM API key live in
-the macOS Keychain (overview.md §4), never in `config.json` or anywhere under `~/.ssb/`. A backup
+the macOS Keychain (overview.md §4), never in `config.json` or anywhere under `~/.secondmind/`. A backup
 or sync tool that copies this directory should never be able to exfiltrate either credential as a
 side effect.
 
 **Raw downloaded files are not persisted.** A PDF, PPTX, or DOCX fetched from Canvas during sync
 is hashed, extracted, embedded, and then discarded — not kept in this tree anywhere. Canvas remains
-the source of truth for course files (unlike recordings/notes, which SSB itself originates and
+the source of truth for course files (unlike recordings/notes, which Second Mind itself originates and
 must keep), so there's nothing to lose by not caching them: a re-extraction (a pipeline
 improvement, a corrupted index) just re-downloads from Canvas rather than reading a local copy.
 This also keeps disk usage bounded — one real course file seen this sprint was 36MB, and a
@@ -155,10 +155,10 @@ this should be confirmed against the actual LanceDB integration, not assumed fro
 
 Each session gets its own directory named for the date and class number
 (`2026-09-12-class-06/`), not a bare UUID — so a student who goes looking through
-`~/.ssb/courses/49797/sessions/` in Finder can find last Tuesday's class without opening the
+`~/.secondmind/courses/49797/sessions/` in Finder can find last Tuesday's class without opening the
 app. `transcript.json` carries timestamped segments (the citation anchor for Q&A, matching the
 `"Lecture 6 · 14:22"` label shape used throughout the mockup and §7); `notes.md` is the student's
-own rough in-class notes, plain Markdown, editable outside SSB if they ever want to; `summary.md`
+own rough in-class notes, plain Markdown, editable outside Second Mind if they ever want to; `summary.md`
 is AI-enhanced structured notes generated from the transcript alone (implementation-plan.md Step
 12 — a deliberate product decision not to mix the student's own notes into that generation step).
 The raw audio recording is never kept past transcription — deleted as soon as it succeeds, the

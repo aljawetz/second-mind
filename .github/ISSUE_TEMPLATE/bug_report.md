@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Something in SSB doesn't work the way it should
+about: Something in Second Mind doesn't work the way it should
 title: ""
 labels: bug
 ---

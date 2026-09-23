@@ -21,7 +21,7 @@ measurable industry or social value.
 
 ## Relevant scope
 
-Pilot courses named in [the design spec](../specs/2026-09-14-ssb-design.md) §13 — 49797 (primary)
+Pilot courses named in [the design spec](../specs/2026-09-14-second-mind-design.md) §13 — 49797 (primary)
 and 18654 (Software Testing and Operations, to prove the multi-course sidebar on different
 content) — are the validation targets. §12's success metrics (citation groundedness, retrieval
 precision@k, artifact groundedness, return usage, confidence) are what gets measured here.

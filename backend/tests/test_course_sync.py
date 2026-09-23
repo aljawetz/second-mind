@@ -37,10 +37,10 @@ def _structure(*metas):
     return [{"items": [{"type": "File", "content_id": m["id"]} for m in metas]}]
 
 
-def _manifest_ids(ssb_home, course_id=1):
+def _manifest_ids(sm_home, course_id=1):
     """Reads the real manifest.db the sync just wrote — deletion guards are
     about what survives on disk, not only about the emitted counts."""
-    conn = course_sync.sync.open_manifest(ssb_home / "courses" / str(course_id) / "manifest.db")
+    conn = course_sync.sync.open_manifest(sm_home / "courses" / str(course_id) / "manifest.db")
     try:
         return {row[0] for row in conn.execute("SELECT canvas_item_id FROM manifest").fetchall()}
     finally:
@@ -100,8 +100,8 @@ def stub_extraction(monkeypatch):
     return calls
 
 
-def run(course_id, ssb_home):
-    return list(course_sync.sync_course(course_id, ssb_home))
+def run(course_id, sm_home):
+    return list(course_sync.sync_course(course_id, sm_home))
 
 
 def test_first_sync_reports_one_new_file_and_one_new_page(tmp_path, stub_canvas, stub_extraction):

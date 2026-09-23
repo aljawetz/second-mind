@@ -21,7 +21,7 @@ Working core prototype, repository update, demonstration, and concise evaluation
 
 ## Relevant scope
 
-Per [the design spec](../specs/2026-09-14-ssb-design.md) §4, this is where ingestion, hybrid
+Per [the design spec](../specs/2026-09-14-second-mind-design.md) §4, this is where ingestion, hybrid
 retrieval (BM25 + vector, §5.3), and grounded cited Q&A (§7) get built for real, replacing the
 [Sprint 3](sprint-03.md) baseline. Retrieval precision@k and citation groundedness (§12) are
 the metrics to evaluate against.

@@ -127,7 +127,7 @@ updated for `mark_synced()`'s new `display_name` parameter regardless of
 whether its logic gets literally reused (see 3.1).
 
 ```python
-def sync_course(course_id: int, ssb_home: Path):
+def sync_course(course_id: int, sm_home: Path):
     """Generator. Yields one dict per processed item:
       {"item": display_name, "status": "done" | "failed", "error"?: str}
     and a final summary dict:
@@ -140,7 +140,7 @@ def sync_course(course_id: int, ssb_home: Path):
 Internal shape (not part of the public contract, but pinned here so the
 plan can break it into real steps):
 
-1. `db_path = ssb_home / "index.lancedb"`; `manifest_path = ssb_home / <course
+1. `db_path = sm_home / "index.lancedb"`; `manifest_path = sm_home / <course
    dir> / "manifest.db"` (matches existing per-course directory convention —
    confirm exact path via `data-model.md` / however `sessions.py` locates a
    course's directory today, during planning).

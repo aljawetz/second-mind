@@ -47,7 +47,7 @@ export default function Sidebar({
     <aside className="sidebar">
       <div className="brand">
         <LogoMark size={15} className="brand-logo" />
-        <span className="mark">SSB</span>
+        <span className="mark">Second Mind</span>
       </div>
 
       <div>

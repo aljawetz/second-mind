@@ -249,7 +249,7 @@ git commit -m "Add HTML-to-text extraction for Canvas Pages"
 
 **Interfaces:**
 - Consumes: `sync.open_manifest`, `sync.diff`, `sync.mark_synced` (new signature from Task 1), `sync.forget`, `sync.content_hash`; `canvas.get_course_structure`, `canvas.get_file`, `canvas.list_pages`, `canvas.get_page`, `canvas.CanvasError`; `ingestion.extract_pdf`, `ingestion.extract_pptx`, `ingestion.extract_html_page` (from Task 2), `ingestion.ocr_pdf_page`; `indexing.pages_to_nodes`, `indexing.slides_to_nodes`, `indexing.add_nodes`, `indexing.delete_ref_doc_nodes`.
-- Produces: `course_sync.sync_course(course_id: int, ssb_home: Path)` — a generator yielding `{"item": str, "status": "done"}`, `{"item": str, "status": "failed", "error": str}` per processed item, then exactly one final `{"done": True, "new": int, "changed": int, "removed": int, "failed": int}`, or `{"done": True, "error": str}` if the course couldn't be reached at all (nothing else yielded first in that case).
+- Produces: `course_sync.sync_course(course_id: int, sm_home: Path)` — a generator yielding `{"item": str, "status": "done"}`, `{"item": str, "status": "failed", "error": str}` per processed item, then exactly one final `{"done": True, "new": int, "changed": int, "removed": int, "failed": int}`, or `{"done": True, "error": str}` if the course couldn't be reached at all (nothing else yielded first in that case).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -311,8 +311,8 @@ def stub_extraction(monkeypatch):
     monkeypatch.setattr(course_sync.indexing, "delete_ref_doc_nodes", lambda db_path, table_name, ref_doc_id: None)
 
 
-def run(course_id, ssb_home):
-    return list(course_sync.sync_course(course_id, ssb_home))
+def run(course_id, sm_home):
+    return list(course_sync.sync_course(course_id, sm_home))
 
 
 def test_first_sync_reports_one_new_file_and_one_new_page(tmp_path, stub_canvas, stub_extraction):
@@ -398,10 +398,10 @@ import sync
 SUPPORTED_FILE_SUFFIXES = {".pdf", ".pptx"}
 
 
-def _course_paths(ssb_home: Path, course_id: int) -> tuple[Path, Path]:
-    course_dir = ssb_home / "courses" / str(course_id)
+def _course_paths(sm_home: Path, course_id: int) -> tuple[Path, Path]:
+    course_dir = sm_home / "courses" / str(course_id)
     course_dir.mkdir(parents=True, exist_ok=True)
-    return course_dir / "manifest.db", ssb_home / "index.lancedb"
+    return course_dir / "manifest.db", sm_home / "index.lancedb"
 
 
 def _sync_deleted(conn, db_path, table_name, item_type, deleted_ids):
@@ -462,13 +462,13 @@ def _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed):
     return title
 
 
-def sync_course(course_id: int, ssb_home: Path):
+def sync_course(course_id: int, sm_home: Path):
     """Generator — see module docstring and the design spec for the full
     contract. Yields {"item", "status", "error"?} per processed item, then
     exactly one final {"done": True, "new", "changed", "removed", "failed"}
     summary, or {"done": True, "error": str} (nothing else yielded first)
     if the course couldn't be synced at all."""
-    manifest_path, db_path = _course_paths(ssb_home, course_id)
+    manifest_path, db_path = _course_paths(sm_home, course_id)
     table_name = f"course_{course_id}"
     conn = sync.open_manifest(manifest_path)
 
@@ -602,7 +602,7 @@ Add `_handle_course_sync` right after `_handle_ask` (they share the same streami
         self.send_header("Transfer-Encoding", "chunked")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
-        for event in course_sync.sync_course(int(course_id), SSB_HOME):
+        for event in course_sync.sync_course(int(course_id), SM_HOME):
             self._write_chunk(event)
         self.wfile.write(b"0\r\n\r\n")
         self.wfile.flush()
@@ -675,9 +675,9 @@ def log(msg: str):
     print(f"[sync-smoke] {msg}")
 
 
-def run_once(course_id: int, ssb_home: Path) -> dict:
+def run_once(course_id: int, sm_home: Path) -> dict:
     summary = None
-    for event in course_sync.sync_course(course_id, ssb_home):
+    for event in course_sync.sync_course(course_id, sm_home):
         if event.get("done"):
             summary = event
         elif event.get("status") == "failed":
@@ -689,16 +689,16 @@ def run_once(course_id: int, ssb_home: Path) -> dict:
 
 def main():
     with tempfile.TemporaryDirectory() as scratch:
-        ssb_home = Path(scratch)
+        sm_home = Path(scratch)
 
         log(f"first sync of course {COURSE_ID} (real Canvas call)")
-        summary = run_once(COURSE_ID, ssb_home)
+        summary = run_once(COURSE_ID, sm_home)
         log(f"  summary: {summary}")
         assert summary.get("error") is None, f"course sync failed outright: {summary}"
         assert summary["new"] > 0, "expected at least one new item on a first sync"
 
         log("re-syncing the same course with no remote changes — expect all zero")
-        summary2 = run_once(COURSE_ID, ssb_home)
+        summary2 = run_once(COURSE_ID, sm_home)
         log(f"  summary: {summary2}")
         assert summary2 == {"done": True, "new": 0, "changed": 0, "removed": 0, "failed": 0}, (
             f"expected a no-op re-sync, got {summary2}"
@@ -937,7 +937,7 @@ export default function OnboardingIndexing({
           })}
         </div>
         <button className="btn-primary" disabled={!allDone} onClick={onNext}>
-          Continue to SSB →
+          Continue to Second Mind →
         </button>
       </div>
     </div>
@@ -954,7 +954,7 @@ Expected: no errors.
 
 - [ ] **Step 3: Manual smoke check**
 
-Run the app (`cd app && PATH="$HOME/.cargo/bin:$PATH" npm run tauri dev`) and walk through onboarding with a real course selected. Confirm: real item names appear as they sync (not 3 generic fake labels), the "Continue to SSB →" button stays disabled until every course reports done, and a course with zero indexable items still reaches `done` (doesn't hang forever on "Starting…").
+Run the app (`cd app && PATH="$HOME/.cargo/bin:$PATH" npm run tauri dev`) and walk through onboarding with a real course selected. Confirm: real item names appear as they sync (not 3 generic fake labels), the "Continue to Second Mind →" button stays disabled until every course reports done, and a course with zero indexable items still reaches `done` (doesn't hang forever on "Starting…").
 
 - [ ] **Step 4: Commit**
 

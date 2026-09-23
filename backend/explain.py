@@ -29,7 +29,7 @@ from llama_index.llms.openai import OpenAI
 import generation
 
 BREAKDOWN_TEMPLATE = PromptTemplate(
-    "You are SSB, a study assistant. Break the following assignment prompt "
+    "You are Second Mind, a study assistant. Break the following assignment prompt "
     "into its actual sub-requirements, in plain, concise language — this is "
     "reading comprehension of the prompt's own structure, not advice on how "
     "to complete it. Do not suggest implementation approaches, do not name "

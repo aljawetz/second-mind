@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Propose something SSB should do
+about: Propose something Second Mind should do
 title: ""
 labels: enhancement
 ---
@@ -15,6 +15,6 @@ Your proposed solution, if you have one in mind.
 Any other approaches you thought about.
 
 **Scope check**
-SSB explains assignments; it doesn't draft them, by deliberate design (see the README's
+Second Mind explains assignments; it doesn't draft them, by deliberate design (see the README's
 "Responsible AI" section). If this touches that boundary, say so explicitly — it'll need
 discussion before implementation either way.

@@ -15,10 +15,10 @@ from llama_index.core.schema import NodeRelationship, NodeWithScore, QueryBundle
 from llama_index.core.vector_stores.utils import metadata_dict_to_node
 from llama_index.llms.openai import OpenAI
 
-CREDENTIAL_SERVICE = "com.ssb.app"
+CREDENTIAL_SERVICE = "com.secondmind.app"
 
 # Shown when grounded=False (design spec §7: "if indexed material does not
-# support an answer, SSB says so rather than falling back to open-domain
+# support an answer, Second Mind says so rather than falling back to open-domain
 # knowledge") — covers both "nothing indexed yet" and "nothing relevant
 # retrieved", which look identical from the student's side.
 NOT_COVERED_MESSAGE = (
@@ -64,7 +64,7 @@ FTS_TOP_K = 1
 DEFAULT_MODEL = "gpt-4o-mini"
 
 ANSWER_FIRST_TEMPLATE = PromptTemplate(
-    "You are SSB, a study assistant. Answer the question directly and "
+    "You are Second Mind, a study assistant. Answer the question directly and "
     "concisely using only the numbered sources below. Cite every "
     "factual claim with its source number, e.g. [1]. If the sources "
     "don't contain enough information to answer, say so explicitly "

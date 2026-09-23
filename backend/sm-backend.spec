@@ -4,15 +4,15 @@
 # pipeline reused when LlamaIndex/onnxruntime/faster-whisper are added.
 #
 # Output is a folder (see the onedir note at the bottom), copied as-is to
-# app/src-tauri/binaries/ssb-backend/.
+# app/src-tauri/binaries/sm-backend/.
 #
 # BUILD FROM `uv sync --group build`, NEVER a plain `uv sync`. PyInstaller
 # bundles whatever's importable in the venv it runs from, not just what
 # main.py needs — building from an environment that also has `convert`
 # installed (optimum, for the ONNX conversion script) silently pulled torch
 # into this exact binary, confirmed by checking, implementation-plan.md
-# Step 4. `pyinstaller ssb-backend.spec` must be run as
-# `uv run --group build pyinstaller ssb-backend.spec ...`.
+# Step 4. `pyinstaller sm-backend.spec` must be run as
+# `uv run --group build pyinstaller sm-backend.spec ...`.
 
 a = Analysis(
     ["main.py"],
@@ -38,18 +38,18 @@ pyz = PYZ(a.pure)
 # fresh temp dir on every launch, and macOS then scanned every newly written
 # dylib — measured 34.5s to first /ping on a repeat launch, vs 2.2s for this
 # layout (both pay a one-time ~35s scan on a never-seen build). The output
-# is dist/ssb-backend/ (the executable plus _internal/), shipped as a Tauri
+# is dist/sm-backend/ (the executable plus _internal/), shipped as a Tauri
 # bundle resource rather than an externalBin, which only takes one file.
 exe = EXE(
     pyz,
     a.scripts,
     [],
     exclude_binaries=True,
-    name="ssb-backend",
+    name="sm-backend",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
     console=True,
 )
-coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="ssb-backend")
+coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="sm-backend")

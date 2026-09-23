@@ -91,7 +91,7 @@ structurally invisible to both plain-text extraction and OCR.
 
 **Decision: Proceed**, with a specific technical approach for ingestion rather than one strategy
 applied uniformly. The core RAG approach and the architecture already laid out in the [design
-spec](../specs/2026-09-14-ssb-design.md) §5 both hold — this sprint's finding is about *how* to
+spec](../specs/2026-09-14-second-mind-design.md) §5 both hold — this sprint's finding is about *how* to
 ingest PDF and slide content, not whether the overall approach works.
 
 **Extraction should be tiered, not uniform:**

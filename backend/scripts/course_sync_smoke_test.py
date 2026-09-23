@@ -33,9 +33,9 @@ def log(msg: str):
     print(f"[sync-smoke] {msg}")
 
 
-def run_once(course_id: int, ssb_home: Path) -> dict:
+def run_once(course_id: int, sm_home: Path) -> dict:
     summary = None
-    for event in course_sync.sync_course(course_id, ssb_home):
+    for event in course_sync.sync_course(course_id, sm_home):
         if event.get("done"):
             summary = event
         elif event.get("status") == "failed":
@@ -47,16 +47,16 @@ def run_once(course_id: int, ssb_home: Path) -> dict:
 
 def main():
     with tempfile.TemporaryDirectory() as scratch:
-        ssb_home = Path(scratch)
+        sm_home = Path(scratch)
 
         log(f"first sync of course {COURSE_ID} (real Canvas call)")
-        summary = run_once(COURSE_ID, ssb_home)
+        summary = run_once(COURSE_ID, sm_home)
         log(f"  summary: {summary}")
         assert summary.get("error") is None, f"course sync failed outright: {summary}"
         assert summary["new"] > 0, "expected at least one new item on a first sync"
 
         log("re-syncing the same course with no remote changes — expect all zero")
-        summary2 = run_once(COURSE_ID, ssb_home)
+        summary2 = run_once(COURSE_ID, sm_home)
         log(f"  summary: {summary2}")
         assert summary2 == {"done": True, "new": 0, "changed": 0, "removed": 0, "failed": 0}, (
             f"expected a no-op re-sync, got {summary2}"

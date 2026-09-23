@@ -105,7 +105,7 @@ locate something from a past lecture or reading to move forward on current work.
 
 ## 2. Proposed solution
 
-SSB (Student Second Brain) is one app per student that ingests their real Canvas course material,
+Second Mind (Second Mind) is one app per student that ingests their real Canvas course material,
 captures their lectures, answers questions with citations back to the source, and generates the
 study material students otherwise build by hand — mock tests, mindmaps, slides, flashcards. Inputs
 are the student's own Canvas token (their existing course access, nothing more) plus their
@@ -143,7 +143,7 @@ documented above. And unlike paying a human, it's available at 11pm for the cost
 - **Return usage during exam weeks** *(user/social)* — the honest signal that generated artifacts
   are actually being used to study, not generated and abandoned.
 - **Pre/post self-reported confidence on the material** *(user/social)* — whether students report
-  feeling more prepared after using SSB versus their prior study routine.
+  feeling more prepared after using Second Mind versus their prior study routine.
 
 At least one technical metric (citation groundedness) and one user-impact metric (return usage
 during exam weeks) anchor the evaluation, per the assignment rubric.

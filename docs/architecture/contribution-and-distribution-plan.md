@@ -1,13 +1,13 @@
 # Contribution & Distribution Plan
 
-A sequenced plan for making SSB easy to **install** (a downloadable build, not "clone and build it
+A sequenced plan for making Second Mind easy to **install** (a downloadable build, not "clone and build it
 yourself") and easy to **contribute to** (a stranger can get a working dev environment in one
 command and knows how to send a PR). Same Do/Test/Depends-on format as
 [implementation-plan.md](implementation-plan.md), but this tracks infra/process work, not feature
 build order — kept separate rather than folded into the sprint sequence.
 
 Modeled loosely on [Onyx's self-serve quickstart](https://docs.onyx.app/deployment/getting_started/quickstart)
-— one command, guided setup, no research required. SSB is a local desktop app rather than a
+— one command, guided setup, no research required. Second Mind is a local desktop app rather than a
 self-hosted server, so the direct analog isn't a CLI installer but a downloadable, double-click
 `.dmg` for end users, plus a one-command bootstrap for contributors' dev environments.
 
@@ -43,10 +43,10 @@ URL built from the configured domain.
 **Verified:** `config.normalize_canvas_base_url()` accepts a bare domain, a full URL, a trailing
 slash, or an accidentally-pasted `/api/v1` and returns one canonical origin (5 new tests,
 `test_config.py`). `canvas._api_base()` reads that origin from `config.json` via a module-level
-`canvas.SSB_HOME` (wired to the real value once in `main.py`, monkeypatched to `tmp_path` in
+`canvas.SM_HOME` (wired to the real value once in `main.py`, monkeypatched to `tmp_path` in
 tests — same pattern `sessions.py`/`courses.py` already use, except as a settable module attribute
 rather than a threaded parameter, since every `canvas.py` call site already existed before this
-and threading `ssb_home` through all of them was a much larger diff for the same result). A new
+and threading `sm_home` through all of them was a much larger diff for the same result). A new
 `respx`-mocked test (`test_configured_base_url_is_used_instead_of_default`) confirms a request
 actually goes to a configured non-CMU origin (`canvas.instructure.com`), not just that the string
 is stored correctly. 51 backend tests pass. Frontend: `canvasBaseUrl` is threaded from `App.tsx`
@@ -70,7 +70,7 @@ no flagged license conflicts.
 `httpx`, `pdfplumber`, `python-pptx`, `pytesseract`, `tokenizers`, `pandas`); `llama-index-core`
 and `keyring` don't declare a classifier but are MIT upstream. `pyinstaller` itself is GPL-3.0, but
 per PyInstaller's own FAQ that applies to PyInstaller's source, not to the programs it freezes —
-the shipped SSB binary isn't required to be GPL. React, Vite, TypeScript, and Tauri (dual MIT/
+the shipped Second Mind binary isn't required to be GPL. React, Vite, TypeScript, and Tauri (dual MIT/
 Apache-2.0) are all permissive. No conflicts found. `LICENSE` added; `app/package.json` and
 `backend/pyproject.toml` both declare `"license": "MIT"`.
 
@@ -121,7 +121,7 @@ be correct).
 first (`uv sync --all-groups` + `convert_embedding_model.py` + `pytest tests/ -v` → 51 passed;
 `npx tsc --noEmit` and `npm run build` → clean; `cargo check` in `app/src-tauri` → clean) — but the
 first real GitHub Actions run still caught something local verification couldn't: the `rust` job
-failed with `resource path 'binaries/ssb-backend-aarch64-apple-darwin' doesn't exist` —
+failed with `resource path 'binaries/sm-backend-aarch64-apple-darwin' doesn't exist` —
 Tauri's build script validates every `externalBin` resource exists on disk before it'll even
 `cargo check`, and that binary is gitignored, only ever produced by the much heavier PyInstaller
 release build (step 5), which this fast type-check job was never meant to run. Fixed by stubbing
@@ -168,7 +168,7 @@ works end to end.
 locally, end to end first — the documented two-phase `uv sync` sequence (`--group convert` to
 generate the embedding model, then a full reconcile to `--group build` before PyInstaller runs)
 confirmed to actually strip torch/optimum back out before the shipped binary is built, exactly as
-`backend/README.md` already warned it must; the sidecar built, `SSB.app` bundled successfully. The
+`backend/README.md` already warned it must; the sidecar built, `Second Mind.app` bundled successfully. The
 final `.dmg`-creation step couldn't be verified in that local sandboxed shell — Tauri's
 `bundle_dmg.sh` shells out to `osascript` to style the Finder window, and that AppleEvent call
 timed out (`-1712`) there. Pushed a real `v0.1.0` tag instead of trusting local output alone: the
@@ -177,5 +177,5 @@ cleanly on GitHub's own macOS runner — but surfaced a second real finding loca
 have caught either: this repo's default `GITHUB_TOKEN` permissions don't include creating a
 release (`Resource not accessible by integration`). Fixed with an explicit `permissions: contents:
 write` block; re-tagged and re-pushed. **Second run fully green** — a real, public
-[v0.1.0 release](https://github.com/aljawetz/ssb/releases/tag/v0.1.0) exists with a downloadable
+[v0.1.0 release](https://github.com/aljawetz/second-mind/releases/tag/v0.1.0) exists with a downloadable
 `.dmg` attached.

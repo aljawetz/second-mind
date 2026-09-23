@@ -21,7 +21,7 @@ implementation milestones.
 
 ## What we did (so far)
 
-Extended [the design spec](../specs/2026-09-14-ssb-design.md) with the pieces this sprint's rubric
+Extended [the design spec](../specs/2026-09-14-second-mind-design.md) with the pieces this sprint's rubric
 calls for beyond Sprint 3's architecture: an onboarding/first-run flow (§5.4), a sync mechanism for
 keeping the index fresh (§5.5), the assignment explainer (§7.1) and its scope boundary against the
 deferred assignment helper (§4), session-capture scheduling and triggering (§9.1–§9.3), and a

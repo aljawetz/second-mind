@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Sprint 4 detail behind [the design spec](../specs/2026-09-14-ssb-design.md)'s §5 architecture.
+Sprint 4 detail behind [the design spec](../specs/2026-09-14-second-mind-design.md)'s §5 architecture.
 This document covers the end-to-end system shape, component interfaces, deployment, security, and
 reliability. Four companion documents go deeper on specific layers:
 
@@ -15,12 +15,12 @@ reliability. Four companion documents go deeper on specific layers:
 
 ## 1. Shape of the system
 
-SSB is a single native desktop app, not a client talking to a server SSB operates. Two processes
+Second Mind is a single native desktop app, not a client talking to a server Second Mind operates. Two processes
 run on the student's machine:
 
 ```
 ┌───────────────────────────────────────────────────────────────────┐
-│ SSB.app (Tauri, macOS)                                            │
+│ Second Mind.app (Tauri, macOS)                                    │
 │                                                                    │
 │  ┌─────────────────────────┐        ┌──────────────────────────┐ │
 │  │ Frontend                │  HTTP  │ Local backend             │ │
@@ -229,7 +229,7 @@ knows or cares that LanceDB is the concrete store.
 ## 3. Deployment
 
 **Packaging.** A single Tauri `.app` bundle for macOS. The Python backend is frozen with
-PyInstaller into a folder (an executable plus `_internal/`) at `Contents/Resources/ssb-backend/` —
+PyInstaller into a folder (an executable plus `_internal/`) at `Contents/Resources/sm-backend/` —
 the student installs one app, never a Python environment, never `pip install` anything themselves.
 A folder, not a single file: the single-file build unpacked ~900 MB to a fresh temp dir on every
 launch and macOS rescanned it each time (~35s to first `/ping`, every launch, vs ~2s). Tauri can't

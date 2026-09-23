@@ -1,4 +1,4 @@
-# SSB — Student Second Brain — Design Spec
+# Second Mind — Second Mind — Design Spec
 
 Course: 49797, Special Topics: Advanced AI for Industry and Society (Fall 2026)
 Date: 2026-09-15
@@ -6,7 +6,7 @@ Supersedes: `2026-09-11-canvas-ai-tutor-design.md`
 
 ## 1. Thesis
 
-**SSB (Student Second Brain) is the open-source alternative to [UniFlow Study](https://www.uniflowstudy.com/).**
+**Second Mind (Second Mind) is the open-source alternative to [UniFlow Study](https://www.uniflowstudy.com/).**
 
 One app per student that ingests their real course material, captures their lectures, answers
 questions with citations back to the source, and generates the study artifacts they would
@@ -36,7 +36,7 @@ Three differentiators:
 
 ## 3. Competitive position
 
-| | UniFlow Study | SSB |
+| | UniFlow Study | Second Mind |
 | --- | --- | --- |
 | License / cost | Proprietary, $0–$39.20/mo, metered | Open source, self-hosted, unmetered |
 | Data location | Vendor cloud | Student's own machine |
@@ -49,7 +49,7 @@ Three differentiators:
 | Personal data in a vector store | Unknown | **Never** — fetched live, never indexed |
 
 The honest read: UniFlow is broader today (Blackboard/Moodle, bilingual transcription, writing
-assistant). SSB wins on ownership, cost, and the generate-study-material axis. We do not claim
+assistant). Second Mind wins on ownership, cost, and the generate-study-material axis. We do not claim
 parity and should not.
 
 ## 4. Scope
@@ -72,7 +72,7 @@ parity and should not.
   session's transcript plus assigned readings. Highest-value next feature; deferred only on time.
 - **Assignment helper** — anything that drafts, completes, or substantially generates submittable
   work: code, written answers, problem-set solutions. This is still deferred on principle, not
-  time: SSB explains the *prompt* and the *material* (§7.1), and does not produce the *submission*.
+  time: Second Mind explains the *prompt* and the *material* (§7.1), and does not produce the *submission*.
   That line, and how we intend to enforce it technically rather than just by instruction to the
   model, is the answer for the Sprint 8 responsible-AI review.
 - **Piazza as a source.** High-value content, but no official public API — an unofficial client is
@@ -83,7 +83,7 @@ parity and should not.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ SSB app (our frontend)                                       │
+│ Second Mind app (our frontend)                               │
 │   onboarding: connect Canvas + LLM keys → select courses     │
 │               → index (assignments, modules, files)          │
 │   sidebar: courses │ sessions                                │
@@ -95,7 +95,7 @@ parity and should not.
 └─────────────────────────────┬────────────────────────────────┘
                               │ HTTP / JSON
 ┌─────────────────────────────▼────────────────────────────────┐
-│ SSB backend                                                  │
+│ Second Mind backend                                          │
 │   ingest     Canvas → parse → chunk → embed                  │
 │   retrieve   Retriever interface (hybrid BM25 + vector)      │
 │   answer     answer-first + citations                        │
@@ -107,7 +107,7 @@ parity and should not.
 ┌──▼─────────────┐ ┌▼───────────┐ ┌▼───────────┐ ┌▼───────────┐
 │ Per-student    │ │ Canvas API │ │ Whisper    │ │ LLM        │
 │ vector store   │ │ live reads │ │ local      │ │ pluggable  │
-│ ~/.ssb/<id>/   │ │ deadlines  │ │ transcribe │ │ default    │
+│ ~/.secondmind/<id>/   │ │ deadlines  │ │ transcribe │ │ default    │
 │   docs/        │ │ grades     │ └────────────┘ │ Claude     │
 │   recordings/  │ │ submissions│                └────────────┘
 │   notes/       │ └────────────┘  + web search MCP
@@ -122,9 +122,9 @@ and their notes. Nothing is shared between students.
 This is **physical** isolation — one local installation per student, on their own machine, under
 their own OS user account — not a filter flag on a shared corpus. A query-filter bug in a shared
 store is a cross-student data leak; a missing directory is an empty result. For a system holding
-lecture recordings and personal academic data, that asymmetry is worth paying for. SSB never runs
+lecture recordings and personal academic data, that asymmetry is worth paying for. Second Mind never runs
 as a shared multi-tenant backend, so there's no additional per-student subdirectory to layer inside
-`~/.ssb/` — the OS account boundary already provides the isolation this section is about
+`~/.secondmind/` — the OS account boundary already provides the isolation this section is about
 (data-model.md §1).
 
 **The cost, stated plainly:** the same slide deck is embedded once per student, and the class gets
@@ -163,15 +163,15 @@ empty shell.
    validated immediately with a real call to each service before the flow proceeds — a bad token
    or key fails fast here, not three days later as an unexplained "why isn't Q&A working." Both
    stay on the student's machine — read once, used to talk to Canvas and the model provider
-   directly, never transmitted to any SSB-operated service (§6). The same failure codes
+   directly, never transmitted to any Second Mind-operated service (§6). The same failure codes
    (`canvas_auth_failed`, `llm_auth_failed` — docs/architecture/overview.md §2) resurface later if
    a token expires or a key gets revoked mid-semester, prompting reconnection rather than failing
    silently.
-2. **Select courses.** SSB fetches the student's enrolled courses from Canvas and lists them for
+2. **Select courses.** Second Mind fetches the student's enrolled courses from Canvas and lists them for
    selection — not every enrolled course needs indexing on day one. Each selected course also gets
    a weekly meeting schedule set here (day, time, session type), the basis for session capture
    (§9.1) — editable later from Settings.
-3. **Index.** For each selected course, SSB ingests assignments, modules, and files (the
+3. **Index.** For each selected course, Second Mind ingests assignments, modules, and files (the
    image-heavy-PDF risk noted in §11 lives here) with visible per-course, per-content-type
    progress. This is the one-time cost; after it completes, everything is local.
 4. **Land in the app**, populated with the student's own courses rather than an empty state.
@@ -198,7 +198,7 @@ whenever the app opens is cheaper, needs no OS-level scheduling, and matches how
 actually gets used — opened when needed, not run passively in the background. A lightweight
 periodic re-check while the app stays open (every few hours) covers long sessions.
 
-**Mechanism: a full ID-and-timestamp diff, not a content re-pull.** Every sync, SSB fetches the
+**Mechanism: a full ID-and-timestamp diff, not a content re-pull.** Every sync, Second Mind fetches the
 current listing (ID + `updated_at`) for each content type from Canvas — cheap, metadata only, a
 handful of API calls even across several courses — and diffs it against a local sync manifest, one
 row per ingested item:
@@ -207,7 +207,7 @@ row per ingested item:
 | --- | --- |
 | `canvas_item_id` | Stable ID from Canvas (page / assignment / announcement / file) |
 | `item_type` | page / assignment / announcement / file |
-| `canvas_updated_at` | Canvas's own timestamp, last time SSB saw it |
+| `canvas_updated_at` | Canvas's own timestamp, last time Second Mind saw it |
 | `content_hash` | Hash of the *extracted* text (post plain-text/OCR/vision pipeline, §10.1), not the raw bytes |
 
 No separate chunk-ID column: setting each chunk's document ID to `canvas_item_id` at ingestion
@@ -237,7 +237,7 @@ with no separate crash-recovery path needed.
 
 Session recordings, transcripts, and notes sit outside this mechanism entirely — they aren't from
 Canvas, so there's nothing to diff against. They're re-embedded on save/edit using the same
-hash-skip-if-unchanged idea, with SSB itself as the source of truth.
+hash-skip-if-unchanged idea, with Second Mind itself as the source of truth.
 
 ## 6. Data and privacy model
 
@@ -249,10 +249,10 @@ hash-skip-if-unchanged idea, with SSB itself as the source of truth.
   defend without a consent mechanism we have not built is "your recording, your machine, nobody
   else's."
 - **Notes** — private, same tier.
-- **Personal academic data** — never persisted by SSB at all (§5.2).
+- **Personal academic data** — never persisted by Second Mind at all (§5.2).
 - **Credentials** — the Canvas token and the student's LLM API key, both entered once during
   onboarding (§5.4), live in the student's local environment, never in the repo, never transmitted
-  to any SSB-operated service.
+  to any Second Mind-operated service.
 
 **Accepted limitation: no cross-device access.** Physical, on-machine storage (§5.1) is what makes
 the recording-consent stance above defensible — but it means a student's index, recordings, and
@@ -269,13 +269,13 @@ recordings, transcripts, or notes.
 traceable to a specific indexed page, file, or transcript segment. This matches what students
 actually want under time pressure and matches the UniFlow behavior we are positioned against.
 
-**Grounding is non-negotiable.** If indexed material does not support an answer, SSB
+**Grounding is non-negotiable.** If indexed material does not support an answer, Second Mind
 says so rather than falling back to open-domain knowledge. Optional web search is a *separate,
 visibly-labeled* path — never silently blended into a course-grounded answer.
 
 ### 7.1 Assignment explainer
 
-A narrow, principled carve-out from the "assignment helper" deferral in §4: SSB will explain what
+A narrow, principled carve-out from the "assignment helper" deferral in §4: Second Mind will explain what
 an assignment is asking, grounded in the student's own course material, and will not draft any
 part of the submission.
 
@@ -298,7 +298,7 @@ asking and citing relevant lecture material is grounded explanation of the stude
 content — the same category of behavior as Q&A above, just scoped to one assignment's prompt
 instead of an open question. It carries no more academic-integrity risk than a TA pointing a
 student back to the right lecture. Producing any part of the submission itself is a different act
-entirely, and stays deferred until SSB can enforce that boundary technically, not just by
+entirely, and stays deferred until Second Mind can enforce that boundary technically, not just by
 instruction to the model.
 
 **Tested finding: the risk surface is "where to start," not "what's being asked."** Run against a
@@ -344,7 +344,7 @@ gesture.
 
 **Manual entry is the primary, confirmed path regardless.** During onboarding (§5.4), selecting a
 course includes setting its weekly meeting schedule — day, start/end time, and a session-type label
-for courses with more than one meeting pattern (lecture vs. recitation, most commonly). SSB attempts
+for courses with more than one meeting pattern (lecture vs. recitation, most commonly). Second Mind attempts
 a best-effort pre-fill from syllabus text where extraction finds something schedule-shaped, always
 shown as an unconfirmed guess the student reviews, never as a confident answer. The schedule stays
 editable afterward from Settings — a professor moving one week's class, an added recitation, a
@@ -357,7 +357,7 @@ for content sync because staleness is recoverable by the next app launch; a miss
 not recoverable at all — there's no "catch up later" for a lecture that already happened. That
 asymmetry would argue *for* background presence here even though §5.5 argued against it for
 sync, but for now the simpler path stands: **when the student opens the app and the current time
-falls inside a scheduled window for one of their courses, SSB recognizes the window and prompts to
+falls inside a scheduled window for one of their courses, Second Mind recognizes the window and prompts to
 start the session** — page, recording, and notes editor together — rather than silently
 auto-starting. Recording is consent-sensitive (§6), so starting it is an explicit action, not an
 ambient one, and it only happens at all if the student opens the app during class.
@@ -368,8 +368,8 @@ plausible later upgrade if this turns out to matter in practice — not committe
 
 ### 9.3 The capture flow
 
-1. The student opens the app inside a scheduled window; SSB prompts to start the session.
-2. On confirmation, SSB creates a `Class #N` page for that course, starts recording, and
+1. The student opens the app inside a scheduled window; Second Mind prompts to start the session.
+2. On confirmation, Second Mind creates a `Class #N` page for that course, starts recording, and
    transcribes locally.
 3. An empty notes editor sits alongside the recording on the same page.
 4. Transcript and notes are indexed into the student's private store, making them available to
@@ -395,7 +395,7 @@ rediscovering later.
 | RAG orchestration | [LlamaIndex](https://developers.llamaindex.ai/) | Chunking, embedding integration, retrieval, and cited response synthesis via a maintained library rather than hand-rolled — a library used inside our own process, not a platform, so none of the Onyx problems (§10.1) apply |
 | Vector store | Embedded, on-disk, per-student (LanceDB, via LlamaIndex's `LanceDBVectorStore`) | Native hybrid vector + full-text (BM25-style) search in one engine — no separate BM25 library or manual reranking step. Zero server processes; one directory per student maps exactly to §5.1 |
 | Embeddings | Local, open-source model (BGE-small class), converted to ONNX and run via `onnxruntime` — not LlamaIndex's `HuggingFaceEmbedding`/`sentence-transformers` path | Anthropic has no public embeddings API, so "pluggable LLM" doesn't cover this layer regardless of provider. The ONNX path specifically avoids bundling torch into the shipped app — a confirmed PyInstaller/macOS packaging problem (docs/architecture/rag-pipeline.md §3), not just a size preference |
-| Canvas access | Direct Canvas REST API calls (`httpx`, sync), backend-owned | A thin, purpose-built client — bearer-token auth, `Link`-header pagination, the specific endpoints in [canvas-integration.md](../architecture/canvas-integration.md) — scoped to exactly what SSB needs, nothing more |
+| Canvas access | Direct Canvas REST API calls (`httpx`, sync), backend-owned | A thin, purpose-built client — bearer-token auth, `Link`-header pagination, the specific endpoints in [canvas-integration.md](../architecture/canvas-integration.md) — scoped to exactly what Second Mind needs, nothing more |
 | Transcription | Whisper (`faster-whisper`), local | Open-source thesis; recordings never leave the machine. UniFlow uses hosted Deepgram. Speed validated: 0.04x real-time factor on CPU alone (base model) — comfortably fast on laptop-class hardware. Real classroom accuracy (noise, accents, room acoustics) still untested — validated on clean synthetic speech only |
 | LLM | Pluggable, default Claude, via LlamaIndex's multi-provider LLM abstraction | Swappable per student's own key without a hand-rolled provider-switch layer; local models possible for full self-hosting |
 | Web search | MCP, explicitly labeled | Never silently blended with course-grounded answers |

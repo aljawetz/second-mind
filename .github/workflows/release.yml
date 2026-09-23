@@ -15,7 +15,7 @@ permissions:
 # macOS only, unsigned — contribution-and-distribution-plan.md step 5. An
 # unsigned .dmg triggers Gatekeeper on first install: either "Apple cannot
 # verify this app" (right-click -> Open bypasses it) or, more often on
-# recent macOS, "SSB is damaged and can't be opened" (right-click -> Open
+# recent macOS, "Second Mind is damaged and can't be opened" (right-click -> Open
 # does NOT bypass this one; requires `xattr -cr` on the app, documented in
 # the release body below). Real notarization needs a paid Apple Developer
 # account and is deliberately deferred rather than blocking a first
@@ -71,7 +71,7 @@ jobs:
 
       # Copies the onedir backend into Contents/Resources (Tauri can't
       # bundle a folder with symlinks itself), ad-hoc re-signs the finished
-      # bundle (the v0.1.0 "SSB is damaged" signature bug), and builds the
+      # bundle (the v0.1.0 "Second Mind is damaged" signature bug), and builds the
       # .dmg from the corrected .app. The script documents each step.
       - name: Add the backend, fix the code signature, build the .dmg
         run: ./scripts/package-macos.sh
@@ -85,9 +85,9 @@ jobs:
             **Unsigned build** (not notarized by Apple). macOS Gatekeeper will block it on first
             launch. Fastest fix, open Terminal and run:
             ```
-            xattr -cr /Applications/SSB.app
+            xattr -cr "/Applications/Second Mind.app"
             ```
-            (point it at wherever you placed `SSB.app` if not yet in Applications), then open it
+            (point it at wherever you placed `Second Mind.app` if not yet in Applications), then open it
             normally.
 
             If you'd rather not use Terminal, depending on your macOS version you'll see one of
@@ -95,7 +95,7 @@ jobs:
 
             - **"Apple could not verify '[App]' is free of malware..."** (current macOS) — no
               inline bypass. Try to open it once (blocked), then System Settings → Privacy &
-              Security → scroll to "'SSB' was blocked to protect your Mac" → **Open Anyway** →
+              Security → scroll to "'Second Mind' was blocked to protect your Mac" → **Open Anyway** →
               try opening it again and confirm.
             - **"Apple cannot verify this app"** (older macOS, has an inline "Open Anyway") —
               right-click the app → Open, then confirm.

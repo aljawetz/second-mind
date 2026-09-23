@@ -27,7 +27,7 @@ deliver.
 ### Strengthened evidence
 
 Beyond the adoption, fragmentation, and market evidence gathered in [Sprint
-1](sprint-01.md), two findings specifically validate *how* SSB needs to solve the problem, not
+1](sprint-01.md), two findings specifically validate *how* Second Mind needs to solve the problem, not
 just that the problem exists:
 
 - **Citations aren't a nice-to-have — they're the #1 trust blocker.** Misinformation is students'
@@ -55,7 +55,7 @@ just that the problem exists:
 - **Beneficiary:** students directly; instructors indirectly, via fewer repeated questions in
   office hours and on discussion boards.
 - **Additional stakeholders surfaced during validation:** instructors and classmates, whose
-  consent and privacy the recording feature touches even though they aren't SSB's user; the
+  consent and privacy the recording feature touches even though they aren't Second Mind's user; the
   student's institution's Canvas administration, whose API access policy bounds what a student
   token can request (directly relevant after Sprint 3's finding that student-scoped tokens hit
   403s on privileged fields).
@@ -86,7 +86,7 @@ classroom recordings.
 **Must have**
 
 - **FR1** — Let the student paste their own Canvas API token and LLM API key during onboarding;
-  store both locally and never transmit them to any SSB-operated service (see NFR1).
+  store both locally and never transmit them to any Second Mind-operated service (see NFR1).
 - **FR2** — Ingest a student's Canvas course content (pages, assignments, announcements, modules,
   files) using the student's own token.
 - **FR3** — Answer natural-language questions about indexed course material with inline citations
@@ -140,7 +140,7 @@ classroom recordings.
 ### Non-functional requirements
 
 - **NFR1 (Privacy)** — Recordings, notes, and documents never leave the student's machine; Canvas
-  token and LLM API key are stored locally and never transmitted to any SSB-operated service.
+  token and LLM API key are stored locally and never transmitted to any Second Mind-operated service.
 - **NFR2 (Groundedness)** — Citation groundedness and artifact groundedness are tracked as
   first-class, separately-evaluated metrics, not assumed from retrieval quality alone.
 - **NFR3 (Onboarding)** — First run (connect credentials → select courses → index → land in app)

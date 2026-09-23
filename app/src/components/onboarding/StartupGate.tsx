@@ -29,7 +29,7 @@ export default function StartupGate({ onReady }: { onReady: () => void }) {
             // spawned (ours exits when its port is taken) — continuing would
             // silently run every request against stale code and state. No
             // Retry: our own backend already exited, so only a relaunch helps.
-            setMessage("Another copy of SSB is already running. Quit it, then reopen SSB.");
+            setMessage("Another copy of Second Mind is already running. Quit it, then reopen Second Mind.");
             return;
           }
           onReady();

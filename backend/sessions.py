@@ -58,7 +58,7 @@ def _get_model() -> WhisperModel:
 # mentions must stay brief, not expanded using outside knowledge. A prompt
 # fix reduces this; it doesn't guarantee zero hallucination from an LLM.
 SUMMARY_TEMPLATE = PromptTemplate(
-    "You are SSB, a study assistant. The following is a raw transcript of a "
+    "You are Second Mind, a study assistant. The following is a raw transcript of a "
     "class recording. Turn it into clean, well-structured notes.\n\n"
     "Strict rules:\n"
     "- Only include what was actually said in the transcript below.\n"
@@ -89,21 +89,21 @@ _SESSIONS: dict[str, dict] = {}
 _counter_lock = threading.Lock()
 
 
-def _sessions_dir(ssb_home: Path, course_id: int) -> Path:
-    return ssb_home / "courses" / str(course_id) / "sessions"
+def _sessions_dir(sm_home: Path, course_id: int) -> Path:
+    return sm_home / "courses" / str(course_id) / "sessions"
 
 
-def _session_dir(ssb_home: Path, course_id: int, session_id: str) -> Path:
-    return _sessions_dir(ssb_home, course_id) / session_id
+def _session_dir(sm_home: Path, course_id: int, session_id: str) -> Path:
+    return _sessions_dir(sm_home, course_id) / session_id
 
 
-def _next_class_num(ssb_home: Path, course_id: int) -> int:
+def _next_class_num(sm_home: Path, course_id: int) -> int:
     # A persistent, monotonic counter — NOT a live count of session
     # directories. Real bug found in the user's own feedback: counting
     # directories reuses a number as soon as any session is deleted
     # (Step 13's DELETE), which silently violates "start at 1 and keep
     # counting."
-    counter_path = ssb_home / "courses" / str(course_id) / "class_counter.json"
+    counter_path = sm_home / "courses" / str(course_id) / "class_counter.json"
     with _counter_lock:
         counter_path.parent.mkdir(parents=True, exist_ok=True)
         current = json.loads(counter_path.read_text())["next"] if counter_path.exists() else 1
@@ -120,10 +120,10 @@ def _write_meta(session_dir: Path, meta: dict) -> None:
     (session_dir / "meta.json").write_text(json.dumps(meta))
 
 
-def start_session(ssb_home: Path, course_id: int) -> dict:
-    sessions_dir = _sessions_dir(ssb_home, course_id)
+def start_session(sm_home: Path, course_id: int) -> dict:
+    sessions_dir = _sessions_dir(sm_home, course_id)
     sessions_dir.mkdir(parents=True, exist_ok=True)
-    class_num = _next_class_num(ssb_home, course_id)
+    class_num = _next_class_num(sm_home, course_id)
     session_id = f"{date.today().isoformat()}-class-{class_num}"
     session_dir = sessions_dir / session_id
     session_dir.mkdir(exist_ok=True)
@@ -201,8 +201,8 @@ def _status_from_disk(session_dir: Path) -> str:
     return "error"
 
 
-def list_sessions(ssb_home: Path, course_id: int) -> list[dict]:
-    sessions_dir = _sessions_dir(ssb_home, course_id)
+def list_sessions(sm_home: Path, course_id: int) -> list[dict]:
+    sessions_dir = _sessions_dir(sm_home, course_id)
     if not sessions_dir.exists():
         return []
     result = []
@@ -222,8 +222,8 @@ def list_sessions(ssb_home: Path, course_id: int) -> list[dict]:
     return result
 
 
-def get_session_detail(ssb_home: Path, course_id: int, session_id: str) -> dict | None:
-    session_dir = _session_dir(ssb_home, course_id, session_id)
+def get_session_detail(sm_home: Path, course_id: int, session_id: str) -> dict | None:
+    session_dir = _session_dir(sm_home, course_id, session_id)
     if not session_dir.exists():
         return None
     meta = _read_meta(session_dir)
@@ -250,8 +250,8 @@ def get_session_detail(ssb_home: Path, course_id: int, session_id: str) -> dict 
     return detail
 
 
-def rename_session(ssb_home: Path, course_id: int, session_id: str, title: str) -> None:
-    session_dir = _session_dir(ssb_home, course_id, session_id)
+def rename_session(sm_home: Path, course_id: int, session_id: str, title: str) -> None:
+    session_dir = _session_dir(sm_home, course_id, session_id)
     if not session_dir.exists():
         raise KeyError(session_id)
     meta = _read_meta(session_dir)
@@ -261,8 +261,8 @@ def rename_session(ssb_home: Path, course_id: int, session_id: str, title: str) 
         _SESSIONS[session_id]["source_label"] = title
 
 
-def delete_session(ssb_home: Path, course_id: int, session_id: str, db_path: Path) -> None:
-    session_dir = _session_dir(ssb_home, course_id, session_id)
+def delete_session(sm_home: Path, course_id: int, session_id: str, db_path: Path) -> None:
+    session_dir = _session_dir(sm_home, course_id, session_id)
     if not session_dir.exists():
         raise KeyError(session_id)
     shutil.rmtree(session_dir)

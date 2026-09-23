@@ -2,7 +2,7 @@
 
 A sequenced build order with a concrete test for each step — "how do we know this actually works,"
 not just "what does it do." Maps to the sprints already in [the design
-spec](../specs/2026-09-14-ssb-design.md) §13. Each step now names a real **Owner** — see
+spec](../specs/2026-09-14-second-mind-design.md) §13. Each step now names a real **Owner** — see
 [sprint-04.md](../sprints/sprint-04.md) for the full team/component table and the PM-side
 cross-cutting responsibilities (Responsible AI boundaries, testing/calibration rigor, docs/specs
 accuracy) that sit alongside these.
@@ -20,7 +20,7 @@ with `pyproject.toml` and a pinned lockfile.
 **Depends on:** nothing — first task.
 **Later revised:** the mockup was ported from vanilla HTML/CSS/JS to React + TypeScript (via Vite)
 once step 1's startup gate added real state the manual DOM re-rendering approach didn't carry
-cleanly — see [the design spec](../specs/2026-09-14-ssb-design.md) §10. Same visual output, same
+cleanly — see [the design spec](../specs/2026-09-14-second-mind-design.md) §10. Same visual output, same
 Tauri/sidecar wiring underneath; only the frontend's own structure changed.
 
 ### 1. Sidecar proof of concept
@@ -132,7 +132,7 @@ retrieval smoke test (4/4 hit rate) already validated. Model files (~128MB, `mod
 over GitHub's 100MB push limit) aren't committed — `backend/scripts/convert_embedding_model.py`
 regenerates them from the public checkpoint, same reasoning as the gitignored sidecar binary.
 **Real finding, caught by the frozen-build check this step explicitly asks for:** building
-`ssb-backend` from an environment with `optimum` (dev-only, needed for the ONNX conversion)
+`sm-backend` from an environment with `optimum` (dev-only, needed for the ONNX conversion)
 installed alongside the runtime deps silently bundled real `torch` submodules into the shipped
 binary — PyInstaller bundles whatever's importable in the venv it runs from, not just what
 `main.py` actually reaches. Fixed by splitting `backend/pyproject.toml`'s dependency groups
@@ -192,7 +192,7 @@ frozen build:**
   differently than BGE's own tokenizer, which is what actually caused the truncation crash above
   (a "700-token" chunk by tiktoken's count isn't 700 tokens to BGE). Fixed at the source by passing
   BGE's own tokenizer to `SentenceSplitter` instead of patching around either symptom.
-- Separately: `ssb-backend.spec`'s `datas` was empty — the ~128MB ONNX model was never actually
+- Separately: `sm-backend.spec`'s `datas` was empty — the ~128MB ONNX model was never actually
   wired to be bundled into the shipped binary at all. `embeddings.py` resolves its model path
   relative to `__file__`, which under a frozen build points into the bundle's internal extraction
   path, not `backend/` on disk. This had gone undetected since step 4's own frozen-build check only
@@ -202,7 +202,7 @@ frozen build:**
 
 ### 7. Sync mechanism
 **Owner:** Aaron.
-**Do:** The manifest diff (new/changed/deleted/unchanged, [design spec](../specs/2026-09-14-ssb-design.md)
+**Do:** The manifest diff (new/changed/deleted/unchanged, [design spec](../specs/2026-09-14-second-mind-design.md)
 §5.5) against real Canvas listings; verify `delete_ref_doc(canvas_item_id)` actually removes the
 right chunks (the flagged caveat in [data-model.md](data-model.md) §4 — there's a real open
 LlamaIndex issue about this not always working).
@@ -346,7 +346,7 @@ indexed yet" case (`TableNotFoundError`) was initially a one-off plain-JSON 200 
 to stream through the same NDJSON path instead, so the frontend has exactly one success shape to
 parse rather than two.
 
-**Verified end-to-end against real data** (course 55710, real index at `~/.ssb/default/index.lancedb`,
+**Verified end-to-end against real data** (course 55710, real index at `~/.secondmind/default/index.lancedb`,
 real server, real HTTP requests): a grounded question returns real citations + a real streamed
 answer; a deliberately off-topic question returns `grounded: false` and the real not-covered copy
 with no LLM call at all (confirmed free — `CitationQueryEngine` short-circuits before synthesis
@@ -358,15 +358,15 @@ a `/ping` issued while a real `/ask` stream was in flight returned in 0.5ms.
 1. No real onboarding→indexing pipeline exists yet — `OnboardingIndexing.tsx` is 100% a simulated
    progress UI (`setTimeout`s against mock `DATA`), with no backend call at all. `/ask` therefore
    assumes an index already exists on disk; for real end-to-end testing, a one-off script built one
-   at the real `~/.ssb/default/index.lancedb` path the same way `generation_smoke_test.py` does.
+   at the real `~/.secondmind/default/index.lancedb` path the same way `generation_smoke_test.py` does.
    Wiring real Canvas sync + indexing into the app's actual onboarding flow is a real, separate
    piece of future work, not covered by this step's scope.
 2. ~~No real per-student directory derivation exists...~~ — turned out not to be a real gap.
-   `main.py` hardcoded `~/.ssb/default/` here, framed at the time as needing a real derived
+   `main.py` hardcoded `~/.secondmind/default/` here, framed at the time as needing a real derived
    student_id per data-model.md §1. Revisited later (user pushback: this app is single-user-per-
    machine, never a shared multi-tenant backend) and the premise didn't hold — the per-student
    subdirectory added no real isolation over the OS user account boundary that already provides
-   it. Fixed by simplifying, not by building student_id derivation: `SSB_HOME` is now `~/.ssb/`
+   it. Fixed by simplifying, not by building student_id derivation: `SM_HOME` is now `~/.secondmind/`
    directly, and data-model.md §1 / design spec §5.1 were updated to match. **Verified:** rebuilt
    sidecar, real `npm run tauri dev` click-through against the migrated real index — the user
    confirmed the app works end-to-end on the new path.
@@ -421,8 +421,8 @@ Step 8 ran):
    (deferred to Step 14, packaging/signing) — until then, expect one Keychain prompt per rebuild.
 
 **Test binary was stale and had to be rebuilt before any of the above manual testing was possible:**
-`src-tauri/binaries/ssb-backend-aarch64-apple-darwin` predated this entire step. Rebuilt via
-`uv sync --group build && pyinstaller ssb-backend.spec` (torch-bundling re-checked: still 0), copied
+`src-tauri/binaries/sm-backend-aarch64-apple-darwin` predated this entire step. Rebuilt via
+`uv sync --group build && pyinstaller sm-backend.spec` (torch-bundling re-checked: still 0), copied
 into place, and it's what both real bugs above were actually caught against.
 
 The actual manual click-through (real `npm run tauri dev`, forcing each error condition) is the
@@ -434,7 +434,7 @@ user's own step, per the established pattern for anything requiring a native GUI
 **Owner:** Yongje (build); Richa validates the explain-never-draft boundary (design spec §7.1).
 **Do:** The narrower retrieval + prompt for explain-only behavior, including the topic-level-only
 pointer constraint found necessary when testing against a real coding assignment ([design
-spec](../specs/2026-09-14-ssb-design.md) §7.1).
+spec](../specs/2026-09-14-second-mind-design.md) §7.1).
 **Test:** Re-run the real boundary test from this sprint (the actual social-network unit-testing
 assignment) as a scripted test, not a one-off manual exercise — assert the output contains no
 per-task-specific implementation language via the proposed cheap output check.
@@ -498,7 +498,7 @@ the "N new items since this was generated" nudge rather than silently invalidati
 ### 12. Session capture
 **Owner:** Yongje (build); Richa validates the recordings-stay-private policy.
 **Do:** The onboarding schedule editor (with syllabus best-effort pre-fill, [design
-spec](../specs/2026-09-14-ssb-design.md) §9.1); app-open window detection (§9.2); recording
+spec](../specs/2026-09-14-second-mind-design.md) §9.1); app-open window detection (§9.2); recording
 start/stop; `faster-whisper` transcription wired to real audio.
 **Test:** **A real recording, not synthetic speech** — finally resolving the one gap the synthetic
 TTS test couldn't close. A team member records a few minutes of themselves talking naturally, and
@@ -561,7 +561,7 @@ as the BGE embedding model (Step 4): a recording feature needing network access 
 student uses it, possibly mid-class on spotty wifi, would undercut "your machine, your index."
 `scripts/fetch_whisper_model.py` (new, mirrors `convert_embedding_model.py`) fetches
 `Systran/faster-whisper-base`'s real CTranslate2 files into `models/faster-whisper-base/`
-(gitignored, ~145MB, regenerable); `ssb-backend.spec` bundles it the same way.
+(gitignored, ~145MB, regenerable); `sm-backend.spec` bundles it the same way.
 
 **source_type "transcript"/"notes" are now real, reachable citation values** — previously hardcoded
 to "file" in `generation.build_citations()` since nothing indexed anything else. `/ask` verified
@@ -752,7 +752,7 @@ seamless double-click, until this step's other half lands.
 of all three courses with zero failures, and timed launches of the packaged `.app`.
 **Real findings:**
 - **The backend outlived the app.** `lib.rs` dropped the sidecar handle right after spawning it, so
-  every quit left `ssb-backend` holding port 8756; the next launch's backend died with "Address
+  every quit left `sm-backend` holding port 8756; the next launch's backend died with "Address
   already in use" and the app talked to the stale one. Fixed with stdin-EOF exit plus a per-launch
   instance token (overview.md §1). A first version of the EOF exit still hung in the real app:
   flushing course_sync's buffered stdout into the closed pipe raised `BrokenPipeError` before

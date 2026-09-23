@@ -15,7 +15,7 @@ export default function OnboardingIndexing({
   title = "Indexing your courses",
   subtitle = "This runs once — after this, everything stays local.",
   showSteps = true,
-  continueLabel = "Continue to SSB →",
+  continueLabel = "Continue to Second Mind →",
 }: {
   courses: AvailableCourse[];
   onNext: () => void;

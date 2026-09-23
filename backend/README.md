@@ -1,4 +1,4 @@
-# SSB backend
+# Second Mind backend
 
 The local sidecar Tauri spawns on app start (`app/src-tauri/src/lib.rs`). Binds to
 `127.0.0.1:8756` only — see [docs/architecture/overview.md](../docs/architecture/overview.md) for
@@ -116,7 +116,7 @@ class/method names) — asserts `explain.build_pointers()` never names any of th
 ## Running the real `/ask` endpoint locally
 
 `POST /courses/{course_id}/ask` (`main.py`) queries whatever index already exists at
-`~/.ssb/index.lancedb/course_<id>` — there's no real onboarding→indexing pipeline wired up
+`~/.secondmind/index.lancedb/course_<id>` — there's no real onboarding→indexing pipeline wired up
 yet (`OnboardingIndexing.tsx` in the frontend is still a simulated progress UI), so nothing builds
 that index for you. To test the endpoint for real, populate it yourself first:
 
@@ -127,7 +127,7 @@ from pathlib import Path
 
 structure = canvas.get_course_structure(YOUR_COURSE_ID)
 # ...extract nodes the same way scripts/generation_smoke_test.py does...
-indexing.build_index(nodes, Path.home() / ".ssb" / "index.lancedb", f"course_{YOUR_COURSE_ID}")
+indexing.build_index(nodes, Path.home() / ".secondmind" / "index.lancedb", f"course_{YOUR_COURSE_ID}")
 ```
 
 Then `uv run python3 main.py` and `curl -N -X POST http://127.0.0.1:8756/courses/{id}/ask -d
@@ -143,7 +143,7 @@ Step 9). A course with no index yet doesn't error — it returns the same shape 
 ./scripts/build_sidecar.sh
 ```
 
-Builds with PyInstaller and installs the result at `app/src-tauri/binaries/ssb-backend/`, where
+Builds with PyInstaller and installs the result at `app/src-tauri/binaries/sm-backend/`, where
 `npm run tauri dev` runs it from. Rerun it after changing backend code you want to see in the app.
 
 It builds from its own venv, `backend/.venv-build`, holding only the main deps plus the `build`

@@ -22,7 +22,7 @@ report.
 
 ## Relevant scope
 
-The onboarding flow in [the design spec](../specs/2026-09-14-ssb-design.md) §5.4 (connect keys →
+The onboarding flow in [the design spec](../specs/2026-09-14-second-mind-design.md) §5.4 (connect keys →
 select courses → index → land in app) is exactly the "someone outside the team can install this"
 test this sprint requires.
 

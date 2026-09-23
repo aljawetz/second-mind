@@ -17,7 +17,7 @@ import type { Citation } from "./sidecar";
 //
 // canvasBaseUrl comes from the student's own configured Canvas origin
 // (config.json's canvas_base_url, set during onboarding) — never a
-// hardcoded domain; SSB only ever worked against canvas.cmu.edu before
+// hardcoded domain; Second Mind only ever worked against canvas.cmu.edu before
 // contribution-and-distribution-plan.md step 2. Falls back to CMU's
 // Canvas only if config genuinely hasn't loaded yet, matching canvas.py's
 // own default.

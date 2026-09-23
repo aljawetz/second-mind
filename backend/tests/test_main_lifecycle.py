@@ -2,8 +2,8 @@
 
 Guards the orphaned-sidecar bug: the backend outlived the Tauri app, kept
 port 8756, and the next launch silently talked to the stale process. Each
-test gets its own free port via SSB_PORT so it never collides with a
-running SSB.
+test gets its own free port via SM_PORT so it never collides with a
+running Second Mind.
 """
 
 import json
@@ -12,6 +12,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 from pathlib import Path
@@ -30,7 +31,15 @@ def _free_port() -> int:
 
 
 def _spawn(port: int, *, pending_stdout: bool = False, **extra_env) -> subprocess.Popen:
-    env = {**os.environ, "SSB_PORT": str(port), "SSB_INSTANCE_TOKEN": "test-token", **extra_env}
+    # A throwaway HOME: main.py's startup moves ~/.ssb to ~/.secondmind
+    # (config.migrate_legacy_home), and must never do that to the real one.
+    env = {
+        **os.environ,
+        "HOME": extra_env.pop("HOME", tempfile.mkdtemp()),
+        "SM_PORT": str(port),
+        "SM_INSTANCE_TOKEN": "test-token",
+        **extra_env,
+    }
     argv = [sys.executable, "main.py"]
     if pending_stdout:
         # Leaves unflushed bytes in main.py's block-buffered stdout pipe
@@ -84,12 +93,12 @@ def backend():
 def test_ping_reports_the_instance_token_it_was_launched_with(backend):
     port = _free_port()
     proc = backend(port)
-    assert _wait_for_ping(proc, port) == {"status": "ok", "source": "ssb-backend", "instance": "test-token"}
+    assert _wait_for_ping(proc, port) == {"status": "ok", "source": "sm-backend", "instance": "test-token"}
 
 
 def test_exits_cleanly_when_the_app_closes_its_stdin(backend):
     port = _free_port()
-    proc = backend(port, SSB_EXIT_ON_STDIN_EOF="1")
+    proc = backend(port, SM_EXIT_ON_STDIN_EOF="1")
     _wait_for_ping(proc, port)
 
     proc.stdin.close()  # what happens when the Tauri process ends, however it ends
@@ -104,7 +113,7 @@ def test_exits_when_the_app_dies_with_unflushed_stdout(backend):
     # dead pipe raised BrokenPipeError before os._exit ran, killing only the
     # watchdog thread and leaving the backend serving forever.
     port = _free_port()
-    proc = backend(port, pending_stdout=True, SSB_EXIT_ON_STDIN_EOF="1")
+    proc = backend(port, pending_stdout=True, SM_EXIT_ON_STDIN_EOF="1")
     _wait_for_ping(proc, port)
 
     proc.stdout.close()
@@ -151,3 +160,18 @@ def test_port_in_use_exits_with_a_readable_message(backend):
     assert code == 1
     assert f"port {port} is already in use" in stderr
     assert "Traceback" not in stderr
+
+
+def test_startup_moves_pre_rename_data_to_the_new_folder(backend, tmp_path):
+    # Installs from when the app was SSB keep their data in ~/.ssb.
+    legacy = tmp_path / ".ssb"
+    (legacy / "courses" / "1").mkdir(parents=True)
+    (legacy / "config.json").write_text('{"onboarding_complete": true}')
+    port = _free_port()
+
+    proc = backend(port, HOME=str(tmp_path))
+    _wait_for_ping(proc, port)
+
+    assert not legacy.exists()
+    assert (tmp_path / ".secondmind" / "config.json").read_text() == '{"onboarding_complete": true}'
+    assert (tmp_path / ".secondmind" / "courses" / "1").is_dir()

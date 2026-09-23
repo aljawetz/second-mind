@@ -1,4 +1,4 @@
-# SSB (Student Second Brain): Technical Design Document
+# Second Mind (Second Mind): Technical Design Document
 
 **Sprint 4 deliverable** · Team: Richa, Lakshita, Shatakshi (Product); Arthur, Aaron, Yongje
 (Engineering) · Status as of 2026-09-21
@@ -8,16 +8,16 @@ earlier design spec disagree, this document describes the code and says so.
 
 ## 1. What we are building
 
-SSB is a native macOS desktop app, one install per student, that indexes the student's real Canvas
+Second Mind is a native macOS desktop app, one install per student, that indexes the student's real Canvas
 material and answers questions with citations back to the source. It also transcribes lectures
 locally, explains assignments without drafting them, and (planned) generates study artifacts: mock
 tests, mindmaps, flashcards, and slides. It is the open-source alternative to UniFlow Study. Three
 constraints shape every decision below:
 
-1. **Local-first.** No SSB-operated server. Nothing is shared between students.
-2. **Grounded or silent.** If the indexed material doesn't support an answer, SSB says so instead
+1. **Local-first.** No Second Mind-operated server. Nothing is shared between students.
+2. **Grounded or silent.** If the indexed material doesn't support an answer, Second Mind says so instead
    of answering from the model's general knowledge.
-3. **Explain, never draft.** SSB explains an assignment and points to course material. It never
+3. **Explain, never draft.** Second Mind explains an assignment and points to course material. It never
    produces a submittable answer.
 
 ## 2. End-to-end architecture
@@ -26,7 +26,7 @@ constraints shape every decision below:
 flowchart LR
     student([Student])
 
-    subgraph app["SSB.app on the student's Mac"]
+    subgraph app["Second Mind.app on the student's Mac"]
         direction TB
         ui["Frontend<br/>Tauri webview, React + TypeScript"]
         api["Local backend (Python sidecar)<br/>HTTP/JSON on 127.0.0.1 only"]
@@ -38,7 +38,7 @@ flowchart LR
             rag["Retrieval + generation<br/>LlamaIndex, cutoff 0.5"]
             capture["Session capture<br/>faster-whisper, local"]
         end
-        store[("Local storage ~/.ssb<br/>LanceDB index, sync manifests,<br/>transcripts, notes")]
+        store[("Local storage ~/.secondmind<br/>LanceDB index, sync manifests,<br/>transcripts, notes")]
         kc[("macOS Keychain<br/>Canvas token, LLM key")]
     end
 
@@ -65,7 +65,7 @@ flowchart LR
 | User / input | Tauri webview; `getUserMedia`/`MediaRecorder` for lecture audio |
 | Interface / output | React + TypeScript (Vite): chat with citations, assignment breakdown, sessions, artifacts |
 | Backend / services | Python sidecar, loopback-only HTTP, frozen with PyInstaller |
-| Data / storage | LanceDB (hybrid vector + BM25), SQLite manifests, plain files under `~/.ssb/` |
+| Data / storage | LanceDB (hybrid vector + BM25), SQLite manifests, plain files under `~/.secondmind/` |
 | AI / processing | BGE-small via `onnxruntime`; LlamaIndex `CitationQueryEngine`; `faster-whisper`; Tesseract OCR |
 | External systems | Canvas REST via `httpx`; OpenAI `gpt-4o-mini` today |
 | Infrastructure | None operated by us. Ships as a `.dmg` from GitHub Releases |
@@ -119,7 +119,7 @@ with a meaningful HTTP status (for example `canvas_auth_failed` 401, `llm_rate_l
 ### 3.2 Data layout
 
 ```
-~/.ssb/
+~/.secondmind/
 ├── config.json              non-sensitive settings only
 ├── index.lancedb/           one table per course
 └── courses/<id>/            meta.json, manifest.db, sessions/<date>-class-<N>/ (no audio)
@@ -136,7 +136,7 @@ Credentials are not in this tree. They live in the macOS Keychain.
 | Local ONNX embeddings, not `sentence-transformers` | Bundling torch made the build 1.8 GB against 874 MB |
 | Local `faster-whisper` | Recordings never leave the machine; 0.04x real time on CPU |
 | Direct Canvas REST, student token | Every request is limited to what the student can already see |
-| Student's own LLM key | No SSB-operated proxy to secure or pay for |
+| Student's own LLM key | No Second Mind-operated proxy to secure or pay for |
 
 **Code vs. spec.** The spec says the LLM is pluggable with Claude as the default. The shipped code
 calls OpenAI `gpt-4o-mini` directly. The multi-provider layer is planned for Sprint 9.
@@ -162,7 +162,7 @@ paid Apple Developer account and is scheduled for Sprint 9.
 
 ## 5. Security, privacy, and responsible AI
 
-**Security.** Credentials sit in the macOS Keychain, never under `~/.ssb/`. The backend binds to
+**Security.** Credentials sit in the macOS Keychain, never under `~/.secondmind/`. The backend binds to
 loopback only and refuses to write outside the student's data directory. Isolation is physical:
 one install per OS user, no shared corpus, so no query filter can leak another student's data.
 **Named gap:** no application-level encryption at rest; we rely on FileVault (review in Sprint 8).
@@ -182,7 +182,7 @@ make the summary opt-in, or support a local model.
 | --- | --- |
 | Hallucinated answers | Below the 0.5 cutoff the LLM is not called at all. Every claim carries a citation (structural) |
 | Blending in web knowledge | Grounding rule in the system prompt. Any web search would be a separate, labeled path (not built) |
-| SSB writing the submission | `/explain` has no draft field, no "draft" action exists, and the prompt says explain and cite only |
+| Second Mind writing the submission | `/explain` has no draft field, no "draft" action exists, and the prompt says explain and cite only |
 | Pointers leaking implementation help | Pointers must stay at topic level. **The post-hoc output check is designed but not built** (Sprint 8) |
 | Hallucinated study artifacts | Per-item citations plus a "n / n sources verified" metric (planned, Step 11) |
 | Cited source doesn't support the claim | **Not yet designed.** Retrieval relevance is checked, answer faithfulness is not (Sprint 8) |
@@ -247,4 +247,4 @@ Step 14 is half done: the unsigned pipeline ships, notarization does not.
 [data-model.md](data-model.md) · [canvas-integration.md](canvas-integration.md) ·
 [rag-pipeline.md](rag-pipeline.md) · [implementation-plan.md](implementation-plan.md) ·
 [contribution-and-distribution-plan.md](contribution-and-distribution-plan.md) ·
-[Design spec](../specs/2026-09-14-ssb-design.md)
+[Design spec](../specs/2026-09-14-second-mind-design.md)

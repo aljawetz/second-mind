@@ -21,7 +21,7 @@ Live end-to-end alpha demonstration plus a short integration/testing report.
 
 ## Relevant scope
 
-Per [the design spec](../specs/2026-09-14-ssb-design.md) §4, this is where lecture capture (§9)
+Per [the design spec](../specs/2026-09-14-second-mind-design.md) §4, this is where lecture capture (§9)
 and study artifacts (§8) come online alongside Sprint 5's Q&A, and the onboarding flow (§5.4) gets
 wired to a real backend instead of the mockup's hardcoded data.
 

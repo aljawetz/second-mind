@@ -21,7 +21,7 @@ before/after evidence.
 
 ## Relevant scope
 
-This is the explicit checkpoint named in [the design spec](../specs/2026-09-14-ssb-design.md) §4
+This is the explicit checkpoint named in [the design spec](../specs/2026-09-14-second-mind-design.md) §4
 for the assignment-explainer / assignment-helper boundary (§7.1) and the privacy model (§6). §11's
 risks — image-heavy PDF ingestion, artifact groundedness, per-student storage cost, recording
 consent — are the candidates for the robustness half of this sprint.

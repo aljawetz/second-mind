@@ -1,7 +1,7 @@
 [project]
-name = "ssb-backend"
+name = "sm-backend"
 version = "0.1.0"
-description = "SSB local backend — sidecar spawned by the Tauri app"
+description = "Second Mind local backend — sidecar spawned by the Tauri app"
 license = "MIT"
 requires-python = ">=3.13"
 dependencies = [

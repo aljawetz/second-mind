@@ -25,11 +25,11 @@ def fake_token(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def fake_ssb_home(tmp_path, monkeypatch):
+def fake_sm_home(tmp_path, monkeypatch):
     # No config.json here — real isolation from whatever's on the actual
     # dev machine, and _api_base() falls through to CANVAS_API_URL (BASE
     # above), same as every test already assumes.
-    monkeypatch.setattr(canvas, "SSB_HOME", tmp_path)
+    monkeypatch.setattr(canvas, "SM_HOME", tmp_path)
 
 
 @respx.mock
@@ -83,7 +83,7 @@ def test_course_structure_403_degrades_to_empty():
 def test_configured_base_url_is_used_instead_of_default(tmp_path, monkeypatch):
     """contribution-and-distribution-plan.md step 2 — a school other than
     CMU must actually be reachable, not just accepted by onboarding."""
-    monkeypatch.setattr(canvas, "SSB_HOME", tmp_path)
+    monkeypatch.setattr(canvas, "SM_HOME", tmp_path)
     config.write_config(tmp_path, {"canvas_base_url": "https://canvas.instructure.com"})
     fx = load("courses")
     respx.get("https://canvas.instructure.com/api/v1/courses").mock(

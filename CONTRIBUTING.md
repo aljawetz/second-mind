@@ -1,13 +1,13 @@
-# Contributing to SSB
+# Contributing to Second Mind
 
-Thanks for looking at this. SSB is an open-source, self-hosted alternative to proprietary Canvas
+Thanks for looking at this. Second Mind is an open-source, self-hosted alternative to proprietary Canvas
 AI tutors — see the [README](README.md) for what it does and why.
 
 ## Getting set up
 
 ```bash
-git clone https://github.com/aljawetz/ssb.git
-cd ssb
+git clone https://github.com/aljawetz/second-mind.git
+cd second-mind
 ./scripts/bootstrap.sh
 ```
 
@@ -50,9 +50,9 @@ your PR description, but they will read the doc.
 
 ## Scope note
 
-SSB explains assignments; it doesn't draft them, and no such feature is planned. See the
+Second Mind explains assignments; it doesn't draft them, and no such feature is planned. See the
 README's "Responsible AI" section and
-[design spec §7.1](docs/specs/2026-09-14-ssb-design.md) before proposing anything that would blur
+[design spec §7.1](docs/specs/2026-09-14-second-mind-design.md) before proposing anything that would blur
 that line — it's a deliberate, principled boundary, not a placeholder.
 
 ## Reporting bugs / proposing features

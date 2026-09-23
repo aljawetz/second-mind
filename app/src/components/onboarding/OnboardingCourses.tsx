@@ -70,7 +70,7 @@ export default function OnboardingCourses({
         </div>
         <div>
           <h2 className="onboard-title">Select your courses</h2>
-          <p className="onboard-sub">Found on your Canvas — pick which ones SSB should index.</p>
+          <p className="onboard-sub">Found on your Canvas — pick which ones Second Mind should index.</p>
         </div>
         {loading && <p className="onboard-sub">Loading your courses…</p>}
         {error && <p className="field-error">{error}</p>}

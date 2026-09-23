@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "SSB",
+  "productName": "Second Mind",
   "version": "0.1.0",
-  "identifier": "com.ssb.app",
+  "identifier": "com.secondmind.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -13,7 +13,7 @@
     "withGlobalTauri": false,
     "windows": [
       {
-        "title": "SSB",
+        "title": "Second Mind",
         "width": 800,
         "height": 600,
         "minWidth": 480,

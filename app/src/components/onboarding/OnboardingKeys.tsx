@@ -6,7 +6,7 @@ import LogoMark from "../LogoMark";
 // canvasUrl comes back from onNext already normalized (config.py's
 // normalize_canvas_base_url, applied server-side on write) rather than
 // whatever raw form the student typed — contribution-and-distribution-
-// plan.md step 2, SSB used to only work against canvas.cmu.edu.
+// plan.md step 2, Second Mind used to only work against canvas.cmu.edu.
 export default function OnboardingKeys({ onNext }: { onNext: (canvasUrl: string) => void }) {
   const [canvasUrl, setCanvasUrl] = useState("");
   const [canvasKey, setCanvasKey] = useState("");
@@ -69,7 +69,7 @@ export default function OnboardingKeys({ onNext }: { onNext: (canvasUrl: string)
         </div>
         <div>
           <h2 className="onboard-title">Connect your accounts</h2>
-          <p className="onboard-sub">Keys stay on this device — SSB talks to Canvas and your model provider directly.</p>
+          <p className="onboard-sub">Keys stay on this device — Second Mind talks to Canvas and your model provider directly.</p>
         </div>
         <div className="field">
           <label htmlFor="canvas-url">Your school's Canvas URL</label>

@@ -1,6 +1,6 @@
 # Canvas Integration
 
-How SSB actually talks to Canvas — the concrete endpoints, the access restrictions found by
+How Second Mind actually talks to Canvas — the concrete endpoints, the access restrictions found by
 testing against a real course, and how §5.5's sync mechanism (design spec) maps onto real API
 calls. See [overview.md](overview.md) for where this sits in the system and
 [data-model.md](data-model.md) for what gets stored from it.
@@ -13,7 +13,7 @@ itself under a student-scoped token, independent of which client calls it.
 ## 1. Authentication
 
 The student generates their own Canvas API personal access token (Canvas Settings → New Access
-Token) and pastes it during onboarding (§5.4). SSB never has institutional or admin-level
+Token) and pastes it during onboarding (§5.4). Second Mind never has institutional or admin-level
 credentials — every request is scoped to exactly what that student can already see, which is both
 the privacy model (§6: "only material the student already has access to") and the source of every
 access restriction in §2 below.
@@ -48,7 +48,7 @@ provides recordings, ingesting those could matter as much as capturing new ones.
 
 The pattern across all of these: **a student-scoped token is not a lesser version of an admin
 token, it's a different access shape entirely**, with its own gaps that don't necessarily show up
-until tested against a real course. Any new content type SSB starts ingesting should be tested
+until tested against a real course. Any new content type Second Mind starts ingesting should be tested
 against a real course before being assumed to work.
 
 ## 3. Content types ingested, and their source endpoint

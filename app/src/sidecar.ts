@@ -44,7 +44,7 @@ export async function getCredentialsStatus(): Promise<CredentialsStatus> {
 }
 
 // config.json (data-model.md §3) — non-sensitive settings persisted by
-// main.py at ~/.ssb/config.json. Used at startup to skip onboarding for a
+// main.py at ~/.secondmind/config.json. Used at startup to skip onboarding for a
 // returning user (real credentials + a remembered course list already on
 // disk) instead of always starting fresh.
 export interface SsbConfig {

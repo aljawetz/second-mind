@@ -1,4 +1,4 @@
-// SSB's mark: a note with a footnote marker, since every answer points back
+// Second Mind's mark: a note with a footnote marker, since every answer points back
 // to a cited source. Same geometry as the app icon
 // (src-tauri/icons/icon.svg), cropped to the two circles; the color comes
 // from currentColor, so each place sets it with CSS.

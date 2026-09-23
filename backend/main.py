@@ -27,23 +27,23 @@ import indexing
 import sessions
 
 HOST = "127.0.0.1"
-# SSB_PORT exists for tests/test_main_lifecycle.py only — the app always
+# SM_PORT exists for tests/test_main_lifecycle.py only — the app always
 # uses 8756 (app/src/sidecar.ts and the http capability scope hardcode it).
-PORT = int(os.environ.get("SSB_PORT", "8756"))
+PORT = int(os.environ.get("SM_PORT", "8756"))
 
 # Random per-launch value the Tauri app passes in and checks against
 # /ping, so the frontend can tell its own backend apart from a stale one
 # left over from an earlier launch still holding the port.
-INSTANCE_TOKEN = os.environ.get("SSB_INSTANCE_TOKEN", "")
+INSTANCE_TOKEN = os.environ.get("SM_INSTANCE_TOKEN", "")
 
-# data-model.md §1: no per-student subdirectory — SSB is a local sidecar,
-# one student per machine, one OS user account per student, so ~/.ssb/
+# data-model.md §1: no per-student subdirectory — Second Mind is a local sidecar,
+# one student per machine, one OS user account per student, so ~/.secondmind/
 # itself is already the physical isolation boundary design spec §5.1 is
 # about. A <student_id> layer inside it would isolate against nothing real
 # for this architecture (revisited and deliberately simplified — not an
 # oversight).
-SSB_HOME = Path.home() / ".ssb"
-canvas.SSB_HOME = SSB_HOME
+SM_HOME = Path.home() / ".secondmind"
+canvas.SM_HOME = SM_HOME
 
 COURSE_PATH = re.compile(r"^/courses/(\d+)$")
 UNSELECT_PATH = re.compile(r"^/courses/(\d+)/unselect$")
@@ -109,13 +109,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/ping":
-            self._send_json(200, {"status": "ok", "source": "ssb-backend", "instance": INSTANCE_TOKEN})
+            self._send_json(200, {"status": "ok", "source": "sm-backend", "instance": INSTANCE_TOKEN})
         elif self.path == "/courses":
             self._handle_list_courses()
         elif self.path == "/credentials/status":
             self._send_json(200, config.credentials_status())
         elif self.path == "/config":
-            self._send_json(200, config.read_config(SSB_HOME))
+            self._send_json(200, config.read_config(SM_HOME))
         else:
             assignments_match = ASSIGNMENTS_PATH.match(self.path)
             if assignments_match:
@@ -159,7 +159,7 @@ class Handler(BaseHTTPRequestHandler):
         # policy can't distinguish "bad id" from "no permission" — but this
         # app's own selected_courses list is a real, local, unambiguous
         # source of truth for "is this a course we know about at all."
-        return course_id in config.read_config(SSB_HOME).get("selected_courses", [])
+        return course_id in config.read_config(SM_HOME).get("selected_courses", [])
 
     def _not_found(self, message: str = "no such course"):
         self._send_json(404, {"error": {"code": "not_found", "message": message}})
@@ -213,13 +213,13 @@ class Handler(BaseHTTPRequestHandler):
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
-        self._send_json(200, {"sessions": sessions.list_sessions(SSB_HOME, int(course_id))})
+        self._send_json(200, {"sessions": sessions.list_sessions(SM_HOME, int(course_id))})
 
     def _handle_session_detail(self, course_id: str, session_id: str):
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
-        detail = sessions.get_session_detail(SSB_HOME, int(course_id), session_id)
+        detail = sessions.get_session_detail(SM_HOME, int(course_id), session_id)
         if detail is None:
             self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
             return
@@ -234,10 +234,10 @@ class Handler(BaseHTTPRequestHandler):
             except json.JSONDecodeError:
                 self._send_json(400, {"error": {"code": "bad_request", "message": "invalid JSON"}})
                 return
-            merged = {**config.read_config(SSB_HOME), **data}
+            merged = {**config.read_config(SM_HOME), **data}
             if merged.get("canvas_base_url"):
                 merged["canvas_base_url"] = config.normalize_canvas_base_url(merged["canvas_base_url"])
-            config.write_config(SSB_HOME, merged)
+            config.write_config(SM_HOME, merged)
             self._send_json(200, merged)
             return
 
@@ -310,28 +310,28 @@ class Handler(BaseHTTPRequestHandler):
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
-        courses.unselect_course(SSB_HOME, int(course_id))
+        courses.unselect_course(SM_HOME, int(course_id))
         self._send_json(200, {"status": "unselected"})
 
     def _handle_delete_course(self, course_id: str):
-        db_path = SSB_HOME / "index.lancedb"
-        if not courses.has_local_data(SSB_HOME, int(course_id), db_path):
+        db_path = SM_HOME / "index.lancedb"
+        if not courses.has_local_data(SM_HOME, int(course_id), db_path):
             self._not_found()
             return
-        courses.delete_course(SSB_HOME, int(course_id), db_path)
+        courses.delete_course(SM_HOME, int(course_id), db_path)
         self._send_json(200, {"status": "deleted"})
 
     def _handle_session_start(self, course_id: str):
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
-        self._send_json(200, sessions.start_session(SSB_HOME, int(course_id)))
+        self._send_json(200, sessions.start_session(SM_HOME, int(course_id)))
 
     def _handle_session_stop(self, session_id: str):
         length = int(self.headers.get("Content-Length", 0))
         audio_bytes = self.rfile.read(length)
         try:
-            result = sessions.stop_session(session_id, audio_bytes, SSB_HOME / "index.lancedb")
+            result = sessions.stop_session(session_id, audio_bytes, SM_HOME / "index.lancedb")
         except KeyError:
             self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
             return
@@ -364,7 +364,7 @@ class Handler(BaseHTTPRequestHandler):
             self._not_found()
             return
         try:
-            sessions.rename_session(SSB_HOME, int(course_id), session_id, data.get("title", ""))
+            sessions.rename_session(SM_HOME, int(course_id), session_id, data.get("title", ""))
         except KeyError:
             self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
             return
@@ -375,7 +375,7 @@ class Handler(BaseHTTPRequestHandler):
             self._not_found()
             return
         try:
-            sessions.delete_session(SSB_HOME, int(course_id), session_id, SSB_HOME / "index.lancedb")
+            sessions.delete_session(SM_HOME, int(course_id), session_id, SM_HOME / "index.lancedb")
         except KeyError:
             self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
             return
@@ -415,7 +415,7 @@ class Handler(BaseHTTPRequestHandler):
         # response_gen, so no error can surface after streaming starts.
         not_indexed = False
         try:
-            db_path = SSB_HOME / "index.lancedb"
+            db_path = SM_HOME / "index.lancedb"
             index = indexing.load_index(db_path, f"course_{course_id}")
             engine = generation.build_query_engine(index, streaming=True)
             response = engine.query(question)
@@ -463,7 +463,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Transfer-Encoding", "chunked")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
-        for event in course_sync.sync_course(int(course_id), SSB_HOME):
+        for event in course_sync.sync_course(int(course_id), SM_HOME):
             self._write_chunk(event)
         self.wfile.write(b"0\r\n\r\n")
         self.wfile.flush()
@@ -501,7 +501,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         try:
-            db_path = SSB_HOME / "index.lancedb"
+            db_path = SM_HOME / "index.lancedb"
             index = indexing.load_index(db_path, f"course_{course_id}")
             pointers = explain.build_pointers(index, name, description_text)
         except TableNotFoundError:
@@ -555,6 +555,11 @@ if __name__ == "__main__":
     # fork bomb during Step 12's development, not a theoretical risk.
     multiprocessing.freeze_support()
 
+    # Before anything reads SM_HOME: an install from before the SSB → Second
+    # Mind rename still has its data at ~/.ssb.
+    if config.migrate_legacy_home(SM_HOME):
+        print(f"moved {config.LEGACY_HOME} to {SM_HOME} (app renamed from SSB to Second Mind)", file=sys.stderr)
+
     # stdout is a pipe to the Tauri app, so Python block-buffers it: sync's
     # "[course_sync] skipping ..." lines sat unseen in the buffer instead of
     # reaching the app's [backend] log. Line buffering delivers each line.
@@ -564,7 +569,7 @@ if __name__ == "__main__":
     # SIGTERM (which PyInstaller's bootloader forwards) exits the same way.
     signal.signal(signal.SIGTERM, lambda *_: _exit_now(0))
 
-    if os.environ.get("SSB_EXIT_ON_STDIN_EOF") == "1" and sys.stdin is not None:
+    if os.environ.get("SM_EXIT_ON_STDIN_EOF") == "1" and sys.stdin is not None:
         threading.Thread(target=_exit_when_app_closes, name="app-watchdog", daemon=True).start()
 
     try:
@@ -573,8 +578,8 @@ if __name__ == "__main__":
         if e.errno != errno.EADDRINUSE:
             raise
         print(
-            f"ssb-backend: port {PORT} is already in use, most likely by another "
-            "SSB backend that is still running; exiting",
+            f"sm-backend: port {PORT} is already in use, most likely by another "
+            "Second Mind backend that is still running; exiting",
             file=sys.stderr,
         )
         _exit_now(1)

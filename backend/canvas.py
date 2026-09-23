@@ -21,10 +21,10 @@ import config
 
 # Default when nothing's configured yet — real base URL is a config.json
 # value (contribution-and-distribution-plan.md step 2), not a constant;
-# SSB used to only work against CMU's Canvas at all.
+# Second Mind used to only work against CMU's Canvas at all.
 CANVAS_API_URL = "https://canvas.cmu.edu/api/v1"
-CREDENTIAL_SERVICE = "com.ssb.app"
-SSB_HOME = Path.home() / ".ssb"  # set to the real value by main.py at startup; tests monkeypatch this directly
+CREDENTIAL_SERVICE = "com.secondmind.app"
+SM_HOME = Path.home() / ".secondmind"  # set to the real value by main.py at startup; tests monkeypatch this directly
 
 _LINK_RE = re.compile(r'<([^>]+)>;\s*rel="([^"]+)"')
 
@@ -41,7 +41,7 @@ def _token() -> str:
 
 
 def _api_base() -> str:
-    origin = config.read_config(SSB_HOME).get("canvas_base_url")
+    origin = config.read_config(SM_HOME).get("canvas_base_url")
     return f"{origin}/api/v1" if origin else CANVAS_API_URL
 
 
