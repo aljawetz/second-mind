@@ -6,6 +6,30 @@ import { splitAssignments, statusPill } from "../../assignmentStatus";
 import type { CanvasAssignment } from "../../sidecar";
 import { openCitation } from "../../citations";
 
+// Must match chat.py's GENERAL_KNOWLEDGE_LABEL: the model starts the part of
+// its answer that isn't from the course with this exact line.
+const GENERAL_KNOWLEDGE_LABEL = "General knowledge (not from your course materials):";
+
+// Shows the general-knowledge part as its own marked block, so the student
+// can tell it apart from the cited course answer without relying on the
+// model's wording alone.
+function AnswerText({ answer }: { answer: string }) {
+  const at = answer.indexOf(GENERAL_KNOWLEDGE_LABEL);
+  const course = (at === -1 ? answer : answer.slice(0, at)).trim();
+  const general = at === -1 ? null : answer.slice(at + GENERAL_KNOWLEDGE_LABEL.length).trim();
+  return (
+    <>
+      {course && <p className="qa-text">{course}</p>}
+      {general !== null && (
+        <div className="qa-general">
+          <div className="qa-general-head">General knowledge · not from your course materials</div>
+          {general && <p className="qa-text">{general}</p>}
+        </div>
+      )}
+    </>
+  );
+}
+
 interface ChatTurn {
   question: string;
   answer: string;
@@ -73,6 +97,9 @@ export default function HomeView({
     if (!question || busy) return;
     setAskValue("");
     const turnIndex = turns.length;
+    // Only finished turns: an errored or half-streamed answer would give the
+    // model a wrong picture of what it already said.
+    const history = turns.filter((t) => t.status === "done").map((t) => ({ question: t.question, answer: t.answer }));
     setTurns((prev) => [...prev, { question, answer: "", citations: [], grounded: false, status: "loading" }]);
     threadRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 
@@ -80,15 +107,20 @@ export default function HomeView({
       setTurns((prev) => prev.map((t, i) => (i === turnIndex ? { ...t, ...patch } : t)));
 
     try {
-      await askQuestion(courseId, question, (event) => {
-        if (event.citations !== undefined) {
-          update({ citations: event.citations, grounded: !!event.grounded, status: "streaming" });
-        }
+      await askQuestion(courseId, courseName, question, history, (event) => {
         if (event.delta) {
-          setTurns((prev) => prev.map((t, i) => (i === turnIndex ? { ...t, answer: t.answer + event.delta } : t)));
+          setTurns((prev) =>
+            prev.map((t, i) => (i === turnIndex ? { ...t, answer: t.answer + event.delta, status: "streaming" } : t))
+          );
+        }
+        if (event.citations !== undefined) {
+          update({ citations: event.citations, grounded: !!event.grounded });
+        }
+        if (event.error) {
+          update({ status: "error", error: event.error });
         }
         if (event.done) {
-          update({ status: "done" });
+          setTurns((prev) => prev.map((t, i) => (i === turnIndex && t.status !== "error" ? { ...t, status: "done" } : t)));
         }
       });
     } catch (err) {
@@ -123,10 +155,10 @@ export default function HomeView({
                 ) : (
                   <div className="qa-a">
                     {turn.status === "loading" ? (
-                      <p className="qa-thinking">Thinking…</p>
+                      <p className="qa-thinking">Searching your course…</p>
                     ) : (
                       <>
-                        <p>{turn.answer}</p>
+                        <AnswerText answer={turn.answer} />
                         {turn.grounded && turn.citations.length > 0 && (
                           <div className="qa-sources">
                             <span>Sources</span>
@@ -136,7 +168,7 @@ export default function HomeView({
                                 key={ci}
                                 onClick={() => openCitation(canvasBaseUrl, courseId, c, onOpenSession)}
                               >
-                                {c.label}
+                                [{ci + 1}] {c.label}
                               </button>
                             ))}
                           </div>

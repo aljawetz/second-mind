@@ -9,6 +9,7 @@ import signal
 import socketserver
 import sys
 import threading
+import traceback
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -18,12 +19,14 @@ from llama_index.vector_stores.lancedb.base import TableNotFoundError
 from onnxruntime.capi.onnxruntime_pybind11_state import NoSuchFile as OnnxModelFileMissing
 
 import canvas
+import chat
 import config
 import course_sync
 import courses
 import explain
 import generation
 import indexing
+import llm
 import sessions
 
 HOST = "127.0.0.1"
@@ -44,6 +47,13 @@ INSTANCE_TOKEN = os.environ.get("SM_INSTANCE_TOKEN", "")
 # oversight).
 SM_HOME = Path.home() / ".secondmind"
 canvas.SM_HOME = SM_HOME
+
+# Similarity cutoff for chat's course search, kept separate from the
+# assignment explainer's so the two can be tuned apart. Tried 0.4 against
+# 0.5 on 67 questions across three courses: same number of good answers,
+# one more made-up course fact, so 0.5 stays — see
+# docs/evaluations/2026-09-23-ask-modes/report.md.
+CHAT_SIMILARITY_CUTOFF = generation.SIMILARITY_CUTOFF
 
 COURSE_PATH = re.compile(r"^/courses/(\d+)$")
 UNSELECT_PATH = re.compile(r"^/courses/(\d+)/unselect$")
@@ -406,25 +416,30 @@ class Handler(BaseHTTPRequestHandler):
         if not question:
             self._send_json(400, {"error": {"code": "bad_request", "message": "question is required"}})
             return
-
-        # Errors here happen before any bytes are written — response.status
-        # can still be set cleanly. Retrieval (TableNotFoundError) and the
-        # LLM call (openai.*Error) both happen synchronously inside
-        # engine.query(), confirmed against a real index and a real,
-        # deliberately-invalid key (Step 9) — nothing here is deferred to
-        # response_gen, so no error can surface after streaming starts.
-        not_indexed = False
         try:
-            db_path = SM_HOME / "index.lancedb"
-            index = indexing.load_index(db_path, f"course_{course_id}")
-            engine = generation.build_query_engine(index, streaming=True)
-            response = engine.query(question)
-        except TableNotFoundError:
-            # Course not indexed yet — indistinguishable from "nothing
-            # relevant retrieved" at the response shape level (§7). Streamed
-            # the same way as every other 200, not a one-off plain-JSON
-            # shape, so the frontend has exactly one success format to parse.
-            not_indexed = True
+            history = chat.parse_history(data.get("history"))
+        except ValueError as e:
+            self._send_json(400, {"error": {"code": "bad_request", "message": str(e)}})
+            return
+        # No local copy of course names exists (config.json keeps ids only),
+        # so the app sends the one it shows in the sidebar.
+        course_name = str(data.get("course_name") or "this course")
+
+        # chat.answer() yields nothing until the model starts writing, so
+        # everything that can fail early (missing key, embedding model files,
+        # searching, the first model calls) fails here, before any response
+        # bytes, and still gets a clean status code.
+        try:
+            try:
+                index = indexing.load_index(SM_HOME / "index.lancedb", f"course_{course_id}")
+            except TableNotFoundError:
+                # Course not indexed yet: every search comes back empty and the
+                # model says it couldn't find anything, same as a real miss.
+                index = None
+            events = chat.answer(
+                question, history, course_name, chat.make_search(index, CHAT_SIMILARITY_CUTOFF), llm.OpenAIProvider()
+            )
+            first = next(events)
         except OnnxModelFileMissing:
             self._send_json(500, {"error": {"code": "model_files_missing", "message": "the local embedding model is missing or corrupted"}})
             return
@@ -432,25 +447,26 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(*self._llm_error(e))
             return
 
-        citations = [] if not_indexed else generation.build_citations(response.source_nodes)
-        grounded = bool(citations)
-
         self.send_response(200)
         self.send_header("Content-Type", "application/x-ndjson")
         self.send_header("Transfer-Encoding", "chunked")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
-        self._write_chunk({"citations": citations, "grounded": grounded})
-        if grounded:
-            # Real tokens only when grounded — an ungrounded query never
-            # reaches the LLM at all (CitationQueryEngine short-circuits
-            # when every node fails the similarity cutoff), so response_gen
-            # would otherwise yield the framework's raw "Empty Response".
-            for token in response.response_gen:
-                self._write_chunk({"delta": token})
-        else:
-            self._write_chunk({"delta": generation.NOT_COVERED_MESSAGE})
-        self._write_chunk({"done": True})
+        try:
+            self._write_chunk(first)
+            for event in events:
+                self._write_chunk(event)
+        except (BrokenPipeError, ConnectionResetError):
+            return  # the app closed the request (student navigated away)
+        except Exception as e:
+            # Something failed after the answer started streaming (a later
+            # search round, or the model connection dropping). The status line
+            # is long gone, so the error travels as a stream event instead.
+            traceback.print_exc()
+            llm_errors = (RuntimeError, openai.AuthenticationError, openai.RateLimitError, openai.APIConnectionError)
+            message = self._llm_error(e)[1]["error"]["message"] if isinstance(e, llm_errors) else "the answer was interrupted"
+            self._write_chunk({"error": message})
+            self._write_chunk({"done": True})
         self.wfile.write(b"0\r\n\r\n")
         self.wfile.flush()
 

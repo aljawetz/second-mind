@@ -269,9 +269,19 @@ recordings, transcripts, or notes.
 traceable to a specific indexed page, file, or transcript segment. This matches what students
 actually want under time pressure and matches the UniFlow behavior we are positioned against.
 
-**Grounding is non-negotiable.** If indexed material does not support an answer, Second Mind
-says so rather than falling back to open-domain knowledge. Optional web search is a *separate,
-visibly-labeled* path — never silently blended into a course-grounded answer.
+**Grounding is non-negotiable for course facts.** Dates, grading, policies, deadlines,
+assignments, staff and what was said in class come only from indexed material, with citations. If
+the material doesn't support an answer, Second Mind says so rather than guessing.
+
+**General knowledge is allowed, but always labeled.** *(Changed 2026-09-23; this rule used to ban
+open-domain knowledge entirely.)* When the course doesn't cover something, or the student asks for
+a simpler explanation or an extra example, Second Mind may explain from general knowledge, but
+only in a separate, visibly labeled part of the answer ("General knowledge (not from your course
+materials)"), never mixed into the cited part. An evaluation of four answering styles showed that
+the old "course only" rule both failed students (a flat "not covered" for reasonable study
+questions) and wasn't followed reliably by the model, which answered from its own knowledge
+anyway and attached unrelated citations. See docs/evaluations/2026-09-23-ask-modes/report.md.
+Optional web search stays a *separate, visibly-labeled* path in the same way.
 
 ### 7.1 Assignment explainer
 

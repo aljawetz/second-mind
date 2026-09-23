@@ -769,6 +769,27 @@ of all three courses with zero failures, and timed launches of the packaged `.ap
 - **Indexing assignment descriptions broke Explain's pointers** until they filtered assignments
   out: the pointer query is the assignment's own text, so its indexed copy always ranked first.
 
+### 16. Chat that understands follow-ups
+**Owner:** Arthur.
+**Do:** Replace `/ask`'s single retrieve-then-answer pass with a tool loop where the model sees the
+chat and searches the course itself, and may add labeled general knowledge (rag-pipeline.md §5,
+design spec §7's updated grounding rule).
+**Test:** `tests/test_chat.py` (fake model and search: forced first search, required search on
+follow-ups, citation renumbering including numbers split across stream chunks, history limits);
+then the evaluation in docs/evaluations/2026-09-23-ask-modes/, run through the shipped code on
+both question sets and graded blind.
+**Real findings:**
+- **Old chat failed follow-ups 6 of 7 times.** "And the final?" was answered with Java's `final`
+  keyword. The shipped chat answered 13 of 14 follow-ups correctly in each of 3 runs.
+- **The first held-out check blamed search, but the real cause was a 1,500-character cap** on
+  each result sent to the model. The right page was found; the answer sat at character ~2,470.
+  With whole chunks (plus the forced searches below), the held-out set went from 24 to 29 good
+  answers out of 33.
+- **The prompt said "always search on follow-ups" and the model sometimes didn't.** Fixed with
+  `tool_choice="required"` on a follow-up's first round.
+- **Still open:** invented grading weights when the only matching text is a garbled slide
+  (rag-pipeline.md §5, "Known weakness").
+
 ## What this plan deliberately leaves open
 
 - **Generation faithfulness verification** (does the LLM's answer stay faithful to its cited

@@ -77,13 +77,23 @@ synced/stored. Courses with no name (some real accounts have these) are filtered
 
 ### `POST /courses/{course_id}/ask`
 ```
-Request:  { "question": string }
-Response: { "answer": string,
-            "citations": [ { "source_type": "page"|"file"|"syllabus"|"assignment"|"transcript"|"notes",
-                              "label": string,        // e.g. "Lecture 6 · 14:22"
-                              "item_id": string } ],
-            "grounded": boolean }     // false when nothing relevant was retrieved (§7)
+Request:  { "question": string,
+            "history": [ { "question": string, "answer": string } ],   // optional, oldest first
+            "course_name": string }                                      // optional, shown to the model
+Response: newline-delimited JSON over a chunked stream:
+          { "delta": string }            // answer text, repeated as it's written
+          { "citations": [ { "source_type": "page"|"file"|"syllabus"|"assignment"|"transcript"|"notes",
+                             "label": string,        // e.g. "Lecture 6 · 14:22"
+                             "item_id": string } ],
+            "grounded": boolean }        // false when the answer cites no course material
+          { "error": string }            // only if the answer broke off after streaming started
+          { "done": true }
 ```
+The answer's `[n]` markers match `citations[n-1]`. Any part of the answer that isn't from the
+course comes after the line `General knowledge (not from your course materials):`, which the app
+renders as its own block. See rag-pipeline.md §5 for how the answer is built. Errors before the
+stream starts (bad key, missing model files) come back as normal error responses; a malformed
+`history` is `400 bad_request`.
 
 ### `POST /courses/{course_id}/assignments/{assignment_id}/explain`
 ```

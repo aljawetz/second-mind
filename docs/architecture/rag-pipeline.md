@@ -164,6 +164,36 @@ actually encodes the grounding rules from design spec §7 — answer-first, cite
 never blend in open-domain knowledge unless the (separately labeled) web-search path was
 explicitly used.
 
+**Course chat is a tool loop, not one retrieve-then-answer pass** (`chat.py`, since 2026-09-23).
+The model sees the whole conversation and has one tool, `search_course`, which runs the same
+`HybridRetriever` as before and returns numbered results. It can search as many times as it needs
+(up to four rounds) before answering. Chosen after comparing four answering styles on 67
+questions across three courses (docs/evaluations/2026-09-23-ask-modes/report.md): the old single
+pass failed almost every follow-up question ("explain the second one" searched for those exact
+words), and a "course only" prompt didn't stop the model from answering from its own knowledge
+with unrelated citations. Rules that the prompt alone didn't enforce are in code:
+- The student's question is always searched first, word for word, before the model's own
+  searches.
+- In a follow-up (any history present), the model's first move must be a search in its own
+  words (`tool_choice="required"`). Without it, "And the final?" sometimes got "couldn't find it"
+  off the word-for-word search, which finds Java's `final` keyword.
+- Results are whole chunks. An earlier 1,500-character preview hid answers that sit further down
+  a page, and was the real cause of most "not found" misses in the first held-out check.
+- Citation numbers are checked and renumbered (`CitationRenumberer`): numbers that match no
+  search result are dropped, the rest become 1..k in order of use.
+- General knowledge must sit under a fixed label line, which the app shows as its own block.
+
+All model calls for chat go through `llm.py`'s `LLMProvider` interface (OpenAI only today), the
+first code on the path to multi-provider support described above. The similarity cutoff for chat
+(`main.CHAT_SIMILARITY_CUTOFF`) stays 0.5: 0.4 gave the same number of good answers with one more
+made-up fact.
+
+**Known weakness: garbled or buried facts.** The model can still invent course facts when the only
+matching text is garbled. The 18-654 grading slide's text extraction kept "12.5%" and "17.5%"
+without their labels, while the real breakdown sits deep inside a long syllabus chunk that search
+never ranks; asked which component is worth the most, chat invented weights in 3 of 3 runs. That
+needs better slide extraction and smaller syllabus chunks (§1, §2), not a prompt change.
+
 **Streaming by default** (NFR5, design spec §5) — a Q&A response starts rendering as tokens arrive
 rather than waiting for the full completion, which is what makes retrieval-augmented generation
 feel conversational instead of like a batch job.

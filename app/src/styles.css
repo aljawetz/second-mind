@@ -236,6 +236,14 @@ button{font:inherit;color:inherit}
 }
 .qa-a p{margin:0 0 .6rem}
 .qa-a p:last-of-type{margin-bottom:0}
+/* Answers carry the model's own line breaks (lists, short code) — keep them. */
+.qa-text{white-space:pre-wrap}
+.qa-general{
+  margin-top:.7rem;padding:.6rem .75rem;border-left:3px solid var(--line);
+  background:var(--surface);border-radius:0 8px 8px 0;
+}
+.qa-general:first-child{margin-top:0}
+.qa-general-head{font-size:.72rem;font-weight:600;color:var(--ink-faint);margin-bottom:.35rem}
 .cite{
   font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--indigo);
   background:var(--indigo-ink);padding:.1rem .45rem;border-radius:6px;white-space:nowrap;

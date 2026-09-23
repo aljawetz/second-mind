@@ -114,19 +114,34 @@ export interface Citation {
 }
 
 // main.py's /ask streams newline-delimited JSON over a chunked response:
-// one {citations, grounded} line first (known once retrieval finishes,
-// before the LLM starts), then one {delta} line per token, then {done}.
-// Verified against a real index and a real strict HTTP client (Node's
-// undici, close in rigor to Tauri's Rust reqwest) — chunked framing
-// parses correctly through the plugin-http IPC bridge's ReadableStream.
+// {delta} lines as the answer is written, then one {citations, grounded}
+// line (known only once the answer is done, since the model decides what to
+// search and which results to cite), then {done}. An {error} line means the
+// answer broke off after streaming started. Chunked framing verified earlier
+// against a real strict HTTP client (Node's undici, close in rigor to
+// Tauri's Rust reqwest) through the plugin-http IPC bridge's ReadableStream.
+//
+// history is the chat so far, oldest first, so follow-ups like "explain the
+// second one" make sense. courseName goes into the model's instructions;
+// the backend only stores course ids.
+export interface AskEvent {
+  delta?: string;
+  citations?: Citation[];
+  grounded?: boolean;
+  error?: string;
+  done?: boolean;
+}
+
 export async function askQuestion(
   courseId: number,
+  courseName: string,
   question: string,
-  onEvent: (event: { citations?: Citation[]; grounded?: boolean; delta?: string; done?: boolean }) => void
+  history: { question: string; answer: string }[],
+  onEvent: (event: AskEvent) => void
 ): Promise<void> {
   const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/ask`, {
     method: "POST",
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, history, course_name: courseName }),
   });
 
   if (!res.ok || !res.body) {

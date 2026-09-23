@@ -107,14 +107,15 @@ class HybridRetriever(BaseRetriever):
     only after both are independently decided, so nothing downstream
     re-filters either kind against a scale it was never computed on."""
 
-    def __init__(self, index, similarity_top_k: int = 5):
+    def __init__(self, index, similarity_top_k: int = 5, similarity_cutoff: float = SIMILARITY_CUTOFF):
         self._index = index
         self._similarity_top_k = similarity_top_k
+        self._similarity_cutoff = similarity_cutoff
         super().__init__()
 
     def _retrieve(self, query_bundle: QueryBundle) -> list[NodeWithScore]:
         vector_nodes = self._index.as_retriever(similarity_top_k=self._similarity_top_k).retrieve(query_bundle)
-        vector_nodes = SimilarityPostprocessor(similarity_cutoff=SIMILARITY_CUTOFF).postprocess_nodes(vector_nodes)
+        vector_nodes = SimilarityPostprocessor(similarity_cutoff=self._similarity_cutoff).postprocess_nodes(vector_nodes)
         seen_ids = {n.node.node_id for n in vector_nodes}
 
         table = self._index.vector_store.table
