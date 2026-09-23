@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { AvailableCourse } from "../../types";
 import { syncCourse, type SyncEvent } from "../../sidecar";
+import LogoMark from "../LogoMark";
 
 interface CourseProgress {
   items: { name: string; failed: boolean }[];
@@ -81,6 +82,9 @@ export default function OnboardingIndexing({
   return (
     <div className="onboard">
       <div className="onboard-card">
+        <div className="onboard-icon">
+          <LogoMark size={26} />
+        </div>
         {showSteps && (
           <div className="onboard-steps">
             <span className="onboard-dot done"></span>

@@ -61,6 +61,7 @@ button{font:inherit;color:inherit}
 }
 .brand{display:flex;align-items:baseline;gap:.4rem;padding:.2rem .3rem .4rem}
 .brand .mark{font-family:'Fraunces',serif;font-weight:600;font-size:1.05rem;letter-spacing:.01em}
+.brand .brand-logo{color:var(--indigo);align-self:center;flex:none}
 .brand .tag{font-size:.68rem;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace;letter-spacing:.02em}
 .nav-label{
   font-size:.65rem;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-faint);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getCredential, setCredential } from "../../credentials";
 import { getConfig, validateCredential, writeConfig } from "../../sidecar";
+import LogoMark from "../LogoMark";
 
 // canvasUrl comes back from onNext already normalized (config.py's
 // normalize_canvas_base_url, applied server-side on write) rather than
@@ -58,7 +59,9 @@ export default function OnboardingKeys({ onNext }: { onNext: (canvasUrl: string)
   return (
     <div className="onboard">
       <div className="onboard-card">
-        <div className="onboard-icon">SSB</div>
+        <div className="onboard-icon">
+          <LogoMark size={26} />
+        </div>
         <div className="onboard-steps">
           <span className="onboard-dot active"></span>
           <span className="onboard-dot"></span>

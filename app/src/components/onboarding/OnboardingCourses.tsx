@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { AvailableCourse } from "../../types";
 import { listCourses, writeConfig } from "../../sidecar";
+import LogoMark from "../LogoMark";
 
 export default function OnboardingCourses({
   courses,
@@ -59,6 +60,9 @@ export default function OnboardingCourses({
         <button className="back-mini" onClick={onBack}>
           ‹ Back
         </button>
+        <div className="onboard-icon">
+          <LogoMark size={26} />
+        </div>
         <div className="onboard-steps">
           <span className="onboard-dot done"></span>
           <span className="onboard-dot active"></span>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { AvailableCourse } from "../../types";
 import type { SessionSummary } from "../../sidecar";
+import LogoMark from "../LogoMark";
 
 export default function Sidebar({
   courses,
@@ -45,6 +46,7 @@ export default function Sidebar({
   return (
     <aside className="sidebar">
       <div className="brand">
+        <LogoMark size={15} className="brand-logo" />
         <span className="mark">SSB</span>
       </div>
 

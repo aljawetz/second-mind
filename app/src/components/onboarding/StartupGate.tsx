@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getBackendInstanceToken, pingSidecar } from "../../sidecar";
+import LogoMark from "../LogoMark";
 
 const POLL_MS = 2000;
 const GRACE_MS = 5000; // switch to "first launch" copy after this long
@@ -57,7 +58,9 @@ export default function StartupGate({ onReady }: { onReady: () => void }) {
   return (
     <div className="onboard onboard-loading">
       <div className="onboard-card">
-        <div className="onboard-icon">SSB</div>
+        <div className="onboard-icon">
+          <LogoMark size={26} />
+        </div>
         <div>
           <h2 className="onboard-title">Starting up</h2>
           <p className="onboard-sub">{message}</p>

@@ -1,0 +1,11 @@
+<!-- SSB app icon source: a note with a footnote marker, since every answer
+     points back to a cited source. Apple's macOS icon grid (824 px rounded
+     square on a 1024 canvas), which macOS 26 needs to avoid drawing the icon
+     inside a gray box. Regenerate the PNG/ICNS/ICO set: render this at
+     1024x1024, then `npx tauri icon <png>` and keep only the files already in
+     this folder. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#2563EB"/>
+  <circle cx="478" cy="556" r="200" fill="#FFFFFF"/>
+  <circle cx="712" cy="318" r="72" fill="#FFFFFF"/>
+</svg>
