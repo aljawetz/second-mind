@@ -12,9 +12,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from memory import consolidate, extract, recall
+from memory import consolidate, extract, forget, recall
 from memory.consolidate import Decision
 from memory.extract import JsonLLM
+from memory.forget import SweepReport
 from memory.recall import Hit
 from memory.store import Memory, MemoryStore
 
@@ -101,6 +102,11 @@ class MemoryService:
         for mid in found:
             self._store.delete(mid, at=self._now(), reason=reason)
         return len(found)
+
+    def sweep(self) -> SweepReport:
+        """Archives what has gone unused for long enough (design spec §5.7),
+        by this service's clock, so the evaluation can replay a semester."""
+        return forget.sweep(self._store, self._now())
 
     def forget_conversation(self, conversation_id: str) -> int:
         """The student deleted a chat: forget what came only from it. A

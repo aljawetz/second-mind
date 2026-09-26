@@ -170,3 +170,17 @@ def test_a_turn_read_later_is_dated_when_it_was_said(service_for, clock):
 
     assert "Tuesday 2026-09-08" in llm.calls[0][-1]["content"]
     assert svc.list()[0].created_at == T0
+
+
+def test_a_sweep_fades_what_went_unused_by_the_service_clock(service_for, clock):
+    reply = _extraction("The student missed Class #5.")
+    reply["memories"][0]["kind"] = "event"
+    reply["memories"][0]["importance"] = 3
+    svc = service_for(ScriptedLLM(reply))
+    svc.observe(_turn("I missed class 5."), conversation_id="c-1", turn_index=0)
+
+    clock["t"] = T0 + timedelta(days=61)
+    report = svc.sweep()
+
+    assert len(report.archived) == 1
+    assert svc.list() == [] and svc.list(include_inactive=True)[0].status == "archived"

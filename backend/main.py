@@ -94,24 +94,33 @@ def _memory_service(course_id: int, provider=None) -> MemoryService:
     return MemoryService(SM_HOME, course_id, llm=provider, embed=memory_jobs.embed)
 
 
-def _run_memory_job(job: tuple[int, str]) -> None:
+def _run_memory_job(job: tuple[int, str | None]) -> None:
+    """(course, chat): read the chat's new turns, then sweep the course.
+    (course, None): just the sweep, which needs no model and so no key."""
     course_id, cid = job
-    with _memory_service(course_id, llm.OpenAIProvider()) as service:
-        memory_jobs.observe_conversation(SM_HOME, course_id, cid, service)
+    with _memory_service(course_id, llm.OpenAIProvider() if cid else None) as service:
+        if cid:
+            memory_jobs.observe_conversation(SM_HOME, course_id, cid, service)
+        # Fading (agent memory design spec §5.7): a scan of one course's
+        # memories, milliseconds, so after every job rather than every 20th.
+        service.sweep()
 
 
-# Memory writes (extraction, consolidation) run here, after an answer has
-# streamed, never in its way (agent memory design spec §5.1).
+# Memory writes (extraction, consolidation, fading) run here, after an
+# answer has streamed, never in its way (agent memory design spec §5.1).
 MEMORY_WORKER = MemoryWorker(_run_memory_job)
 
 
-def queue_unread_turns() -> None:
+def queue_startup_memory_jobs() -> None:
     """At startup: turns saved but not yet read by memory when the app last
-    quit are queued again."""
+    quit, then a sweep of every selected course."""
     if not _memory_enabled():
         return
-    for job in memory_jobs.pending(SM_HOME, config.read_config(SM_HOME).get("selected_courses", [])):
+    selected = config.read_config(SM_HOME).get("selected_courses", [])
+    for job in memory_jobs.pending(SM_HOME, selected):
         MEMORY_WORKER.submit(job)
+    for course_id in selected:
+        MEMORY_WORKER.submit((course_id, None))
 
 
 def _memory_json(m) -> dict:
@@ -770,5 +779,5 @@ if __name__ == "__main__":
             file=sys.stderr,
         )
         _exit_now(1)
-    queue_unread_turns()
+    queue_startup_memory_jobs()
     server.serve_forever()

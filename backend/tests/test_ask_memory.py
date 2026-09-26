@@ -9,6 +9,7 @@ import json
 import re
 import threading
 import zlib
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -21,6 +22,7 @@ import llm
 import main
 import memory_jobs
 from llm import TurnEnd
+from memory import MemoryService
 
 COURSE = 55710
 
@@ -32,8 +34,8 @@ def embed(text):
     return v
 
 
-def _extraction(text):
-    memory = {"kind": "fact", "text": text, "importance": 4, "event_time": None, "entities": [], "task_ref_hint": None}
+def _extraction(text, kind="fact"):
+    memory = {"kind": kind, "text": text, "importance": 3, "event_time": None, "entities": [], "task_ref_hint": None}
     return {"memories": [memory], "summary": "s"}
 
 
@@ -235,7 +237,7 @@ def test_turns_left_unread_are_queued_again_at_startup(app):
     conversations.append_turn(app.home, COURSE, "c-000000000001", turn)
     app.model.json_replies.append(_extraction("The student is on team 4."))
 
-    main.queue_unread_turns()
+    main.queue_startup_memory_jobs()
 
     assert main.MEMORY_WORKER.wait_idle(10)
     assert [m["text"] for m in _json(app, "GET", f"/courses/{COURSE}/memories")[1]["memories"]] == ["The student is on team 4."]
@@ -255,3 +257,39 @@ def test_memory_and_chat_routes_need_a_selected_course(app, method, path):
     status, body = _json(app, method, path)
 
     assert status == 404 and body["error"]["code"] == "not_found"
+
+
+class _OneReply:
+    def __init__(self, reply):
+        self._reply = reply
+
+    def complete_json(self, messages):
+        return self._reply
+
+
+def _remember_long_ago(home, text, days=90):
+    """An event memory from `days` ago, never recalled since."""
+    long_ago = datetime.now(timezone.utc) - timedelta(days=days)
+    with MemoryService(home, COURSE, llm=_OneReply(_extraction(text, kind="event")), embed=embed, now=lambda: long_ago) as svc:
+        svc.observe([{"role": "user", "content": text}], conversation_id="c-old", turn_index=0)
+
+
+def test_startup_fades_old_memories_in_every_selected_course(app):
+    _remember_long_ago(app.home, "The student missed Class #2.")
+
+    main.queue_startup_memory_jobs()
+
+    assert main.MEMORY_WORKER.wait_idle(10)
+    assert _json(app, "GET", f"/courses/{COURSE}/memories") == (200, {"memories": []})
+    [m] = _json(app, "GET", f"/courses/{COURSE}/memories?include_inactive=1")[1]["memories"]
+    assert m["status"] == "archived"
+    assert app.model.json_calls == []  # a sweep alone needs no model, so no key
+
+
+def test_each_memory_job_also_fades_its_course(app):
+    _remember_long_ago(app.home, "The student missed Class #2.")
+
+    _say(app, "I'm on team 4.", remembers="The student is on team 4.")
+
+    assert [m["text"] for m in _json(app, "GET", f"/courses/{COURSE}/memories")[1]["memories"]] == ["The student is on team 4."]
+

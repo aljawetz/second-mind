@@ -130,6 +130,12 @@ def _when(m: Memory) -> datetime:
     return m.event_time or m.created_at
 
 
+def last_use(m: Memory) -> datetime:
+    """When a memory last mattered: last recalled, else when it happened or
+    was said. Recency here and fading in forget.py both count from it."""
+    return m.last_accessed or _when(m)
+
+
 def _as_data(text: str) -> str:
     """Memory text goes into a system prompt. It's the student's own words,
     but it still mustn't be able to close the fence it sits in."""
@@ -142,8 +148,7 @@ def _recency(m: Memory, now: datetime) -> float:
     (never lower, so an old but exact match still comes up)."""
     if m.kind == "fact":
         return 1.0
-    last_use = m.last_accessed or _when(m)
-    days = max((now - last_use).total_seconds() / 86400, 0.0)
+    days = max((now - last_use(m)).total_seconds() / 86400, 0.0)
     return 0.5 + 0.5 * math.exp(-days / RECENCY_DAYS)
 
 
