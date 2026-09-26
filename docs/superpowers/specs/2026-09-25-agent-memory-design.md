@@ -381,8 +381,9 @@ backend/memory/
 class MemoryService:
     def __init__(self, sm_home: Path, course_id: int, llm: JsonLLM,
                  embed: Callable[[str], list[float]], now: Callable[[], datetime] = utcnow): ...
-    def observe_turn(self, conversation_id: str, turn_index: int) -> None       # queues a job
-    def observe_session(self, turns: list[dict], at: datetime, session_id: str) -> None  # sync; eval harness
+    def observe(self, messages: list[dict], *, conversation_id: str, turn_index: int,
+                summary: str = "") -> ObserveResult    # synchronous: one turn (app) or a session (eval)
+    def observe_turn(self, conversation_id: str, turn_index: int) -> None       # queues observe() on the worker
     def profile_block(self) -> str
     def recall(self, query: str, k: int = 5, include_history: bool = False) -> list[MemoryHit]
     def forget(self, memory_ids: list[str]) -> int
