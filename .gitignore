@@ -32,3 +32,7 @@ backend/models/
 # backend/scripts/fetch_ingestion_fixtures.py. The measured baseline
 # derived from them (tests/fixtures/ingestion_baseline.json) is committed.
 backend/tests/fixtures/ingestion/
+
+# Evaluation datasets (LongMemEval), downloaded by the memory evaluation —
+# docs/superpowers/specs/2026-09-25-agent-memory-evaluation-design.md §4.1.
+backend/.cache/
