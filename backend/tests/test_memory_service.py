@@ -35,7 +35,7 @@ class ScriptedLLM:
         return self._replies.pop(0)
 
 
-def _extraction(*texts, summary="Talked about the project."):
+def _extraction(*texts, summary=""):  # no summary memory unless a test wants one
     return {
         "memories": [
             {"kind": "fact", "text": t, "importance": 4, "event_time": None, "entities": ["team"], "task_ref_hint": None}
@@ -70,7 +70,7 @@ def service_for(tmp_path, clock):
 
 
 def test_what_the_student_said_can_be_recalled_later(service_for, clock):
-    svc = service_for(ScriptedLLM(_extraction("The student is on team 4 with Priya and Ken.")))
+    svc = service_for(ScriptedLLM(_extraction("The student is on team 4 with Priya and Ken.", summary="Talked about the project.")))
 
     result = svc.observe(_turn("I'm on team 4 with Priya and Ken."), conversation_id="c-1", turn_index=0)
     clock["t"] = T1
@@ -120,7 +120,7 @@ def test_the_summary_so_far_goes_to_extraction_and_drops_are_reported(service_fo
     assert "Old summary." in llm.calls[0][-1]["content"]
     assert result.summary == "New summary."
     assert result.dropped == [("The student got a 72 on the midterm.", "grades_or_deadlines")]
-    assert svc.list() == []
+    assert [m.text for m in svc.list()] == ["New summary."]  # the chat's summary, not the grade
 
 
 def test_the_profile_comes_from_the_same_store(service_for):
@@ -184,3 +184,70 @@ def test_a_sweep_fades_what_went_unused_by_the_service_clock(service_for, clock)
 
     assert len(report.archived) == 1
     assert svc.list() == [] and svc.list(include_inactive=True)[0].status == "archived"
+
+
+def test_each_turn_rewrites_its_chat_summary_as_one_memory(service_for, clock):
+    llm = ScriptedLLM(
+        _extraction("The student is on team 4 with Priya and Ken.", summary="Asked which team does the fixtures lab."),
+        {"memories": [], "summary": "Asked about the fixtures lab, then about mocking the email service."},
+    )
+    svc = service_for(llm)
+    svc.observe(_turn("Which team does the fixtures lab?"), conversation_id="c-1", turn_index=0)
+    clock["t"] = T1
+    svc.observe(_turn("How do I mock the email service?"), conversation_id="c-1", turn_index=1)
+
+    [summary] = [m for m in svc.list() if m.kind == "summary"]
+    assert (summary.text, summary.conversation_id) == ("Asked about the fixtures lab, then about mocking the email service.", "c-1")
+    assert [h.memory.id for h in svc.recall("What did we say about mocking email?")] == [summary.id]
+
+
+def test_the_chat_being_answered_does_not_recall_its_own_summary(tmp_path, clock):
+    llm = ScriptedLLM({"memories": [], "summary": "Asked about mocking the email service."})
+    with MemoryService(tmp_path, COURSE, llm=llm, embed=embed, now=lambda: clock["t"]) as svc:
+        svc.observe(_turn("How do I mock the email service?"), conversation_id="c-1", turn_index=0)
+    with MemoryService(tmp_path, COURSE, llm=llm, embed=embed, now=lambda: clock["t"], conversation_id="c-1") as same_chat:
+        assert same_chat.recall("mocking email") == []
+    with MemoryService(tmp_path, COURSE, llm=llm, embed=embed, now=lambda: clock["t"], conversation_id="c-2") as other_chat:
+        assert len(other_chat.recall("mocking email")) == 1
+
+
+def _service_reporting_forgets(tmp_path, clock, *replies):
+    cleared = []
+    svc = MemoryService(tmp_path, COURSE, llm=ScriptedLLM(*replies), embed=embed, now=lambda: clock["t"], on_forget=cleared.append)
+    return svc, cleared
+
+
+def test_forgetting_a_fact_forgets_its_chats_summaries_and_says_which_chats(tmp_path, clock):
+    # A chat's summary may repeat the fact, and so may the chat's running
+    # summary, which would write it back on the next turn.
+    svc, cleared = _service_reporting_forgets(
+        tmp_path, clock,
+        _extraction("The student is auditing the course.", summary="Said they are auditing."),
+        _extraction("The student wants code examples in Java.", summary="Asked for Java."),
+    )
+    with svc:
+        svc.observe(_turn("I'm auditing."), conversation_id="c-1", turn_index=0)
+        svc.observe(_turn("Use Java."), conversation_id="c-2", turn_index=0)
+        auditing = next(m.id for m in svc.list() if "auditing" in m.text and m.kind == "fact")
+
+        assert svc.forget([auditing]) == 1
+
+        assert sorted(m.text for m in svc.list(include_inactive=True)) == ["Asked for Java.", "The student wants code examples in Java."]
+        assert cleared == [["c-1"]]
+
+
+def test_forgetting_a_chat_summary_itself_clears_that_chats_running_summary(tmp_path, clock):
+    svc, cleared = _service_reporting_forgets(tmp_path, clock, {"memories": [], "summary": "Said they are auditing."})
+    with svc:
+        svc.observe(_turn("I'm auditing."), conversation_id="c-1", turn_index=0)
+        [summary] = svc.list()
+
+        assert svc.forget([summary.id]) == 1
+        assert cleared == [["c-1"]]
+
+
+def test_forgetting_nothing_reports_no_chats(tmp_path, clock):
+    svc, cleared = _service_reporting_forgets(tmp_path, clock)
+    with svc:
+        assert svc.forget(["m-000000000000"]) == 0
+        assert cleared == []

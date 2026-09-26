@@ -37,6 +37,7 @@ from llama_index.core.schema import NodeWithScore
 
 import generation
 from llm import LLMProvider, ToolCall, TurnEnd
+from memory.compress import summary_block
 from memory.recall import Hit, format_hits
 
 GENERAL_KNOWLEDGE_LABEL = "General knowledge (not from your course materials):"
@@ -240,13 +241,15 @@ def answer(
     search: Callable[[str], list[NodeWithScore]],
     provider: LLMProvider,
     memory=None,
+    summary: str = "",
 ) -> Iterator[dict]:
     """Yields /ask's stream events: {"delta"} text pieces, then one
     {"citations", "grounded"}, then {"done": True}. With `memory` (a
     memory.MemoryService), the final event also has "memories_used": the
     memories recalled this turn and not forgotten, [{id, text}], so the app
     can show what the answer drew on. The profile isn't listed: it's there
-    on every question.
+    on every question. `summary` is the conversation's running summary when
+    `history` is only its last few turns (memory.compress).
 
     Nothing is yielded until the model starts writing its answer, so errors
     from searching or the first model calls surface before the caller has
@@ -313,6 +316,8 @@ def answer(
         profile = memory.profile_block()
         if profile:
             prompt += "\n\n" + profile
+    if summary:
+        prompt += "\n\n" + summary_block(summary)
     messages = [{"role": "system", "content": prompt}, *_history_messages(history), {"role": "user", "content": question}]
     # The first search is made here, in the model's name, so it always
     # happens and always uses the student's exact words.

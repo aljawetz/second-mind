@@ -34,9 +34,9 @@ def embed(text):
     return v
 
 
-def _extraction(text, kind="fact"):
+def _extraction(text, kind="fact", summary=""):  # no summary memory unless a test wants one
     memory = {"kind": kind, "text": text, "importance": 3, "event_time": None, "entities": [], "task_ref_hint": None}
-    return {"memories": [memory], "summary": "s"}
+    return {"memories": [memory], "summary": summary}
 
 
 class FakeModel:
@@ -113,7 +113,7 @@ def _final(events):
 def _say(app, question, answer="Noted.", remembers=None, **body):
     """One /ask, answered with `answer`; the worker then extracts `remembers`."""
     app.model.chat_replies.append([answer])
-    app.model.json_replies.append(_extraction(remembers) if remembers else {"memories": [], "summary": "s"})
+    app.model.json_replies.append(_extraction(remembers) if remembers else {"memories": [], "summary": ""})
     status, events = _ask(app, question, **body)
     assert status == 200, events
     assert main.MEMORY_WORKER.wait_idle(10)
@@ -293,3 +293,31 @@ def test_each_memory_job_also_fades_its_course(app):
 
     assert [m["text"] for m in _json(app, "GET", f"/courses/{COURSE}/memories")[1]["memories"]] == ["The student is on team 4."]
 
+
+def test_a_long_chat_is_sent_as_its_summary_and_its_last_four_turns(app):
+    cid = "c-000000000001"
+    for i in range(6):
+        turn = {"question": f"Question {i}?", "answer": f"Answer {i}.", "citations": [], "grounded": False, "asked_at": "2026-09-21T18:00:00Z"}
+        conversations.append_turn(app.home, COURSE, cid, turn)
+    conversations.set_memory_progress(app.home, COURSE, cid, processed_upto=6, summary="Went over stubs and mocks.")
+
+    _say(app, "And fakes?", conversation_id=cid)
+
+    sent = app.model.chat_calls[-1]
+    assert "<summary>\nWent over stubs and mocks.\n</summary>" in sent[0]["content"]
+    assert [m["content"] for m in sent if m["role"] == "user"] == ["Question 2?", "Question 3?", "Question 4?", "Question 5?", "And fakes?"]
+
+
+def test_forgetting_a_memory_clears_its_chats_running_summary(app):
+    app.model.chat_replies.append(["Noted."])
+    app.model.json_replies.append(_extraction("The student is auditing the course.", summary="Said they are auditing."))
+    _, events = _ask(app, "I'm auditing the course.")
+    assert main.MEMORY_WORKER.wait_idle(10)
+    cid = events[0]["conversation_id"]
+    assert conversations.get_conversation(app.home, COURSE, cid)["summary"] == "Said they are auditing."
+    fact = next(m for m in _json(app, "GET", f"/courses/{COURSE}/memories")[1]["memories"] if m["kind"] == "fact")
+
+    assert _json(app, "DELETE", f"/courses/{COURSE}/memories/{fact['id']}") == (200, {"status": "deleted"})
+
+    assert _json(app, "GET", f"/courses/{COURSE}/memories?include_inactive=1") == (200, {"memories": []})
+    assert conversations.get_conversation(app.home, COURSE, cid)["summary"] == ""

@@ -38,7 +38,7 @@ class ScriptedLLM:
 
 def _extraction(text):
     memory = {"kind": "fact", "text": text, "importance": 4, "event_time": None, "entities": [], "task_ref_hint": None}
-    return {"memories": [memory], "summary": "s"}
+    return {"memories": [memory], "summary": ""}  # no summary memory unless a test wants one
 
 
 class FakeProvider:
@@ -215,3 +215,12 @@ def test_a_memory_label_split_across_chunks_leaves_no_stray_space(memory):
     text, _, _ = _run("q", [(["Use Java", " [M", "1]. Here", " it is."], [])], memory.service)
 
     assert text == "Use Java. Here it is."
+
+
+def test_an_earlier_summary_goes_into_the_system_prompt():
+    provider = FakeProvider([(["ok"], [])])
+    list(chat.answer("And the third?", [], "Test Course", lambda q: [], provider, summary="Went over stubs, then fakes."))
+
+    system = provider.calls[0]["messages"][0]["content"]
+    assert "Earlier in this conversation, summarized" in system
+    assert "<summary>\nWent over stubs, then fakes.\n</summary>" in system

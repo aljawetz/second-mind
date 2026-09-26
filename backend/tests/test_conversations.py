@@ -143,3 +143,14 @@ def test_memory_progress_on_a_deleted_conversation_is_ignored(tmp_path):
     conversations.set_memory_progress(tmp_path, COURSE, "c-000000000009", processed_upto=1, summary="x")
 
     assert not conversations.exists(tmp_path, COURSE, "c-000000000009")
+
+
+def test_clearing_summaries_keeps_the_turns_and_how_far_memory_read(tmp_path):
+    conversations.append_turn(tmp_path, COURSE, "c-000000000001", _turn())
+    conversations.set_memory_progress(tmp_path, COURSE, "c-000000000001", processed_upto=1, summary="Said they are auditing.")
+
+    conversations.clear_summaries(tmp_path, COURSE, ["c-000000000001", "c-000000000009"])  # the second doesn't exist
+
+    c = conversations.get_conversation(tmp_path, COURSE, "c-000000000001")
+    assert (c["summary"], c["memory_processed_upto"], len(c["turns"])) == ("", 1, 1)
+    assert not conversations.exists(tmp_path, COURSE, "c-000000000009")

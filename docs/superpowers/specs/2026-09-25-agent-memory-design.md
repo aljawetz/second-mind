@@ -302,11 +302,20 @@ Three levels:
 1. **Within a conversation.** The fixed 6-turn window is replaced by the conversation summary
    (≤ 150 words, from §5.2) plus the last 4 turns verbatim. Citations are stripped and answers
    capped at 1,500 characters, as today. The summary is stored in the conversation file
-   (`summary`, `summary_upto`). If the worker hasn't caught up yet, chat falls back to today's
-   window.
+   (`summary`; it covers the first `memory_processed_upto` turns). If it doesn't cover every turn
+   older than the last 4 (the worker hasn't caught up, or memory is off), chat falls back to
+   today's window (`memory/compress.py`). It goes into the system prompt, fenced, under a header
+   saying it's the conversation and not course material.
 2. **Conversation → one `summary` memory.** The same summary is upserted as that conversation's
-   `summary` memory, keyed by `conversation_id`, so recall can answer "what did we go over about
-   mocks last week?".
+   `summary` memory, keyed by `conversation_id` (`MemoryStore.set_summary`), so recall can answer
+   "what did we go over about mocks last week?". Importance 2, so a specific memory wins a close
+   call; its `event_time` is the chat's latest turn, so it fades from when the chat was last
+   active. Chat never recalls the summary of the chat it's answering (its history already carries
+   it).
+   - **The grades rule covers summaries too.** Found while building this: the summary is
+     model-written from the student's words, so "got a 72 on the midterm" could end up in a
+     recallable memory. `extract.py` drops summary sentences that match the grades/deadlines
+     filter, and the prompt now says so too.
 3. **Turns → short facts.** Recall never returns raw turns, only extracted memories and
    summaries. The evaluation measures the size ratio of memory to raw conversation.
 
@@ -318,7 +327,12 @@ client sends. The client's copy can be stale. Requests without an id keep today'
 
 1. **Superseding and invalidating** (§5.3): a soft forget. The memory is out of normal recall but
    kept for history questions.
-2. **Decay → archive:** a sweep at backend start and after every 20 worker jobs.
+2. **Decay → archive** (`memory/forget.py`): a sweep of every selected course at backend start,
+   and of the course after every memory job. A sweep scans one course's rows in milliseconds, so
+   every job is simpler than every 20th. The startup sweep needs no model, so it runs without a
+   key. "Recalled" below means `recall.last_use`: last recalled, else when it happened or was
+   said, the same clock recall's recency uses. A time still ahead ("the midterm is on Dec 10") is
+   never old.
 
    | Kind | Archived when |
    |---|---|
@@ -339,7 +353,10 @@ client sends. The client's copy can be stale. Requests without an id keep today'
    - **Through the API:** `DELETE /courses/{id}/memories/{mid}`.
    - **What gets deleted:** the memory row, its FTS row, its entity links, its provenance, and its
      `ops_log` rows. So do the `summary` memories of the conversations it came from, since they
-     may repeat the fact; they're rebuilt on the conversation's next turn.
+     may repeat the fact. Those conversations' running summaries are cleared too, through
+     `MemoryService(on_forget=)` and `conversations.clear_summaries`, because the next turn's
+     extraction starts from the running summary and would write the fact straight back. The next
+     turn starts a fresh summary, and chat sends the plain recent turns until it covers them.
    - **What it doesn't touch:** the saved chat itself. The tool result tells the model to say so:
      "It's still in your chat from Sep 21; delete that chat to remove it completely."
    - **Gone from the files, not just from queries.** Found while building `store.py`: a plain
@@ -508,6 +525,15 @@ the ablations.
   - This work displaces Study artifacts (Step 11, Yongjie) from Sprint 5.
   - The team's Sprint 5 report still needs course-search precision@k compared with Sprint 3.
     That's naturally Aaron's (retrieval owner) and isn't covered here.
+- **Forgetting while a memory job is still running (known gap, for the technical analysis).**
+  "Forget that I'm auditing" said right after "I'm auditing":
+  - The job reading the earlier turn may not have stored the fact yet, so recall can't find it to
+    forget.
+  - Or the job read the running summary before the forget cleared it, and writes it back
+    afterwards.
+
+  Both need the worker to be idle for that chat, or to recheck after its job. Not handled in P0;
+  the student-memory set's forget probes will show how often it bites.
 - **Frontend dependency.** Resolved for the demo: the app sends `conversation_id` back (§8). There
   is still no way in the app to reopen or delete a past chat (conversation history plan, Task 5).
 

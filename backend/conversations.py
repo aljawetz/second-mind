@@ -119,6 +119,20 @@ def set_memory_progress(sm_home: Path, course_id: int, cid: str, *, processed_up
         _write(path, data)
 
 
+def clear_summaries(sm_home: Path, course_id: int, cids: list[str]) -> None:
+    """Something these chats told memory was forgotten, and their running
+    summaries may repeat it. Cleared, not rewritten: the next turn starts a
+    new summary, and chat sends the plain recent turns until then."""
+    with _lock:
+        for cid in cids:
+            path = _path(sm_home, course_id, cid)
+            if not path.exists():
+                continue
+            data = json.loads(path.read_text())
+            data["summary"] = ""
+            _write(path, data)
+
+
 def pending_memory(sm_home: Path, course_id: int) -> list[str]:
     """Conversations with turns memory hasn't read yet: what the worker
     picks up again after a restart."""

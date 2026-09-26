@@ -54,7 +54,7 @@ explanations are not facts about the student.
 "yesterday" or "last Tuesday" into a date.
 - Skip facts about the course itself (dates, grading, policies, content): the course materials \
 already hold those. Skip small talk and anything the summary already records.
-- Never record grades, scores or deadlines.
+- Never write down grades, scores or deadlines, in memories or the summary.
 - importance: 1 (trivia) to 5 (the student would expect you to always remember it).
 - event_time: the date (YYYY-MM-DD) it happened or became true, if known.
 - entities: the people, assignments, projects and topics it mentions, as short lowercase names.
@@ -87,6 +87,7 @@ _GRADES_OR_DEADLINES = [
     re.compile(r"\b(got|received|earned|lost)\b[^.]{0,30}?\b\d{1,3}(?:\.\d+)?\b", re.IGNORECASE),
     re.compile(r"\b(due|overdue|deadlines?)\b", re.IGNORECASE),
 ]
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
 _SPEAKERS = {"user": "Student", "assistant": "Assistant"}
 
@@ -146,8 +147,17 @@ def extract(messages: list[dict], *, at: datetime, summary: str, llm: JsonLLM) -
             )
         )
     new_summary = reply.get("summary")
-    if isinstance(new_summary, str) and new_summary.strip():
-        summary = " ".join(new_summary.split()[:MAX_SUMMARY_WORDS])
+    if isinstance(new_summary, str):
+        # The summary becomes a recallable memory too (design spec §5.6), so
+        # the grades rule applies to it, one sentence at a time.
+        kept = []
+        for sentence in _SENTENCE_END.split(" ".join(new_summary.split())):
+            if any(p.search(sentence) for p in _GRADES_OR_DEADLINES):
+                dropped.append((sentence, "grades_or_deadlines"))
+            elif sentence:
+                kept.append(sentence)
+        if kept:
+            summary = " ".join(" ".join(kept).split()[:MAX_SUMMARY_WORDS])
     return Extraction(memories=memories, summary=summary, dropped=dropped)
 
 

@@ -33,7 +33,7 @@ import indexing
 import llm
 import memory_jobs
 import sessions
-from memory import MemoryService
+from memory import MemoryService, compress
 from memory.worker import MemoryWorker
 
 HOST = "127.0.0.1"
@@ -89,9 +89,19 @@ def _memory_enabled() -> bool:
     return config.read_config(SM_HOME).get("memory_enabled", True) is not False
 
 
-def _memory_service(course_id: int, provider=None) -> MemoryService:
-    """provider: the model memory writes need; reads and deletes don't."""
-    return MemoryService(SM_HOME, course_id, llm=provider, embed=memory_jobs.embed)
+def _memory_service(course_id: int, provider=None, conversation_id: str | None = None) -> MemoryService:
+    """provider: the model memory writes need; reads and deletes don't.
+    conversation_id: the chat being answered, whose own summary recall skips."""
+    return MemoryService(
+        SM_HOME,
+        course_id,
+        llm=provider,
+        embed=memory_jobs.embed,
+        conversation_id=conversation_id,
+        # A forgotten memory's chats must not write it back from their
+        # running summaries (agent memory design spec §5.7).
+        on_forget=lambda cids: conversations.clear_summaries(SM_HOME, course_id, cids),
+    )
 
 
 def _run_memory_job(job: tuple[int, str | None]) -> None:
@@ -560,6 +570,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(400, {"error": {"code": "bad_request", "message": "question is required"}})
             return
         cid = data.get("conversation_id")
+        summary = ""
         if cid is None:
             cid = conversations.new_conversation_id()
             try:
@@ -573,8 +584,12 @@ class Handler(BaseHTTPRequestHandler):
             if saved is None:
                 self._not_found("no such conversation")
                 return
-            # The saved chat, not the app's copy of it, which can be stale.
-            history = [{"question": t["question"], "answer": t["answer"]} for t in saved["turns"]]
+            # The saved chat, not the app's copy of it, which can be stale. A
+            # long one goes as its running summary plus its last few turns
+            # (agent memory design spec §5.6).
+            turns = [{"question": t["question"], "answer": t["answer"]} for t in saved["turns"]]
+            compressed = compress.build_history(turns, saved["summary"], saved["memory_processed_upto"])
+            history, summary = compressed.turns, compressed.summary
         # No local copy of course names exists (config.json keeps ids only),
         # so the app sends the one it shows in the sidebar.
         course_name = str(data.get("course_name") or "this course")
@@ -594,9 +609,15 @@ class Handler(BaseHTTPRequestHandler):
                     # model says it couldn't find anything, same as a real miss.
                     index = None
                 provider = llm.OpenAIProvider()
-                memory = _memory_service(int(course_id), provider) if memory_on else None
+                memory = _memory_service(int(course_id), provider, conversation_id=cid) if memory_on else None
                 events = chat.answer(
-                    question, history, course_name, chat.make_search(index, CHAT_SIMILARITY_CUTOFF), provider, memory=memory
+                    question,
+                    history,
+                    course_name,
+                    chat.make_search(index, CHAT_SIMILARITY_CUTOFF),
+                    provider,
+                    memory=memory,
+                    summary=summary,
                 )
                 first = next(events)
             except OnnxModelFileMissing:

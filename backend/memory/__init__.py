@@ -44,11 +44,19 @@ class MemoryService:
         llm: JsonLLM,
         embed: Callable[[str], list[float]],
         now: Callable[[], datetime] = _utcnow,
+        conversation_id: str | None = None,
+        on_forget: Callable[[list[str]], None] | None = None,
     ):
+        """conversation_id: the chat this service answers in, if any; recall
+        leaves out that chat's own summary. on_forget: called with the chats
+        a hard delete touched, so the app can clear their running summaries
+        (this package doesn't know how chats are stored)."""
         self._store = MemoryStore(sm_home / "courses" / str(course_id) / "memory.db")
         self._llm = llm
         self._embed = embed
         self._now = now
+        self._conversation_id = conversation_id
+        self._on_forget = on_forget
 
     def close(self) -> None:
         self._store.close()
@@ -82,11 +90,19 @@ class MemoryService:
             )
             for candidate in extraction.memories
         ]
+        # The chat as a whole, recallable from other chats ("what did we go
+        # over about mocks last week?"), design spec §5.6.
+        if extraction.summary:
+            self._store.set_summary(
+                conversation_id, text=extraction.summary, embedding=self._embed(extraction.summary), at=at,
+                turn_index=turn_index,
+            )
         return ObserveResult(extraction.summary, decisions, extraction.dropped)
 
     def recall(self, query: str, k: int = 5, include_history: bool = False) -> list[Hit]:
         return recall.recall(
-            query, store=self._store, embed=self._embed, now=self._now(), k=k, include_history=include_history
+            query, store=self._store, embed=self._embed, now=self._now(), k=k, include_history=include_history,
+            skip_conversation=self._conversation_id,
         )
 
     def profile_block(self) -> str:
@@ -97,10 +113,23 @@ class MemoryService:
 
     def forget(self, memory_ids: list[str], reason: str = "student asked to forget") -> int:
         """Hard delete (design spec §5.7): gone from the files, not just
-        hidden. Unknown ids are skipped. Returns how many were deleted."""
-        found = [mid for mid in memory_ids if self._store.get(mid) is not None]
-        for mid in found:
+        hidden. Unknown ids are skipped. Returns how many were deleted.
+
+        The summaries of the chats a memory came from go too, since they may
+        repeat it, and on_forget hears which chats: their running summaries
+        would otherwise write it back on the next turn."""
+        found = [m for m in (self._store.get(mid) for mid in dict.fromkeys(memory_ids)) if m is not None]
+        if not found:
+            return 0
+        chats = sorted({cid for m in found for cid, _ in m.provenance} | {m.conversation_id for m in found if m.conversation_id})
+        doomed = {m.id for m in found}
+        doomed |= {
+            m.id for m in self._store.list_memories(include_inactive=True) if m.kind == "summary" and m.conversation_id in chats
+        }
+        for mid in doomed:
             self._store.delete(mid, at=self._now(), reason=reason)
+        if self._on_forget:
+            self._on_forget(chats)
         return len(found)
 
     def sweep(self) -> SweepReport:

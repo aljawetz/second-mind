@@ -21,6 +21,10 @@ from pathlib import Path
 import numpy as np
 
 KINDS = ("fact", "event", "task", "summary")
+# A chat's summary (design spec §5.6) matters less than any one thing the
+# student said in it: recall's importance weight settles close calls
+# towards the specific memory.
+SUMMARY_IMPORTANCE = 2
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS memory (
@@ -172,6 +176,36 @@ class MemoryStore:
             )
             self._log(created_at, "ADD", memory_id, reason)
         return memory_id
+
+    def set_summary(self, conversation_id: str, *, text: str, embedding: list[float], at: datetime, turn_index: int) -> str:
+        """A chat's summary memory, one per chat, rewritten in place as the
+        chat goes on. Its event_time is the latest turn, so it fades from
+        when the chat was last active; a faded one comes back if the chat
+        goes on."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT id FROM memory WHERE kind = 'summary' AND conversation_id = ?", (conversation_id,)
+            ).fetchone()
+            if row is None:
+                return self.add(
+                    kind="summary", text=text, importance=SUMMARY_IMPORTANCE, embedding=embedding,
+                    created_at=at, event_time=at, provenance=[(conversation_id, turn_index)],
+                    conversation_id=conversation_id, reason="summary",
+                )
+            memory_id = row["id"]
+            with self._conn:
+                self._conn.execute(
+                    "UPDATE memory SET text = ?, embedding = ?, event_time = ?, status = 'active' WHERE id = ?",
+                    (text, np.asarray(embedding, dtype=np.float32).tobytes(), _iso(at), memory_id),
+                )
+                self._conn.execute("DELETE FROM memory_fts WHERE memory_id = ?", (memory_id,))
+                self._conn.execute("INSERT INTO memory_fts (memory_id, text) VALUES (?, ?)", (memory_id, text))
+                self._conn.execute(
+                    "INSERT INTO provenance (memory_id, conversation_id, turn_index) VALUES (?, ?, ?)",
+                    (memory_id, conversation_id, turn_index),
+                )
+                self._log(at, "UPDATE", memory_id, "summary")
+            return memory_id
 
     def get(self, memory_id: str) -> Memory | None:
         with self._lock:

@@ -46,16 +46,24 @@ def recall(
     now: datetime,
     k: int = 5,
     include_history: bool = False,
+    skip_conversation: str | None = None,
 ) -> list[Hit]:
     """The k memories that bear most on `query`, best first. Only current
     ones, unless include_history ("what was it before?"). Marks what it
-    returns as used."""
+    returns as used. skip_conversation: the chat being answered, whose own
+    summary is left out (its history already carries it)."""
+
+    def wanted(m: Memory) -> bool:
+        return not (m.kind == "summary" and m.conversation_id == skip_conversation)
+
     vector = [
         m
         for m, cosine in store.vector_search(embed(query), k=VECTOR_CANDIDATES, include_history=include_history)
-        if cosine >= MEMORY_SIMILARITY_CUTOFF
+        if cosine >= MEMORY_SIMILARITY_CUTOFF and wanted(m)
     ]
-    keyword = [m for m, _ in store.keyword_search(query, k=KEYWORD_CANDIDATES, include_history=include_history)]
+    keyword = [
+        m for m, _ in store.keyword_search(query, k=KEYWORD_CANDIDATES, include_history=include_history) if wanted(m)
+    ]
 
     relevance: dict[str, float] = {}
     by_id: dict[str, Memory] = {}

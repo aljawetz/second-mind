@@ -196,3 +196,28 @@ def test_the_summary_is_kept_to_150_words():
     result, _ = _extract([], reply_summary=" ".join(f"w{i}" for i in range(200)))
 
     assert result.summary.split() == [f"w{i}" for i in range(150)]
+
+
+def test_grades_and_deadlines_are_cut_from_the_summary_too():
+    # The summary becomes a recallable memory (design spec §5.6), so the
+    # grades rule covers it sentence by sentence.
+    result, _ = _extract(
+        [],
+        reply_summary="The student asked about mocks. They got a 72 on the midterm! Their A3 is due Friday? Then they asked about fakes.",
+    )
+
+    assert result.summary == "The student asked about mocks. Then they asked about fakes."
+    assert result.dropped == [
+        ("They got a 72 on the midterm!", "grades_or_deadlines"),
+        ("Their A3 is due Friday?", "grades_or_deadlines"),
+    ]
+
+
+def test_a_summary_that_is_all_grades_keeps_the_previous_one():
+    result, _ = _extract([], summary="Asked about mocks.", reply_summary="The student got a B+ on the quiz.")
+
+    assert result.summary == "Asked about mocks."
+
+
+def test_the_prompt_rules_grades_out_of_the_summary_as_well():
+    assert "grades, scores or deadlines, in memories or the summary" in extract.SYSTEM_PROMPT

@@ -277,3 +277,28 @@ def test_keyword_search_ignores_words_that_every_memory_shares(store):
     assert store.keyword_search("What did the student say?", k=5) == []
     assert _ids(store.keyword_search("Which team is the student on?", k=5)) == [team]
     assert _ids(store.keyword_search("team 4", k=5)) == [team]
+
+
+def test_a_chat_summary_is_one_memory_rewritten_in_place(store):
+    first = store.set_summary("c-1", text="Asked about fixtures.", embedding=X, at=T0, turn_index=0)
+    again = store.set_summary("c-1", text="Asked about mocks instead.", embedding=[0.0, 1.0, 0.0], at=T1, turn_index=1)
+    other = store.set_summary("c-2", text="Asked about fakes.", embedding=X, at=T1, turn_index=0)
+
+    assert first == again != other
+    m = store.get(first)
+    assert (m.kind, m.text, m.importance, m.conversation_id) == ("summary", "Asked about mocks instead.", 2, "c-1")
+    assert (m.created_at, m.event_time) == (T0, T1)
+    assert m.embedding == pytest.approx([0.0, 1.0, 0.0])
+    assert m.provenance == [("c-1", 0), ("c-1", 1)]
+    assert _ids(store.keyword_search("mocks", k=5)) == [first]
+    assert store.keyword_search("fixtures", k=5) == []
+    assert [o["op"] for o in store.ops() if o["memory_id"] == first] == ["ADD", "UPDATE"]
+
+
+def test_a_faded_chat_summary_comes_back_when_the_chat_goes_on(store):
+    mid = store.set_summary("c-1", text="Asked about fixtures.", embedding=X, at=T0, turn_index=0)
+    store.archive(mid, at=T1)
+
+    store.set_summary("c-1", text="Back to fixtures.", embedding=X, at=T2, turn_index=1)
+
+    assert store.get(mid).status == "active"
