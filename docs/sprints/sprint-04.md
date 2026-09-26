@@ -58,7 +58,7 @@ below — team: 3 PMs (Richa, Lakshita, Shatakshi), 3 Engineers (Arthur, Aaron, 
 | --- | --- |
 | Arthur | App shell & sidecar infra ([Steps 0–1](../architecture/implementation-plan.md)); Credentials & Canvas integration (Steps 2–3); Error handling & course management (Step 13); Contribution & distribution pipeline (license, CI, release) |
 | Aaron | Ingestion, embedding & retrieval pipeline (Steps 4–6, and the cross-step integration check); Sync mechanism (Step 7); Generation/Q&A backend (Step 8) |
-| Yongje | Q&A frontend wiring (Step 9); Assignment explainer (Step 10); Session capture (Step 12); **Study artifacts (Step 11 — not yet built, next up)** |
+| Yongjie | Q&A frontend wiring (Step 9); Assignment explainer (Step 10); Session capture (Step 12); **Study artifacts (Step 11 — not yet built, next up)** |
 
 ### Product — owns a cross-cutting responsibility spanning multiple steps, not a single component
 
