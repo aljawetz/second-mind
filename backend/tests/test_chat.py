@@ -182,3 +182,8 @@ def test_unclosed_bracket_in_prose_is_not_held_forever():
     renumberer = chat.CitationRenumberer(lambda n: True)
     out = renumberer.feed("a list [like this one that never closes and keeps going")
     assert out == "a list [like this one that never closes and keeps going"
+
+
+def test_a_dropped_citation_split_across_chunks_leaves_no_stray_space():
+    text, *_ = _run("q", replies=[(["True", " [", "7]. Next."], [])], results={"q": [_node("a", "A.pdf")]})
+    assert text == "True. Next."
