@@ -238,6 +238,7 @@ export default function AppShell({
             <div className={"view-inner" + (view === "home" ? " view-inner-fill" : "")}>
               {view === "home" && (
                 <HomeView
+                  key={courseId}
                   courseId={courseId}
                   courseName={course.name}
                   canvasBaseUrl={canvasBaseUrl}

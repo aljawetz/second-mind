@@ -124,10 +124,24 @@ export interface Citation {
 // history is the chat so far, oldest first, so follow-ups like "explain the
 // second one" make sense. courseName goes into the model's instructions;
 // the backend only stores course ids.
+//
+// The backend saves every finished answer to a conversation. The first line
+// carries its conversation_id; send it back as conversationId to continue
+// that chat (the backend then reads the chat so far from disk and ignores
+// history), or null to start a new one. With agent memory on, the
+// {citations} line also lists memories_used: what the student told Second
+// Mind in earlier chats that this answer drew on.
+export interface MemoryUsed {
+  id: string;
+  text: string;
+}
+
 export interface AskEvent {
+  conversation_id?: string;
   delta?: string;
   citations?: Citation[];
   grounded?: boolean;
+  memories_used?: MemoryUsed[];
   error?: string;
   done?: boolean;
 }
@@ -137,11 +151,13 @@ export async function askQuestion(
   courseName: string,
   question: string,
   history: { question: string; answer: string }[],
+  conversationId: string | null,
   onEvent: (event: AskEvent) => void
 ): Promise<void> {
+  const body = { question, history, course_name: courseName, ...(conversationId ? { conversation_id: conversationId } : {}) };
   const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/ask`, {
     method: "POST",
-    body: JSON.stringify({ question, history, course_name: courseName }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok || !res.body) {

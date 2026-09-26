@@ -142,9 +142,16 @@ periodically ───────────►  7 Forget    decay → archive
 ### 5.1 Capture
 
 When `/ask` finishes streaming, `main.py` saves the turn (conversation history plan, Task 2) and
-calls `memory.observe_turn(conversation_id, turn_index)`. That puts a job on a queue served by one
-background thread. The answer is never delayed, and if the job fails, the turn stays saved and
-the error is logged.
+queues `(course_id, conversation_id)` on `main.MEMORY_WORKER` (`memory/worker.py`), one
+background thread. The job (`memory_jobs.observe_conversation`) reads every saved turn past
+`memory_processed_upto`, one turn per `observe` call, dated by the turn's `asked_at`. The answer is
+never delayed, and if the job fails, the turn stays saved and the error is logged.
+
+- **Saved before `done`, not after:** the turn is written just before the final `{"done": true}`
+  event goes out. The conversation history plan had it after, but the app sends the next question
+  with the new id as soon as it sees `done`, so a new chat's file must exist by then.
+- **A chat deleted mid-job:** after each turn, the job checks the chat still exists; if not, it
+  runs the delete cascade again for anything it just added.
 
 - **One worker thread:** memory writes happen one at a time (no racing consolidations), and LLM
   spend stays bounded.
@@ -271,6 +278,11 @@ score(m)     = relevance · recency · weight                 → top 5
   matters for things that happened.
 - **Reinforcement:** returned memories get `access_count += 1` and `last_accessed = now`. Memories
   that keep being used fade more slowly (§5.7).
+- **Stopwords, found while wiring recall into chat:** memories are all written "The student …", so
+  a keyword query with "the", "is" or "student" in it matched every memory. Rank fusion counts a
+  keyword match by rank alone, so automatic recall would have added five unrelated memories to
+  every chat turn and `NO_MEMORIES` would almost never happen. `store._STOPWORDS` drops those
+  words (and "student") before the keyword search.
 
 **Memory results are shown to the model as `[M1] (fact, since 2026-09-21) The student is on
 team 4…`** They are never citable course sources. The prompt says to mention them naturally
@@ -408,8 +420,8 @@ platform other agents can reuse, not a chat feature.
 | `llm.py` | Add `complete_json(messages) -> dict` to `OpenAIProvider` (non-streaming, `response_format={"type": "json_object"}`) |
 | `chat.py` | `answer()` gains `memory: MemoryService \| None = None`. When set: profile block in the system prompt, the `recall-0` result, the `recall_memory` and `forget_memory` tools, `[M\d+]` stripping, and history built by `memory.compress`. When `None`: behaves exactly as today |
 | `main.py` | `/ask` takes `conversation_id` (conversation history plan) and calls `observe_turn` after saving. New memory endpoints (§9). The final stream event gains `memories_used: [{id, text}]` |
-| `config.py` | `memory_enabled` (default: see §12) |
-| `app/src/sidecar.ts`, `HomeView.tsx` | Minimum for the demo: keep the `conversation_id` from the first chunk and send it back. The full history UI stays in the conversation history plan, Tasks 4–5 |
+| `config.json` | `memory_enabled`, read by `main._memory_enabled()`. On unless set to `false`, for the prototype; the default is still open (§12) |
+| `app/src/sidecar.ts`, `HomeView.tsx`, `AppShell.tsx` | Minimum for the demo: keep the `conversation_id` from the first chunk and send it back, and show `memories_used` under the answer as plain chips (not citation links). `HomeView` is keyed by course, so switching course starts a new chat instead of sending course A's id to course B. The full history UI stays in the conversation history plan, Tasks 4–5 |
 | `indexing.py`, `generation.py`, `course_sync.py` | No change |
 
 ## 9. API
@@ -496,9 +508,8 @@ the ablations.
   - This work displaces Study artifacts (Step 11, Yongjie) from Sprint 5.
   - The team's Sprint 5 report still needs course-search precision@k compared with Sprint 3.
     That's naturally Aaron's (retrieval owner) and isn't covered here.
-- **Frontend dependency.** Without the app sending `conversation_id` back, every question starts
-  a new conversation. Facts still carry across chats, but compression within a chat doesn't
-  happen. §8's minimal change covers the demo.
+- **Frontend dependency.** Resolved for the demo: the app sends `conversation_id` back (§8). There
+  is still no way in the app to reopen or delete a past chat (conversation history plan, Task 5).
 
 ## 13. References
 

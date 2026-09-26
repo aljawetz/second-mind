@@ -255,6 +255,16 @@ button{font:inherit;color:inherit}
   display:flex;flex-wrap:wrap;gap:.4rem;font-size:.72rem;color:var(--ink-faint);
 }
 .qa-empty{color:var(--ink-faint);font-size:.85rem;padding:.4rem .1rem}
+/* Agent memory: what the student told Second Mind earlier that this answer
+   drew on. Plain chips, not citation links: memory is never a course source. */
+.qa-memories{
+  margin-top:.6rem;display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;
+  font-size:.72rem;color:var(--ink-faint);
+}
+.memory-chip{
+  font-size:.72rem;color:var(--ink);background:var(--surface);
+  border:1px solid var(--line);padding:.1rem .45rem;border-radius:6px;
+}
 .qa-thinking{color:var(--ink-faint)}
 .qa-a-error{color:var(--danger);border-color:var(--danger)}
 .ask-bar input:disabled{color:var(--ink-faint)}

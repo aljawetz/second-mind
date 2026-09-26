@@ -10,6 +10,18 @@
 
 **Tech stack:** Python stdlib (`json`, `uuid`, `threading`), existing `ThreadingHTTPServer` handler, React/TypeScript.
 
+**Status (2026-09-26):** Tasks 1-3 are built, as part of agent memory
+(docs/superpowers/specs/2026-09-25-agent-memory-design.md), and so is Task 4's `conversationId`
+argument with the minimal `HomeView` change. Task 4's list/get/delete client functions and Tasks 5-6 are
+not. Two changes from this plan:
+- `conversation_id` rides on the first stream event, whatever it is: since the tool-loop chat,
+  that's a `{delta}`, not `{citations, grounded}`.
+- The turn is saved just before `{"done": true}`, not after. The app sends the next question with
+  the id as soon as it sees `done`.
+
+`/ask` and the endpoints are tested in-process in `tests/test_ask_memory.py`, instead of the manual
+`curl` check.
+
 ## Decisions
 
 | Decision | Choice | Reason |
@@ -73,33 +85,33 @@ All four go through `_course_selected` like `/ask` does.
 
 A module-level `threading.Lock` guards the read-modify-write in `append_turn`, same reasoning as `sessions._counter_lock`: `ThreadingHTTPServer` can run two `/ask` requests for one conversation at once. Write via temp file + `os.replace` so a crash mid-write can't leave half a JSON file.
 
-- [ ] Write tests first: first turn creates file and title; title truncation at 60 chars; second turn appends and bumps `updated_at`; list is newest-first and per course; get/delete of a missing id; list on a course with no conversations dir.
-- [ ] Implement until they pass.
+- [x] Write tests first: first turn creates file and title; title truncation at 60 chars; second turn appends and bumps `updated_at`; list is newest-first and per course; get/delete of a missing id; list on a course with no conversations dir.
+- [x] Implement until they pass.
 
 ### Task 2: persist turns from `/ask`
 
 **Files:** modify `backend/main.py`
 
-- [ ] Read optional `conversation_id` from the body. If given and `not conversations.exists(...)`, return `404` before any other work. If absent, `conversations.new_conversation_id()`.
-- [ ] Add `conversation_id` to the first chunk: `{"conversation_id", "citations", "grounded"}`.
-- [ ] Accumulate streamed deltas into `answer` (or use `NOT_COVERED_MESSAGE` for the ungrounded path).
-- [ ] After writing `{"done": true}` and the terminating chunk, call `conversations.append_turn(...)` with question, answer, citations, grounded, `asked_at`.
-- [ ] Wrap the streaming loop so a `BrokenPipeError`/`ConnectionResetError` (student navigated away mid-answer) returns without saving, instead of logging a traceback.
-- [ ] Keep the handler thin: the only new logic is id resolution and one `append_turn` call. Behaviour is covered by Task 1's tests; `/ask` itself needs a live LLM and stays covered by `scripts/generation_smoke_test.py`.
+- [x] Read optional `conversation_id` from the body. If given and `not conversations.exists(...)`, return `404` before any other work. If absent, `conversations.new_conversation_id()`.
+- [x] Add `conversation_id` to the first chunk: `{"conversation_id", "citations", "grounded"}`.
+- [x] Accumulate streamed deltas into `answer` (or use `NOT_COVERED_MESSAGE` for the ungrounded path).
+- [x] After writing `{"done": true}` and the terminating chunk, call `conversations.append_turn(...)` with question, answer, citations, grounded, `asked_at`.
+- [x] Wrap the streaming loop so a `BrokenPipeError`/`ConnectionResetError` (student navigated away mid-answer) returns without saving, instead of logging a traceback.
+- [x] Keep the handler thin: the only new logic is id resolution and one `append_turn` call. Behaviour is covered by Task 1's tests; `/ask` itself needs a live LLM and stays covered by `scripts/generation_smoke_test.py`.
 
 ### Task 3: list/detail/delete endpoints
 
 **Files:** modify `backend/main.py`
 
-- [ ] Add `CONVERSATION_LIST_PATH = ^/courses/(\d+)/conversations$` and `CONVERSATION_DETAIL_PATH = ^/courses/(\d+)/conversations/([\w-]+)$`.
-- [ ] Wire `GET` list, `GET` detail, `DELETE` detail next to the session handlers, same 404 shapes.
-- [ ] Manual check with `curl` against a running sidecar: ask twice with the returned id, list, get, delete, list again.
+- [x] Add `CONVERSATION_LIST_PATH = ^/courses/(\d+)/conversations$` and `CONVERSATION_DETAIL_PATH = ^/courses/(\d+)/conversations/([\w-]+)$`.
+- [x] Wire `GET` list, `GET` detail, `DELETE` detail next to the session handlers, same 404 shapes.
+- [x] Manual check with `curl` against a running sidecar: ask twice with the returned id, list, get, delete, list again.
 
 ### Task 4: frontend client
 
 **Files:** modify `app/src/sidecar.ts`
 
-- [ ] `askQuestion(courseId, question, conversationId | null, onEvent)`; event type gains `conversation_id?: string`.
+- [x] `askQuestion(courseId, question, conversationId | null, onEvent)`; event type gains `conversation_id?: string`.
 - [ ] Add `ConversationSummary`, `Conversation`, `ConversationTurn` types.
 - [ ] Add `listConversations`, `getConversation`, `deleteConversation`, following `listSessions` / `getSessionDetail` / `deleteSession`.
 

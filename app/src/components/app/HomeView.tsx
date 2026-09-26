@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { ArtifactType } from "../../types";
 import { ARTIFACT_TYPES } from "../../data";
-import { askQuestion, type Citation } from "../../sidecar";
+import { askQuestion, type Citation, type MemoryUsed } from "../../sidecar";
 import { splitAssignments, statusPill } from "../../assignmentStatus";
 import type { CanvasAssignment } from "../../sidecar";
 import { openCitation } from "../../citations";
@@ -35,6 +35,7 @@ interface ChatTurn {
   answer: string;
   citations: Citation[];
   grounded: boolean;
+  memoriesUsed: MemoryUsed[];
   status: "loading" | "streaming" | "done" | "error";
   error?: string;
 }
@@ -60,6 +61,10 @@ export default function HomeView({
 }) {
   const [askValue, setAskValue] = useState("");
   const [turns, setTurns] = useState<ChatTurn[]>([]);
+  // The backend's id for this chat, from its first answer: sent with every
+  // later question so the chat continues where it is saved. AppShell mounts
+  // a fresh HomeView per course, which starts a new chat.
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
   const { upcoming, past } = splitAssignments(assignments);
   const lastTurn = turns[turns.length - 1];
@@ -100,21 +105,27 @@ export default function HomeView({
     // Only finished turns: an errored or half-streamed answer would give the
     // model a wrong picture of what it already said.
     const history = turns.filter((t) => t.status === "done").map((t) => ({ question: t.question, answer: t.answer }));
-    setTurns((prev) => [...prev, { question, answer: "", citations: [], grounded: false, status: "loading" }]);
+    setTurns((prev) => [
+      ...prev,
+      { question, answer: "", citations: [], grounded: false, memoriesUsed: [], status: "loading" },
+    ]);
     threadRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
 
     const update = (patch: Partial<ChatTurn>) =>
       setTurns((prev) => prev.map((t, i) => (i === turnIndex ? { ...t, ...patch } : t)));
 
     try {
-      await askQuestion(courseId, courseName, question, history, (event) => {
+      await askQuestion(courseId, courseName, question, history, conversationId, (event) => {
+        if (event.conversation_id) {
+          setConversationId(event.conversation_id);
+        }
         if (event.delta) {
           setTurns((prev) =>
             prev.map((t, i) => (i === turnIndex ? { ...t, answer: t.answer + event.delta, status: "streaming" } : t))
           );
         }
         if (event.citations !== undefined) {
-          update({ citations: event.citations, grounded: !!event.grounded });
+          update({ citations: event.citations, grounded: !!event.grounded, memoriesUsed: event.memories_used ?? [] });
         }
         if (event.error) {
           update({ status: "error", error: event.error });
@@ -170,6 +181,16 @@ export default function HomeView({
                               >
                                 [{ci + 1}] {c.label}
                               </button>
+                            ))}
+                          </div>
+                        )}
+                        {turn.memoriesUsed.length > 0 && (
+                          <div className="qa-memories">
+                            <span>From what you told me before</span>
+                            {turn.memoriesUsed.map((m) => (
+                              <span className="memory-chip" key={m.id}>
+                                {m.text}
+                              </span>
                             ))}
                           </div>
                         )}
