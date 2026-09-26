@@ -208,8 +208,12 @@ For each candidate:
      one.
    - **INVALIDATE n**: the student took something back with no replacement ("I'm not on a team
      anymore"). Set `valid_to` and insert nothing.
-   - **NOOP**: already known. Nothing is written, but the matched memory's `importance` goes up
-     by 1 (capped at 5).
+   - **NOOP**: already known. No new memory is written. The matched memory's `importance` goes
+     up by 1 (capped at 5), and this turn is added to its provenance. Without that, deleting the
+     first chat would remove a fact the student also said in another one.
+   - **Unusable reply** (unknown decision, or a target number that wasn't shown): ADD. A
+     duplicate can be cleaned up later; a lost fact can't be recovered. Logged as
+     `consolidation: fallback`, so the evaluation can count how often it happens.
 
 **Superseded memories are kept, not deleted.** That lets the agent answer "which project did we
 have before?", and gives an audit trail of why the memory changed. A superseded memory is left out

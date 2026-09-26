@@ -234,6 +234,16 @@ class MemoryStore:
                 [(_iso(at), mid) for mid in memory_ids],
             )
 
+    def add_provenance(self, memory_id: str, provenance: list[tuple[str, int]]) -> None:
+        """The student said it again (consolidation's NOOP). Recorded so
+        that deleting the first chat doesn't take a fact they also said in
+        another one (memories_only_from)."""
+        with self._lock, self._conn:
+            self._conn.executemany(
+                "INSERT INTO provenance (memory_id, conversation_id, turn_index) VALUES (?, ?, ?)",
+                [(memory_id, cid, turn) for cid, turn in provenance],
+            )
+
     def memories_only_from(self, conversation_id: str) -> list[str]:
         """What deleting this chat takes with it (design spec §5.7): memories
         every one of whose source turns is in it, plus its summary. A fact

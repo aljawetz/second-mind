@@ -255,3 +255,12 @@ def test_store_closes_its_file_at_the_end_of_a_with_block(tmp_path):
 
     with pytest.raises(sqlite3.ProgrammingError):
         store.get("m-000000000000")
+
+
+def test_a_memory_said_again_in_another_chat_survives_deleting_the_first(store):
+    mid = _add(store, provenance=[("c-1", 0)])
+
+    store.add_provenance(mid, [("c-2", 3)])
+
+    assert store.get(mid).provenance == [("c-1", 0), ("c-2", 3)]
+    assert store.memories_only_from("c-1") == []
