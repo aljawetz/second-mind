@@ -128,3 +128,45 @@ def test_the_profile_comes_from_the_same_store(service_for):
     svc.observe(_turn("Use Java for examples please."), conversation_id="c-1", turn_index=0)
 
     assert "The student wants code examples in Java." in svc.profile_block()
+
+
+def test_forgetting_by_id_really_deletes_and_skips_unknown_ids(service_for):
+    svc = service_for(ScriptedLLM(_extraction("The student is auditing the course.", "The student wants code examples in Java.")))
+    svc.observe(_turn("I'm auditing. Use Java."), conversation_id="c-1", turn_index=0)
+    auditing = next(m.id for m in svc.list() if "auditing" in m.text)
+
+    assert svc.forget([auditing, "m-000000000000"]) == 1
+
+    assert [m.text for m in svc.list(include_inactive=True)] == ["The student wants code examples in Java."]
+    assert all("auditing" not in h.memory.text for h in svc.recall("Am I auditing the course?"))
+
+
+def test_deleting_a_chat_forgets_what_came_only_from_it(service_for, clock):
+    llm = ScriptedLLM(
+        _extraction("The student is on team 4 with Priya and Ken."),
+        _extraction("The student wants code examples in Java."),
+        _extraction("The student is on team 4 with Priya and Ken."),
+        {"decision": "NOOP", "target": 1},
+    )
+    svc = service_for(llm)
+    svc.observe(_turn("I'm on team 4 with Priya and Ken."), conversation_id="c-1", turn_index=0)
+    svc.observe(_turn("Use Java."), conversation_id="c-1", turn_index=1)
+    svc.observe(_turn("Team 4 again, with Priya and Ken."), conversation_id="c-2", turn_index=0)
+
+    assert svc.forget_conversation("c-1") == 1
+
+    # Said again in c-2, so the team fact stays; Java came only from c-1.
+    assert [m.text for m in svc.list(include_inactive=True)] == ["The student is on team 4 with Priya and Ken."]
+
+
+def test_a_turn_read_later_is_dated_when_it_was_said(service_for, clock):
+    # After a restart the worker reads turns asked days ago; "last Tuesday"
+    # must be worked out from when the student said it.
+    llm = ScriptedLLM(_extraction("The student missed Class #5."))
+    svc = service_for(llm)
+    clock["t"] = T1
+
+    svc.observe(_turn("I missed class last Tuesday."), conversation_id="c-1", turn_index=0, at=T0)
+
+    assert "Tuesday 2026-09-08" in llm.calls[0][-1]["content"]
+    assert svc.list()[0].created_at == T0

@@ -62,6 +62,21 @@ CREATE TABLE IF NOT EXISTS ops_log (at TEXT NOT NULL, op TEXT NOT NULL, memory_i
 # student's raw question passed straight to MATCH raises "fts5: syntax error".
 _WORD = re.compile(r"\w+")
 
+# Words that match (nearly) every memory, so they say nothing about which
+# one a question is about. "student" is here because every memory is
+# written "The student …" (extract.py's prompt). Without this list, any
+# question containing "the" or "is" keyword-matched every memory, and
+# recall, which counts a keyword match by rank alone, returned five
+# unrelated memories on every chat turn.
+_STOPWORDS = frozenset(
+    """a about after again all also am an and any are as at be been before being both but by can could
+    d did do does doing done for from get got had has have having he her here hers him his how i if in into
+    is it its just ll m me more most my no nor not now of off on once only or other our out over own re s
+    said same say says she should so some student students such t than that the their them then there these
+    they this those through to too under until up us ve very was we were what when where which while who
+    whom why will with would you your""".split()
+)
+
 
 @dataclass
 class Memory:
@@ -298,7 +313,7 @@ class MemoryStore:
     ) -> list[tuple[Memory, float]]:
         """Top k by BM25, best first. Scores are only comparable within one
         search (design spec §5.5), so callers should use the rank."""
-        words = _WORD.findall(query.lower())
+        words = [w for w in _WORD.findall(query.lower()) if w not in _STOPWORDS]
         if not words:
             return []
         match = " OR ".join(f'"{w}"' for w in words)

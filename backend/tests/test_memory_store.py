@@ -264,3 +264,16 @@ def test_a_memory_said_again_in_another_chat_survives_deleting_the_first(store):
 
     assert store.get(mid).provenance == [("c-1", 0), ("c-2", 3)]
     assert store.memories_only_from("c-1") == []
+
+
+def test_keyword_search_ignores_words_that_every_memory_shares(store):
+    # Memories are written "The student …" (design spec §5.2): "the", "is"
+    # and "student" match all of them, and recall counts a keyword match by
+    # rank alone, so these would pull every memory into every chat turn.
+    team = _add(store, "The student is on team 4 with Priya.")
+    _add(store, "The student wants code examples in Java.")
+
+    assert store.keyword_search("When is the midterm?", k=5) == []
+    assert store.keyword_search("What did the student say?", k=5) == []
+    assert _ids(store.keyword_search("Which team is the student on?", k=5)) == [team]
+    assert _ids(store.keyword_search("team 4", k=5)) == [team]

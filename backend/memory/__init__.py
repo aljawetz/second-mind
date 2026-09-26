@@ -59,12 +59,20 @@ class MemoryService:
         self.close()
 
     def observe(
-        self, messages: list[dict], *, conversation_id: str, turn_index: int, summary: str = ""
+        self,
+        messages: list[dict],
+        *,
+        conversation_id: str,
+        turn_index: int,
+        summary: str = "",
+        at: datetime | None = None,
     ) -> ObserveResult:
         """Extract memories from these messages and fold them into the store.
         The app passes one turn; the evaluation a whole session. `summary`
-        is the conversation's summary before these messages."""
-        at = self._now()
+        is the conversation's summary before these messages. `at` is when
+        they were said, if not now: the worker reads turns after a restart,
+        and "last Tuesday" must count from when the student said it."""
+        at = at or self._now()
         extraction = extract.extract(messages, at=at, summary=summary, llm=self._llm)
         decisions = [
             consolidate.consolidate(
@@ -85,3 +93,16 @@ class MemoryService:
 
     def list(self, include_inactive: bool = False) -> list[Memory]:
         return self._store.list_memories(include_inactive)
+
+    def forget(self, memory_ids: list[str], reason: str = "student asked to forget") -> int:
+        """Hard delete (design spec §5.7): gone from the files, not just
+        hidden. Unknown ids are skipped. Returns how many were deleted."""
+        found = [mid for mid in memory_ids if self._store.get(mid) is not None]
+        for mid in found:
+            self._store.delete(mid, at=self._now(), reason=reason)
+        return len(found)
+
+    def forget_conversation(self, conversation_id: str) -> int:
+        """The student deleted a chat: forget what came only from it. A
+        memory also said in another chat stays."""
+        return self.forget(self._store.memories_only_from(conversation_id), reason="chat deleted")
