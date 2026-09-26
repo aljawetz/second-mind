@@ -89,7 +89,7 @@ CREATE TABLE memory (
   event_time    TEXT,                           -- when it happened or became true (ISO 8601)
   created_at    TEXT NOT NULL,
   valid_to      TEXT,                           -- NULL = current; set when superseded or closed
-  superseded_by TEXT REFERENCES memory(id),
+  superseded_by TEXT REFERENCES memory(id) ON DELETE SET NULL,
   status        TEXT NOT NULL DEFAULT 'active', -- active | archived
   task_ref      TEXT,                           -- e.g. "assignment:4412" when resolvable (P1)
   conversation_id TEXT,                         -- summary memories only: one per conversation
@@ -110,7 +110,7 @@ CREATE TABLE memory_entity (
 );
 CREATE VIRTUAL TABLE memory_fts USING fts5(memory_id UNINDEXED, text);
 CREATE TABLE ops_log (                          -- every lifecycle decision, for debugging and eval
-  at TEXT NOT NULL, op TEXT NOT NULL, memory_id TEXT, reason TEXT
+  at TEXT NOT NULL, op TEXT NOT NULL, memory_id TEXT, reason TEXT NOT NULL
 );
 ```
 
@@ -118,8 +118,12 @@ CREATE TABLE ops_log (                          -- every lifecycle decision, for
   never memory text. A hard delete (§5.7) also removes the memory's `ops_log` rows.
 - FTS5 is a standalone table written in the same transaction as `memory`, not an
   external-content table with triggers. It's simpler, and there's nothing to drift out of sync.
-- Connections open in WAL mode, and writes go through a per-course lock, the same reasoning as
-  `sessions._counter_lock`: `ThreadingHTTPServer` can run two requests at once.
+- Each `MemoryStore` has one connection, guarded by its own lock, so one store can be shared
+  between threads. Different stores on the same file (the worker's, a request thread's) rely on
+  WAL mode and a 10-second busy timeout. Consolidation's read-then-write is safe without a
+  per-course lock, because only the single background worker consolidates (§5.1).
+- A store is used as `with MemoryStore(path) as store:`. Python 3.13+ warns about SQLite
+  connections that are garbage-collected without being closed; the strict test run found this.
 
 ## 5. Lifecycle
 
@@ -322,6 +326,17 @@ client sends. The client's copy can be stale. Requests without an id keep today'
      may repeat the fact; they're rebuilt on the conversation's next turn.
    - **What it doesn't touch:** the saved chat itself. The tool result tells the model to say so:
      "It's still in your chat from Sep 21; delete that chat to remove it completely."
+   - **Gone from the files, not just from queries.** Found while building `store.py`: a plain
+     SQL `DELETE` left the text readable in the database files, where a backup tool or disk image
+     would still pick it up. Removing each fix in turn showed there are three places, and each
+     needs its own measure:
+     - SQLite's freed pages keep the old bytes → `PRAGMA secure_delete=ON`.
+     - FTS5 records a delete as a marker and keeps the old index segment with the words → an FTS
+       `optimize` merge after each delete.
+     - The write-ahead log keeps the page as it was before the delete → a `TRUNCATE` checkpoint.
+       If another connection is mid-read, the checkpoint can't finish until the next delete.
+
+     `test_memory_store.py` reads the raw files after a delete to check the text is gone.
 4. **Cascades:**
    - Deleting a conversation deletes every memory whose provenance points only to that
      conversation.
