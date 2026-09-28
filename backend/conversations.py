@@ -51,13 +51,18 @@ def exists(sm_home: Path, course_id: int, cid: str) -> bool:
     return _path(sm_home, course_id, cid).exists()
 
 
-def append_turn(sm_home: Path, course_id: int, cid: str, turn: dict) -> None:
+def append_turn(sm_home: Path, course_id: int, cid: str, turn: dict, *, create_if_missing: bool = True) -> bool:
     """turn: {question, answer, citations, grounded, asked_at}. The first
-    turn creates the conversation, titled by its question."""
+    turn creates the conversation, titled by its question.
+
+    When create_if_missing is False, a missing file means the chat was deleted
+    mid-request and the turn is dropped (same rule as set_memory_progress)."""
     path = _path(sm_home, course_id, cid)
     with _lock:
         if path.exists():
             data = json.loads(path.read_text())
+        elif not create_if_missing:
+            return False
         else:
             data = {
                 "conversation_id": cid,
@@ -70,6 +75,7 @@ def append_turn(sm_home: Path, course_id: int, cid: str, turn: dict) -> None:
         data["turns"].append(turn)
         data["updated_at"] = turn["asked_at"]
         _write(path, data)
+    return True
 
 
 def get_conversation(sm_home: Path, course_id: int, cid: str) -> dict | None:

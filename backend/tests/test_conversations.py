@@ -96,6 +96,17 @@ def test_deleting_removes_the_file(tmp_path):
     assert conversations.list_conversations(tmp_path, COURSE) == []
 
 
+def test_append_turn_does_not_recreate_a_deleted_chat_when_create_if_missing_is_false(tmp_path):
+    cid = "c-000000000001"
+    conversations.append_turn(tmp_path, COURSE, cid, _turn())
+    conversations.delete_conversation(tmp_path, COURSE, cid)
+
+    saved = conversations.append_turn(tmp_path, COURSE, cid, _turn(question="Q2"), create_if_missing=False)
+
+    assert saved is False
+    assert conversations.list_conversations(tmp_path, COURSE) == []
+
+
 def test_two_requests_appending_at_once_both_land(tmp_path):
     # ThreadingHTTPServer can run two /ask requests for one conversation.
     cid = "c-000000000001"

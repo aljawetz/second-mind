@@ -7,6 +7,7 @@ in for OpenAI. No network, no key."""
 import http.client
 import json
 import re
+import sqlite3
 import threading
 import zlib
 from datetime import datetime, timedelta, timezone
@@ -206,6 +207,82 @@ def test_an_answer_that_broke_off_is_neither_saved_nor_remembered(app):
     assert conversations.list_conversations(app.home, COURSE) == []
     assert main.MEMORY_WORKER.wait_idle(10)
     assert app.model.json_calls == []
+
+
+def test_a_broken_first_turn_leaves_no_conversation_on_disk(app):
+    app.model.chat_replies.append(["Partial", ConnectionError("model connection dropped")])
+
+    status, events = _ask(app, "When is the midterm?")
+
+    assert status == 200
+    stale_cid = events[0]["conversation_id"]
+    assert conversations.get_conversation(app.home, COURSE, stale_cid) is None
+    status, body = _ask(app, "Try again?", conversation_id=stale_cid, history=[])
+    assert status == 404 and body["error"]["code"] == "not_found"
+
+
+def test_after_a_broken_first_turn_a_fresh_question_without_an_id_works(app):
+    app.model.chat_replies.append(["Partial", ConnectionError("model connection dropped")])
+    _, events = _ask(app, "When is the midterm?")
+    stale_cid = events[0]["conversation_id"]
+
+    app.model.chat_replies.append(["The midterm is next Tuesday."])
+    app.model.json_replies.append({"memories": [], "summary": ""})
+    status, events = _ask(app, "When is the midterm?")
+
+    assert status == 200
+    new_cid = events[0]["conversation_id"]
+    assert new_cid != stale_cid
+    assert conversations.get_conversation(app.home, COURSE, new_cid) is not None
+
+
+def test_deleting_a_chat_before_its_in_flight_turn_finishes_does_not_resurrect_it(app):
+    cid = _say(app, "First turn.", answer="First answer.")[0]["conversation_id"]
+    gate = threading.Event()
+    held = threading.Event()
+
+    def slow_stream(messages, tools, require_tool=False):
+        app.model.chat_calls.append([dict(m) for m in messages])
+        yield "Second "
+        gate.set()
+        held.wait(timeout=5)
+        yield "answer."
+        yield TurnEnd()
+
+    app.model.stream_chat = slow_stream
+    app.model.json_replies.append({"memories": [], "summary": ""})
+
+    ask_result = {}
+
+    def run_ask():
+        ask_result["pair"] = _ask(app, "Second turn?", conversation_id=cid, history=[])
+
+    thread = threading.Thread(target=run_ask)
+    thread.start()
+    assert gate.wait(timeout=5)
+    assert _json(app, "DELETE", f"/courses/{COURSE}/conversations/{cid}") == (200, {"status": "deleted"})
+    held.set()
+    thread.join(timeout=10)
+
+    status, events = ask_result["pair"]
+    assert status == 200 and events[-1] == {"done": True}
+    assert conversations.list_conversations(app.home, COURSE) == []
+    assert main.MEMORY_WORKER.wait_idle(10)
+    assert app.model.json_calls == []
+
+
+def test_memory_store_errors_on_ask_return_json(app, monkeypatch):
+    from memory import store
+
+    def locked(self, path):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(store.MemoryStore, "__init__", locked)
+    app.model.chat_replies.append(["Not used."])
+
+    status, body = _ask(app, "Hello?")
+
+    assert status == 503 and body["error"]["code"] == "memory_busy"
 
 
 def test_with_memory_switched_off_chats_are_saved_but_nothing_is_remembered(app):

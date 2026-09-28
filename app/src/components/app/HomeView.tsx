@@ -113,6 +113,7 @@ export default function HomeView({
 
     const update = (patch: Partial<ChatTurn>) =>
       setTurns((prev) => prev.map((t, i) => (i === turnIndex ? { ...t, ...patch } : t)));
+    const conversationIdAtSend = conversationId;
 
     try {
       await askQuestion(courseId, courseName, question, history, conversationId, (event) => {
@@ -129,6 +130,11 @@ export default function HomeView({
         }
         if (event.error) {
           update({ status: "error", error: event.error });
+          // A new chat's id is sent before the turn is saved; drop it so the
+          // next question starts fresh instead of 404ing forever.
+          if (conversationIdAtSend === null) {
+            setConversationId(null);
+          }
         }
         if (event.done) {
           setTurns((prev) => prev.map((t, i) => (i === turnIndex && t.status !== "error" ? { ...t, status: "done" } : t)));
@@ -136,6 +142,9 @@ export default function HomeView({
       });
     } catch (err) {
       update({ status: "error", error: err instanceof Error ? err.message : "Something went wrong" });
+      if (conversationIdAtSend === null) {
+        setConversationId(null);
+      }
     }
   }
 

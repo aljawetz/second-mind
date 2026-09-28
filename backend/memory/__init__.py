@@ -7,6 +7,8 @@ meant to be used by every agent (chat first, then the assignment explainer
 and study artifacts), and to run on its own for the evaluation.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path

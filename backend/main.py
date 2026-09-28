@@ -8,6 +8,7 @@ import os
 import re
 import signal
 import socketserver
+import sqlite3
 import sys
 import threading
 import traceback
@@ -255,6 +256,11 @@ class Handler(BaseHTTPRequestHandler):
                 return 402, {"error": {"code": "llm_quota_exceeded", "message": "OpenAI quota exceeded"}}
             return 429, {"error": {"code": "llm_rate_limited", "message": "OpenAI rate limit hit — try again shortly"}}
         return 503, {"error": {"code": "llm_unreachable", "message": "could not reach the LLM provider"}}  # openai.APIConnectionError
+
+    def _memory_error(self, e: sqlite3.Error) -> tuple[int, dict]:
+        if isinstance(e, sqlite3.OperationalError):
+            return 503, {"error": {"code": "memory_busy", "message": "memory store is busy, try again shortly"}}
+        return 500, {"error": {"code": "memory_error", "message": "memory store could not be read"}}
 
     def _course_selected(self, course_id: int) -> bool:
         # Real not_found gap (implementation-plan.md Step 13): Canvas
@@ -521,24 +527,36 @@ class Handler(BaseHTTPRequestHandler):
         # What memory learned only from this chat goes with it (agent memory
         # design spec §5.7). A job still reading it cleans up after itself
         # (memory_jobs.observe_conversation).
-        with _memory_service(int(course_id)) as service:
-            service.forget_conversation(cid)
+        try:
+            with _memory_service(int(course_id)) as service:
+                service.forget_conversation(cid)
+        except sqlite3.Error as e:
+            self._send_json(*self._memory_error(e))
+            return
         self._send_json(200, {"status": "deleted"})
 
     def _handle_list_memories(self, course_id: str, include_inactive: bool):
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
-        with _memory_service(int(course_id)) as service:
-            memories = [_memory_json(m) for m in service.list(include_inactive)]
+        try:
+            with _memory_service(int(course_id)) as service:
+                memories = [_memory_json(m) for m in service.list(include_inactive)]
+        except sqlite3.Error as e:
+            self._send_json(*self._memory_error(e))
+            return
         self._send_json(200, {"memories": memories})
 
     def _handle_memory_delete(self, course_id: str, memory_id: str):
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
-        with _memory_service(int(course_id)) as service:
-            deleted = service.forget([memory_id])
+        try:
+            with _memory_service(int(course_id)) as service:
+                deleted = service.forget([memory_id])
+        except sqlite3.Error as e:
+            self._send_json(*self._memory_error(e))
+            return
         if not deleted:
             self._not_found("no such memory")
             return
@@ -571,6 +589,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         cid = data.get("conversation_id")
         summary = ""
+        continuing_conversation = cid is not None
         if cid is None:
             cid = conversations.new_conversation_id()
             try:
@@ -623,15 +642,38 @@ class Handler(BaseHTTPRequestHandler):
             except OnnxModelFileMissing:
                 self._send_json(500, {"error": {"code": "model_files_missing", "message": "the local embedding model is missing or corrupted"}})
                 return
+            except sqlite3.Error as e:
+                self._send_json(*self._memory_error(e))
+                return
             except (RuntimeError, openai.AuthenticationError, openai.RateLimitError, openai.APIConnectionError) as e:
                 self._send_json(*self._llm_error(e))
                 return
-            self._stream_answer(int(course_id), cid, question, asked_at, memory_on, first, events)
+            self._stream_answer(
+                int(course_id),
+                cid,
+                question,
+                asked_at,
+                memory_on,
+                first,
+                events,
+                create_if_missing=not continuing_conversation,
+            )
         finally:
             if memory is not None:
                 memory.close()
 
-    def _stream_answer(self, course_id: int, cid: str, question: str, asked_at: str, memory_on: bool, first: dict, events):
+    def _stream_answer(
+        self,
+        course_id: int,
+        cid: str,
+        question: str,
+        asked_at: str,
+        memory_on: bool,
+        first: dict,
+        events,
+        *,
+        create_if_missing: bool,
+    ):
         """Streams chat.answer's events, the first one carrying the
         conversation id. A finished answer is saved, and queued for memory,
         before its "done" goes out: the app sends the next question with this
@@ -658,9 +700,11 @@ class Handler(BaseHTTPRequestHandler):
                         "grounded": final.get("grounded", False),
                         "asked_at": asked_at,
                     }
-                    conversations.append_turn(SM_HOME, course_id, cid, turn)
-                    if memory_on:
-                        MEMORY_WORKER.submit((course_id, cid))
+                    if conversations.append_turn(
+                        SM_HOME, course_id, cid, turn, create_if_missing=create_if_missing
+                    ):
+                        if memory_on:
+                            MEMORY_WORKER.submit((course_id, cid))
                 self._write_chunk(event)
         except (BrokenPipeError, ConnectionResetError):
             return  # the app closed the request (student navigated away)
