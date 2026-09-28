@@ -3,7 +3,8 @@
 Date: 2026-09-26, updated 2026-09-28 with automated recall@5/citation/faithfulness/abstention metrics
 Full working report: [2026-09-23-ask-modes/report.md](2026-09-23-ask-modes/report.md)
 Script: `backend/scripts/ask_modes_eval.py` (`--set first` or `--set heldout`, `--no-judge` to skip the LLM judge)
-Grades: `heldout-grades.json`, `shipped-grades.json`, `reindexed-grades.json` in the folder above (hand-graded, 2026-09-23). Raw model answers and the 2026-09-28 automated-run outputs (`results-2026-09-28.json`, `heldout-2026-09-28.json`) are not in git because they quote course material, including staff names and emails. Rerun the script to regenerate them.
+Grades (hand-graded, 2026-09-23): `heldout-grades.json`, `shipped-grades.json`, `reindexed-grades.json` in [2026-09-23-ask-modes/](2026-09-23-ask-modes/).
+Grades (judged, 2026-09-28): `results-grades.json`, `heldout-grades.json` in [2026-09-28-ask-modes/](2026-09-28-ask-modes/) — written automatically by the script alongside its raw output, stripped to metrics only (no quoted course content), safe to commit. Raw model answers, in both folders, are not in git because they quote course material, including staff names and emails. Rerun the script to regenerate them.
 
 ## Summary
 
@@ -65,7 +66,10 @@ date/format, storyboard criteria, and usability sample size). Against those gold
   (deliberately not gpt-4o-mini, the model under test, to avoid a model grading its own homework).
 - **Cost per query**, priced at gpt-4o-mini's actual rate, and **p50/p95 latency**.
 
-All six options (A-F) were run against both question sets for real, all 67 questions, all judged.
+All six options (A-F) were run against both question sets for real, all 67 questions, all judged. Every
+row's verdict (which case, which mode, which turn, every metric below) is in
+[2026-09-28-ask-modes/results-grades.json](2026-09-28-ask-modes/results-grades.json) and
+[heldout-grades.json](2026-09-28-ask-modes/heldout-grades.json) — safe to commit, no quoted course content.
 
 ### First set (34 questions)
 
