@@ -141,6 +141,17 @@ def test_forgetting_by_id_really_deletes_and_skips_unknown_ids(service_for):
     assert all("auditing" not in h.memory.text for h in svc.recall("Am I auditing the course?"))
 
 
+def test_a_student_edit_rewrites_text_and_embedding(service_for):
+    svc = service_for(ScriptedLLM(_extraction("The student is on team 4.")))
+    svc.observe(_turn("Team 4."), conversation_id="c-1", turn_index=0)
+    mid = svc.list()[0].id
+
+    updated = svc.update_text(mid, "The student is on team 5.")
+
+    assert updated is not None and updated.text == "The student is on team 5."
+    assert svc.list()[0].text == "The student is on team 5."
+
+
 def test_deleting_a_chat_forgets_what_came_only_from_it(service_for, clock):
     llm = ScriptedLLM(
         _extraction("The student is on team 4 with Priya and Ken."),

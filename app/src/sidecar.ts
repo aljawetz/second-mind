@@ -338,13 +338,29 @@ export interface CourseMemory {
 }
 
 export async function listMemories(courseId: number, includeInactive = false): Promise<CourseMemory[]> {
-  const q = includeInactive ? "?include_inactive=1" : "";
-  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/memories${q}`);
+  const url = includeInactive
+    ? `http://127.0.0.1:8756/courses/${courseId}/memories/all`
+    : `http://127.0.0.1:8756/courses/${courseId}/memories`;
+  const res = await fetch(url);
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data?.error?.message ?? `failed to list memories (${res.status})`);
   }
-  return data.memories;
+  return data.memories ?? [];
+}
+
+export async function updateMemory(courseId: number, memoryId: string, text: string): Promise<CourseMemory> {
+  // POST, not PATCH: Tauri's fetch builds a web Request() in WKWebView, which
+  // rejects PATCH with "The string did not match the expected pattern."
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/memories/${memoryId}/edit`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `failed to update memory (${res.status})`);
+  }
+  return data.memory;
 }
 
 export async function deleteMemory(courseId: number, memoryId: string): Promise<void> {

@@ -250,6 +250,21 @@ class MemoryStore:
             self._conn.execute("UPDATE memory SET importance = MIN(importance + 1, 5) WHERE id = ?", (memory_id,))
             self._log(at, "BUMP", memory_id, reason)
 
+    def revise(self, memory_id: str, *, text: str, embedding: list[float], at: datetime, reason: str = "") -> None:
+        """Student corrected the wording in Manage memories: new text and
+        embedding, FTS updated, stays active for recall."""
+        blob = np.asarray(embedding, dtype=np.float32).tobytes()
+        with self._lock, self._conn:
+            updated = self._conn.execute(
+                "UPDATE memory SET text = ?, embedding = ?, status = 'active' WHERE id = ? AND valid_to IS NULL",
+                (text, blob, memory_id),
+            ).rowcount
+            if not updated:
+                raise KeyError(memory_id)
+            self._conn.execute("DELETE FROM memory_fts WHERE memory_id = ?", (memory_id,))
+            self._conn.execute("INSERT INTO memory_fts (memory_id, text) VALUES (?, ?)", (memory_id, text))
+            self._log(at, "UPDATE", memory_id, reason)
+
     def delete(self, memory_id: str, *, at: datetime, reason: str = "") -> None:
         """The student asked to forget it (design spec §5.7): really gone,
         not just hidden. Provenance and entity links cascade; a memory it

@@ -551,11 +551,12 @@ button{font:inherit;color:inherit}
 .manage-actions .icon-btn-danger{border-color:var(--danger-ink)}
 .manage-confirm{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;min-width:0}
 .manage-memories-intro{margin:.5rem 0 1rem}
-.manage-memories-filter{
-  display:flex;align-items:center;gap:.35rem;font-size:.72rem;color:var(--ink-faint);
-  margin:-.35rem 0 .65rem;cursor:pointer;
+.memory-edit-area{
+  width:100%;min-height:4.5rem;resize:vertical;border:1px solid var(--line-strong);border-radius:10px;
+  padding:.5rem .65rem;font-size:.84rem;line-height:1.35;color:var(--ink);background:var(--surface);
+  font-family:inherit;
 }
-.manage-memories-filter input{accent-color:var(--indigo);width:14px;height:14px}
+.memory-edit-area:focus{outline:none;border-color:var(--indigo)}
 .manage-confirm input{
   font-size:.78rem;border:1px solid var(--line-strong);border-radius:8px;padding:.3rem .5rem;
   background:var(--surface);color:var(--ink);width:150px;min-width:0;flex:1 1 120px;

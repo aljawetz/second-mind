@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { deleteMemory, listMemories, type CourseMemory } from "../../sidecar";
+import { deleteMemory, listMemories, updateMemory, type CourseMemory } from "../../sidecar";
 
 function kindLabel(kind: string): string {
   if (kind === "fact") return "Fact";
@@ -21,23 +21,26 @@ export default function ManageMemoriesView({
   onBack: () => void;
 }) {
   const [memories, setMemories] = useState<CourseMemory[] | null>(null);
-  const [includeInactive, setIncludeInactive] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [forgettingId, setForgettingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     setLoadError("");
-    return listMemories(courseId, includeInactive)
+    return listMemories(courseId)
       .then(setMemories)
       .catch((err) => {
         setMemories([]);
         setLoadError(err instanceof Error ? err.message : "Couldn't load memories");
       });
-  }, [courseId, includeInactive]);
+  }, [courseId]);
 
   useEffect(() => {
     setMemories(null);
+    setEditingId(null);
     refresh();
   }, [refresh]);
 
@@ -46,12 +49,100 @@ export default function ManageMemoriesView({
     setActionError("");
     try {
       await deleteMemory(courseId, memory.id);
+      if (editingId === memory.id) setEditingId(null);
       await refresh();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Couldn't forget this memory");
     } finally {
       setForgettingId(null);
     }
+  }
+
+  function startEdit(memory: CourseMemory) {
+    setActionError("");
+    setEditingId(memory.id);
+    setEditDraft(memory.text);
+  }
+
+  async function saveEdit(memoryId: string) {
+    const text = editDraft.trim();
+    if (!text) {
+      setActionError("Memory text can't be empty.");
+      return;
+    }
+    setSavingId(memoryId);
+    setActionError("");
+    try {
+      await updateMemory(courseId, memoryId, text);
+      setEditingId(null);
+      await refresh();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Couldn't save this memory");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditDraft("");
+  }
+
+  function renderMemoryRow(m: CourseMemory) {
+    const editing = editingId === m.id;
+
+    return (
+      <div className="course-row" key={m.id}>
+        <span className="cmeta">
+          {editing ? (
+            <textarea
+              className="memory-edit-area"
+              value={editDraft}
+              autoFocus
+              rows={3}
+              onChange={(e) => setEditDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") cancelEdit();
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void saveEdit(m.id);
+              }}
+            />
+          ) : (
+            <div className="ccode">{m.text}</div>
+          )}
+          <div className="cname">{kindLabel(m.kind)}</div>
+        </span>
+        <span className="manage-actions">
+          {editing ? (
+            <>
+              <button
+                className="icon-btn"
+                disabled={savingId === m.id}
+                onClick={() => void saveEdit(m.id)}
+              >
+                Save
+              </button>
+              <button className="icon-btn" disabled={savingId === m.id} onClick={cancelEdit}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="icon-btn" title="Edit memory text" onClick={() => startEdit(m)}>
+                Edit
+              </button>
+              <button
+                className="icon-btn icon-btn-danger"
+                title="Forget — permanently removes this memory"
+                disabled={forgettingId === m.id}
+                onClick={() => handleForget(m)}
+              >
+                Forget
+              </button>
+            </>
+          )}
+        </span>
+      </div>
+    );
   }
 
   return (
@@ -69,42 +160,12 @@ export default function ManageMemoriesView({
 
       <div className="home-block">
         <div className="section-label">Saved memories</div>
-        <label className="manage-memories-filter">
-          <input
-            type="checkbox"
-            checked={includeInactive}
-            onChange={(e) => setIncludeInactive(e.target.checked)}
-          />
-          Show archived
-        </label>
         {memories === null && !loadError && <p className="qa-thinking">Loading memories…</p>}
         {memories !== null && memories.length === 0 && !loadError && (
           <div className="qa-empty">Nothing saved yet — tell Second Mind something in chat and it may appear here.</div>
         )}
         {memories !== null && memories.length > 0 && (
-          <div className="course-pick">
-            {memories.map((m) => (
-              <div className="course-row" key={m.id}>
-                <span className="cmeta">
-                  <div className="ccode">{m.text}</div>
-                  <div className="cname">
-                    {kindLabel(m.kind)}
-                    {m.status !== "active" ? ` · ${m.status}` : ""}
-                  </div>
-                </span>
-                <span className="manage-actions">
-                  <button
-                    className="icon-btn icon-btn-danger"
-                    title="Forget — permanently removes this memory"
-                    disabled={forgettingId === m.id}
-                    onClick={() => handleForget(m)}
-                  >
-                    Forget
-                  </button>
-                </span>
-              </div>
-            ))}
-          </div>
+          <div className="course-pick">{memories.map(renderMemoryRow)}</div>
         )}
       </div>
     </section>
