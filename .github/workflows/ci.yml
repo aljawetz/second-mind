@@ -5,20 +5,62 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      rust: ${{ steps.filter.outputs.rust }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'app/**'
+              - '.github/workflows/ci.yml'
+            rust:
+              - 'app/src-tauri/**'
+              - 'app/package-lock.json'
+              - 'app/vite.config.*'
+              - 'app/src/**'
+              - '.github/workflows/ci.yml'
+
   backend:
     name: Backend (pytest)
-    runs-on: macos-latest
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3
         with:
-          version: "latest"
+          version: "0.9.28"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
 
       - name: Install Tesseract (OCR fallback, pytesseract wraps the binary)
-        run: brew install tesseract
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: |
+            backend/models/bge-small-en-v1.5-onnx
+            ~/.cache/huggingface
+          key: embedding-${{ hashFiles('backend/scripts/convert_embedding_model.py', 'backend/uv.lock') }}
 
       - name: Install dependencies
         working-directory: backend
@@ -31,14 +73,24 @@ jobs:
         # cleanly here, same as local dev without a Canvas token — CI never
         # gets a real Canvas or OpenAI credential.
         working-directory: backend
-        run: uv run python3 scripts/convert_embedding_model.py
+        run: |
+          if [ ! -f models/bge-small-en-v1.5-onnx/model.onnx ]; then
+            uv run python3 scripts/convert_embedding_model.py
+          fi
 
       - name: Run tests
         working-directory: backend
-        run: uv run pytest tests/ -v
+        run: |
+          args=(-v)
+          if [ "${{ github.event_name }}" != "push" ]; then
+            args+=(-m "not integration")
+          fi
+          uv run pytest tests/ "${args[@]}"
 
   frontend:
     name: Frontend (typecheck + build)
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,27 +113,28 @@ jobs:
         working-directory: app
         run: npm run build
 
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: app/dist
+          retention-days: 1
+
   rust:
     name: Tauri shell (cargo check)
+    needs: [changes, frontend]
+    if: github.event_name == 'push' || needs.changes.outputs.rust == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: actions/setup-node@v4
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
         with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: app/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: app
-        run: npm ci
-
-      - name: Build frontend (cargo check needs frontendDist to exist)
-        working-directory: app
-        run: npm run build
+          name: frontend-dist
+          path: app/dist
 
       - name: cargo check
         working-directory: app/src-tauri

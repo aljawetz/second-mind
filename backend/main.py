@@ -19,23 +19,9 @@ from urllib.parse import parse_qs
 
 import httpx
 import openai
-from llama_index.vector_stores.lancedb.base import TableNotFoundError
-from onnxruntime.capi.onnxruntime_pybind11_state import NoSuchFile as OnnxModelFileMissing
 
 import canvas
-import chat
 import config
-import conversations
-import course_sync
-import courses
-import explain
-import generation
-import indexing
-import llm
-import memory_jobs
-import sessions
-from memory import MemoryService, compress
-from memory.worker import MemoryWorker
 
 HOST = "127.0.0.1"
 # SM_PORT exists for tests/test_main_lifecycle.py only — the app always
@@ -53,15 +39,35 @@ INSTANCE_TOKEN = os.environ.get("SM_INSTANCE_TOKEN", "")
 # about. A <student_id> layer inside it would isolate against nothing real
 # for this architecture (revisited and deliberately simplified — not an
 # oversight).
-SM_HOME = Path.home() / ".secondmind"
+SM_HOME = Path(os.environ.get("SM_HOME", str(Path.home() / ".secondmind")))
 canvas.SM_HOME = SM_HOME
 
-# Similarity cutoff for chat's course search, kept separate from the
-# assignment explainer's so the two can be tuned apart. Tried 0.4 against
-# 0.5 on 67 questions across three courses: same number of good answers,
-# one more made-up course fact, so 0.5 stays — see
+# Same value as generation.SIMILARITY_CUTOFF — kept here so /ping can be
+# served without importing generation (and its LlamaIndex stack) at startup.
+# Tried 0.4 against 0.5 on 67 questions across three courses: same number of
+# good answers, one more made-up course fact, so 0.5 stays — see
 # docs/evaluations/2026-09-23-ask-modes/report.md.
-CHAT_SIMILARITY_CUTOFF = generation.SIMILARITY_CUTOFF
+CHAT_SIMILARITY_CUTOFF = 0.5
+
+class _MemoryWorkerProxy:
+    """Lazy facade so tests can keep using main.MEMORY_WORKER without importing
+    the worker (and memory stack) at main.py import time."""
+
+    def __init__(self) -> None:
+        self._worker = None
+
+    def _instance(self):
+        if self._worker is None:
+            from memory.worker import MemoryWorker
+
+            self._worker = MemoryWorker(_run_memory_job)
+        return self._worker
+
+    def __getattr__(self, name):
+        return getattr(self._instance(), name)
+
+
+MEMORY_WORKER = _MemoryWorkerProxy()
 
 COURSE_PATH = re.compile(r"^/courses/(\d+)$")
 UNSELECT_PATH = re.compile(r"^/courses/(\d+)/unselect$")
@@ -92,9 +98,13 @@ def _memory_enabled() -> bool:
     return config.read_config(SM_HOME).get("memory_enabled", True) is not False
 
 
-def _memory_service(course_id: int, provider=None, conversation_id: str | None = None) -> MemoryService:
+def _memory_service(course_id: int, provider=None, conversation_id: str | None = None):
     """provider: the model memory writes need; reads and deletes don't.
     conversation_id: the chat being answered, whose own summary recall skips."""
+    import conversations
+    import memory_jobs
+    from memory import MemoryService
+
     return MemoryService(
         SM_HOME,
         course_id,
@@ -110,6 +120,9 @@ def _memory_service(course_id: int, provider=None, conversation_id: str | None =
 def _run_memory_job(job: tuple[int, str | None]) -> None:
     """(course, chat): read the chat's new turns, then sweep the course.
     (course, None): just the sweep, which needs no model and so no key."""
+    import llm
+    import memory_jobs
+
     course_id, cid = job
     if not (SM_HOME / "courses" / str(course_id)).is_dir():
         return
@@ -121,14 +134,11 @@ def _run_memory_job(job: tuple[int, str | None]) -> None:
         service.sweep()
 
 
-# Memory writes (extraction, consolidation, fading) run here, after an
-# answer has streamed, never in its way (agent memory design spec §5.1).
-MEMORY_WORKER = MemoryWorker(_run_memory_job)
-
-
 def queue_startup_memory_jobs() -> None:
     """At startup: turns saved but not yet read by memory when the app last
     quit, then a sweep of every selected course."""
+    import memory_jobs
+
     if not _memory_enabled():
         return
     selected = config.read_config(SM_HOME).get("selected_courses", [])
@@ -302,6 +312,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(200, {"courses": course_list})
 
     def _handle_list_assignments(self, course_id: str):
+        import explain
+
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
@@ -333,12 +345,16 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(200, {"assignments": assignments})
 
     def _handle_list_sessions(self, course_id: str):
+        import sessions
+
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
         self._send_json(200, {"sessions": sessions.list_sessions(SM_HOME, int(course_id))})
 
     def _handle_session_detail(self, course_id: str, session_id: str):
+        import sessions
+
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
@@ -444,6 +460,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(404, {"error": {"code": "not_found", "message": "no such route"}})
 
     def _handle_unselect(self, course_id: str):
+        import courses
+
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
@@ -451,6 +469,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(200, {"status": "unselected"})
 
     def _handle_delete_course(self, course_id: str):
+        import courses
+
         db_path = SM_HOME / "index.lancedb"
         if not courses.has_local_data(SM_HOME, int(course_id), db_path):
             self._not_found()
@@ -459,12 +479,16 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(200, {"status": "deleted"})
 
     def _handle_session_start(self, course_id: str):
+        import sessions
+
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
         self._send_json(200, sessions.start_session(SM_HOME, int(course_id)))
 
     def _handle_session_stop(self, session_id: str):
+        import sessions
+
         length = int(self.headers.get("Content-Length", 0))
         audio_bytes = self.rfile.read(length)
         try:
@@ -475,6 +499,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(200, result)
 
     def _handle_session_notes(self, session_id: str):
+        import sessions
+
         length = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(length)
         try:
@@ -490,6 +516,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(200, {"status": "saved"})
 
     def _handle_session_rename(self, course_id: str, session_id: str):
+        import sessions
+
         length = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(length)
         try:
@@ -508,6 +536,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(200, {"status": "renamed"})
 
     def _handle_session_delete(self, course_id: str, session_id: str):
+        import sessions
+
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
@@ -519,12 +549,16 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(200, {"status": "deleted"})
 
     def _handle_list_conversations(self, course_id: str):
+        import conversations
+
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
         self._send_json(200, {"conversations": conversations.list_conversations(SM_HOME, int(course_id))})
 
     def _handle_conversation_detail(self, course_id: str, cid: str):
+        import conversations
+
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
@@ -535,6 +569,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(200, conversation)
 
     def _handle_conversation_delete(self, course_id: str, cid: str):
+        import conversations
+
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
@@ -623,6 +659,14 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.flush()
 
     def _handle_ask(self, course_id: str):
+        import chat
+        import conversations
+        import indexing
+        import llm
+        from llama_index.vector_stores.lancedb.base import TableNotFoundError
+        from memory import compress
+        from onnxruntime.capi.onnxruntime_pybind11_state import NoSuchFile as OnnxModelFileMissing
+
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
@@ -732,6 +776,8 @@ class Handler(BaseHTTPRequestHandler):
         before its "done" goes out: the app sends the next question with this
         id as soon as it sees "done", and the chat must exist by then. An
         answer that broke off is neither saved nor remembered."""
+        import conversations
+
         self.send_response(200)
         self.send_header("Content-Type", "application/x-ndjson")
         self.send_header("Transfer-Encoding", "chunked")
@@ -774,6 +820,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.flush()
 
     def _handle_course_sync(self, course_id: str):
+        import course_sync
+
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
@@ -788,6 +836,11 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.flush()
 
     def _handle_explain(self, course_id: str, assignment_id: str):
+        import explain
+        import indexing
+        from llama_index.vector_stores.lancedb.base import TableNotFoundError
+        from onnxruntime.capi.onnxruntime_pybind11_state import NoSuchFile as OnnxModelFileMissing
+
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
@@ -897,5 +950,5 @@ if __name__ == "__main__":
             file=sys.stderr,
         )
         _exit_now(1)
-    queue_startup_memory_jobs()
+    threading.Thread(target=queue_startup_memory_jobs, name="startup-memory", daemon=True).start()
     server.serve_forever()
