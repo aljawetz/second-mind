@@ -1,6 +1,6 @@
 # Course sync, Phase 1: real Canvas indexing — design
 
-**Status:** approved for planning
+**Status:** implemented — see `docs/plans/2026-09-20-course-sync-phase1.md`
 **Depends on:** nothing (all consumed modules already exist and are tested)
 **Blocks:** Phase 2 (view indexed documents), Phase 3 (remove a document), Phase 4 (upload a document)
 
