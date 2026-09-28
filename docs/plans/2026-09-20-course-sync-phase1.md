@@ -1,6 +1,6 @@
 # Course Sync Phase 1 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+**Status:** Done — implemented and shipped (`backend/course_sync.py`, `POST /courses/{id}/sync`, `OnboardingIndexing.tsx`). Kept as a record of the design decisions; steps below are checked off as completed.
 
 **Goal:** Wire Canvas Files (PDF/PPTX) and Canvas Pages into a real, incremental sync pipeline, replacing `OnboardingIndexing.tsx`'s fake `setTimeout` simulation with a real streamed endpoint.
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.13, `httpx`, `beautifulsoup4` (new), LlamaIndex + LanceDB, SQLite (manifest), TypeScript/React frontend, `fetch` + `ReadableStream` for the chunked NDJSON response.
 
-**Spec:** `docs/superpowers/specs/2026-09-20-course-sync-phase1-design.md`
+**Spec:** `docs/specs/2026-09-20-course-sync-phase1-design.md`
 
 ## Global Constraints
 
@@ -31,7 +31,7 @@
 - Produces: `sync.mark_synced(conn, canvas_item_id: str, item_type: str, display_name: str, canvas_updated_at: str, hash_: str) -> None` — note the new `display_name` parameter is the 3rd positional argument, inserted between `item_type` and `canvas_updated_at`.
 - `sync.diff()`, `sync.forget()`, `sync.get_content_hash()`, `sync.open_manifest()`, `sync.content_hash()`, `sync.raw_bytes_hash()` are unchanged.
 
-- [ ] **Step 1: Update the failing tests first**
+- [x] **Step 1: Update the failing tests first**
 
 Edit `backend/tests/test_sync.py`: every `sync.mark_synced(...)` call gains a display name as the 3rd argument. Replace each of these 7 call sites exactly as shown (same file, same line content otherwise):
 
@@ -55,12 +55,12 @@ sync.mark_synced(conn, "item_b", "page", "Doc B", "2026-01-01", sync.content_has
 sync.mark_synced(conn, "item_a", "page", "Doc A", "2026-01-02", new_hash)
 ```
 
-- [ ] **Step 2: Run the tests to verify they now fail against the old signature**
+- [x] **Step 2: Run the tests to verify they now fail against the old signature**
 
 Run: `cd backend && uv run pytest tests/test_sync.py -v`
 Expected: FAIL — `TypeError: mark_synced() takes ... positional arguments but ... were given` (or similar arity error) on every test that calls it.
 
-- [ ] **Step 3: Update the schema and function**
+- [x] **Step 3: Update the schema and function**
 
 In `backend/sync.py`, replace the `SCHEMA` constant and `mark_synced` function:
 
@@ -100,12 +100,12 @@ def mark_synced(
     conn.commit()
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `cd backend && uv run pytest tests/test_sync.py -v`
 Expected: PASS (the `test_changed_and_deleted_items_end_to_end` one is skipped unless `backend/models/` exists — that's expected and fine, matches its existing `skipif`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd backend && git add sync.py tests/test_sync.py
@@ -124,7 +124,7 @@ git commit -m "Add display_name to the sync manifest, needed for listing indexed
 **Interfaces:**
 - Produces: `ingestion.extract_html_page(html: str) -> str`
 
-- [ ] **Step 1: Add the dependency**
+- [x] **Step 1: Add the dependency**
 
 In `backend/pyproject.toml`, in the `dependencies` list (not a `[dependency-groups]` entry — this is needed at runtime), add one line, keeping the list alphabetically loose but grouped near the other content-extraction libraries:
 
@@ -155,12 +155,12 @@ dependencies = [
 Run: `cd backend && uv sync`
 Expected: `beautifulsoup4` (and its `soupsieve` dependency) appear in the sync output as newly installed.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Create `backend/tests/test_html_extraction.py`:
 
 ```python
-"""ingestion.extract_html_page — docs/superpowers/specs/2026-09-20-course-sync-phase1-design.md.
+"""ingestion.extract_html_page — docs/specs/2026-09-20-course-sync-phase1-design.md.
 Plain inline HTML, no external fixtures needed (unlike test_ingestion.py's
 real-course-material tests)."""
 
@@ -200,12 +200,12 @@ def test_empty_body_returns_empty_string():
     assert ingestion.extract_html_page("<p></p>") == ""
 ```
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [x] **Step 3: Run the test to verify it fails**
 
 Run: `cd backend && uv run pytest tests/test_html_extraction.py -v`
 Expected: FAIL with `AttributeError: module 'ingestion' has no attribute 'extract_html_page'`
 
-- [ ] **Step 4: Implement it**
+- [x] **Step 4: Implement it**
 
 In `backend/ingestion.py`, add the import at the top (alongside the existing `pdfplumber`/`pytesseract`/`pptx` imports):
 
@@ -227,12 +227,12 @@ def extract_html_page(html: str) -> str:
     return soup.get_text(separator=" ", strip=True)
 ```
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [x] **Step 5: Run the test to verify it passes**
 
 Run: `cd backend && uv run pytest tests/test_html_extraction.py -v`
 Expected: PASS (all 4 tests)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd backend && git add ingestion.py pyproject.toml uv.lock tests/test_html_extraction.py
@@ -251,12 +251,12 @@ git commit -m "Add HTML-to-text extraction for Canvas Pages"
 - Consumes: `sync.open_manifest`, `sync.diff`, `sync.mark_synced` (new signature from Task 1), `sync.forget`, `sync.content_hash`; `canvas.get_course_structure`, `canvas.get_file`, `canvas.list_pages`, `canvas.get_page`, `canvas.CanvasError`; `ingestion.extract_pdf`, `ingestion.extract_pptx`, `ingestion.extract_html_page` (from Task 2), `ingestion.ocr_pdf_page`; `indexing.pages_to_nodes`, `indexing.slides_to_nodes`, `indexing.add_nodes`, `indexing.delete_ref_doc_nodes`.
 - Produces: `course_sync.sync_course(course_id: int, sm_home: Path)` — a generator yielding `{"item": str, "status": "done"}`, `{"item": str, "status": "failed", "error": str}` per processed item, then exactly one final `{"done": True, "new": int, "changed": int, "removed": int, "failed": int}`, or `{"done": True, "error": str}` if the course couldn't be reached at all (nothing else yielded first in that case).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `backend/tests/test_course_sync.py`:
 
 ```python
-"""course_sync.py — docs/superpowers/specs/2026-09-20-course-sync-phase1-design.md.
+"""course_sync.py — docs/specs/2026-09-20-course-sync-phase1-design.md.
 
 canvas.py, ingestion.py, and indexing.py are all monkeypatched with plain
 stubs here — this tests course_sync.py's own branching logic
@@ -367,17 +367,17 @@ def test_whole_course_failure_yields_a_single_error_event(tmp_path, monkeypatch)
     assert events == [{"done": True, "error": "token expired"}]
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd backend && uv run pytest tests/test_course_sync.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'course_sync'`
 
-- [ ] **Step 3: Implement `course_sync.py`**
+- [x] **Step 3: Implement `course_sync.py`**
 
 Create `backend/course_sync.py`:
 
 ```python
-"""Course sync orchestrator — docs/superpowers/specs/2026-09-20-course-sync-phase1-design.md.
+"""Course sync orchestrator — docs/specs/2026-09-20-course-sync-phase1-design.md.
 
 Wires canvas.py + ingestion.py + indexing.py together via sync.py's
 manifest-diff mechanism into a real, incremental sync pipeline. sync.py
@@ -535,17 +535,17 @@ def sync_course(course_id: int, sm_home: Path):
     yield {"done": True, "new": new_count, "changed": changed_count, "removed": removed_count, "failed": failed_count}
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `cd backend && uv run pytest tests/test_course_sync.py -v`
 Expected: PASS (all 6 tests). If a mock doesn't match (e.g. an `AttributeError` on a monkeypatched name), fix the attribute path in the test — this is the normal TDD loop, not a plan defect.
 
-- [ ] **Step 5: Run the full backend suite to confirm nothing else broke**
+- [x] **Step 5: Run the full backend suite to confirm nothing else broke**
 
 Run: `cd backend && uv run pytest tests/ -q`
 Expected: all tests pass (the same count as before this task, plus the new ones).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd backend && git add course_sync.py tests/test_course_sync.py
@@ -563,7 +563,7 @@ git commit -m "Add the course sync orchestrator (canvas -> ingestion -> indexing
 - Consumes: `course_sync.sync_course` (Task 3).
 - Produces: `POST /courses/{course_id}/sync` (no existing automated test covers `main.py`'s HTTP layer anywhere in this codebase — every other handler is exercised only via the manual smoke-test scripts and real usage; this task follows that same established pattern. Task 5's smoke test script is what actually exercises this route.)
 
-- [ ] **Step 1: Add the import and route pattern**
+- [x] **Step 1: Add the import and route pattern**
 
 In `backend/main.py`, add to the import block (alphabetically among the existing local module imports):
 
@@ -577,7 +577,7 @@ Add the new regex near the other `_PATH` patterns (right after `ASK_PATH`):
 SYNC_PATH = re.compile(r"^/courses/(\d+)/sync$")
 ```
 
-- [ ] **Step 2: Wire the route into `do_POST`**
+- [x] **Step 2: Wire the route into `do_POST`**
 
 In `do_POST`, add this dispatch block right after the existing `ask_match` block (before `explain_match`):
 
@@ -588,7 +588,7 @@ In `do_POST`, add this dispatch block right after the existing `ask_match` block
             return
 ```
 
-- [ ] **Step 3: Implement the handler**
+- [x] **Step 3: Implement the handler**
 
 Add `_handle_course_sync` right after `_handle_ask` (they share the same streaming shape):
 
@@ -608,12 +608,12 @@ Add `_handle_course_sync` right after `_handle_ask` (they share the same streami
         self.wfile.flush()
 ```
 
-- [ ] **Step 4: Verify the whole backend suite still passes**
+- [x] **Step 4: Verify the whole backend suite still passes**
 
 Run: `cd backend && uv run pytest tests/ -q`
 Expected: all tests pass (this task adds no new automated test itself, per the note above — it must not have broken any existing one).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd backend && git add main.py
@@ -633,18 +633,18 @@ git commit -m "Wire POST /courses/{id}/sync to the real sync orchestrator"
 **Interfaces:**
 - Consumes: `course_sync.sync_course` (Task 3).
 
-- [ ] **Step 1: Delete the superseded script**
+- [x] **Step 1: Delete the superseded script**
 
 ```bash
 cd backend && git rm scripts/integration_smoke_test.py
 ```
 
-- [ ] **Step 2: Write the new real-data smoke test**
+- [x] **Step 2: Write the new real-data smoke test**
 
 Create `backend/scripts/course_sync_smoke_test.py`:
 
 ```python
-"""Course sync smoke test — docs/superpowers/specs/2026-09-20-course-sync-phase1-design.md.
+"""Course sync smoke test — docs/specs/2026-09-20-course-sync-phase1-design.md.
 Supersedes the old integration_smoke_test.py: same real-Canvas proof (new
 -> unchanged on a re-diff) plus real coverage that one never had — a
 genuinely changed item and a genuinely removed item, both against real
@@ -711,12 +711,12 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 3: Run it against real data (manual verification, not part of the automated gate)**
+- [x] **Step 3: Run it against real data (manual verification, not part of the automated gate)**
 
 Run: `cd backend && uv run python3 scripts/course_sync_smoke_test.py`
 Expected: `ALL CHECKS PASSED`. If Canvas's Pages list summary turns out not to include `updated_at` (the spec's flagged open question), this is where that surfaces — a `KeyError` or empty `updated_at` on page items. If so, fix `course_sync.py`'s page-remote-listing line to call `canvas.get_page()` per page first to get `updated_at`, matching the file path's existing "no cheap listing" reality, and re-run this script until it passes before moving on.
 
-- [ ] **Step 4: Update `backend/README.md`**
+- [x] **Step 4: Update `backend/README.md`**
 
 Find the "## Running the generation smoke test" section's neighboring content that references `integration_smoke_test.py` (grep it first: `grep -n "integration_smoke_test" backend/README.md`). Replace that section with:
 
@@ -735,7 +735,7 @@ No OpenAI key needed — sync never calls an LLM, only the local embedding model
 `models/bge-small-en-v1.5-onnx/` (`scripts/convert_embedding_model.py`).
 ```
 
-- [ ] **Step 5: Update `docs/architecture/overview.md`**
+- [x] **Step 5: Update `docs/architecture/overview.md`**
 
 Replace the `### POST /sync` section (found via `grep -n "POST /sync" docs/architecture/overview.md`) with:
 
@@ -757,7 +757,7 @@ Response (chunked NDJSON):
 ```
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/scripts/course_sync_smoke_test.py backend/README.md docs/architecture/overview.md
@@ -774,7 +774,7 @@ git commit -m "Replace integration_smoke_test.py with a real course-sync smoke t
 **Interfaces:**
 - Produces: `syncCourse(courseId: number, onEvent: (event: SyncEvent) => void): Promise<void>` where `SyncEvent = { item?: string; status?: "done" | "failed"; error?: string; done?: boolean; new?: number; changed?: number; removed?: number; failed?: number }`.
 
-- [ ] **Step 1: Add the type and function**
+- [x] **Step 1: Add the type and function**
 
 In `app/src/sidecar.ts`, add right after `askQuestion` (they share the exact same NDJSON-over-chunked-fetch parsing loop):
 
@@ -818,12 +818,12 @@ export async function syncCourse(courseId: number, onEvent: (event: SyncEvent) =
 }
 ```
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run: `cd app && npx tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd app && git add src/sidecar.ts
@@ -840,7 +840,7 @@ git commit -m "Add syncCourse to sidecar.ts, mirroring askQuestion's NDJSON pars
 **Interfaces:**
 - Consumes: `syncCourse` (Task 6).
 
-- [ ] **Step 1: Replace the fake simulation with real calls**
+- [x] **Step 1: Replace the fake simulation with real calls**
 
 Replace the entire contents of `app/src/components/onboarding/OnboardingIndexing.tsx`:
 
@@ -947,16 +947,16 @@ export default function OnboardingIndexing({
 
 This replaces the fixed 3-fake-rows-per-course layout with one real row per actually-synced item, since the real count is unknown ahead of time and can be dozens, not 3. `p.error` covers a whole-course failure (`{"done": true, "error": ...}`); an individual item's `"failed"` status still counts toward "done" but renders with a `!` marker instead of `✓`.
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run: `cd app && npx tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 3: Manual smoke check**
+- [x] **Step 3: Manual smoke check**
 
 Run the app (`cd app && PATH="$HOME/.cargo/bin:$PATH" npm run tauri dev`) and walk through onboarding with a real course selected. Confirm: real item names appear as they sync (not 3 generic fake labels), the "Continue to Second Mind →" button stays disabled until every course reports done, and a course with zero indexable items still reaches `done` (doesn't hang forever on "Starting…").
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd app && git add src/components/onboarding/OnboardingIndexing.tsx
@@ -967,7 +967,7 @@ git commit -m "Wire OnboardingIndexing to the real sync endpoint instead of a fa
 
 ## Post-plan verification
 
-- [ ] `cd backend && uv run pytest tests/ -q` — full suite passes
-- [ ] `cd app && npx tsc --noEmit` — clean
-- [ ] `cd backend && uv run python3 scripts/course_sync_smoke_test.py` — passes against a real course
-- [ ] Manual walkthrough of onboarding end-to-end with a real course, confirmed real items appear and `/ask` afterward returns material-grounded answers (not "not covered") for something that's actually in the course's Canvas files/pages
+- [x] `cd backend && uv run pytest tests/ -q` — full suite passes
+- [x] `cd app && npx tsc --noEmit` — clean
+- [x] `cd backend && uv run python3 scripts/course_sync_smoke_test.py` — passes against a real course
+- [x] Manual walkthrough of onboarding end-to-end with a real course, confirmed real items appear and `/ask` afterward returns material-grounded answers (not "not covered") for something that's actually in the course's Canvas files/pages
