@@ -121,17 +121,17 @@ CASES = [
     },
     {
         "id": "F7",
-        "kind": "trap",  # was course_fact — see note below
+        "kind": "course_fact",  # was wrongly marked trap — see note below
         "turns": ["How many people can be on a project team?"],
-        "gold_source": None,
-        "gold_answer": (
-            "Not yet available as of this eval's Canvas state (2026-09-28, Week 6 of 14): the 'Course "
-            "materials' module stops exactly at Week 6 content, and team formation happens in Week 7 per "
-            "the syllabus calendar. Correct behavior says this isn't posted yet, not a guessed number. "
-            "Recheck once Week 7+ materials post — the original report's repeat-run noted '5', from an "
-            "earlier/different point in the semester or a different source not re-confirmed this session."
-        ),
-        "gold_confidence": "V",  # the "not yet posted" finding is confirmed; the number itself is not
+        "gold_source": '"01 CourseInfoF26.pdf · p.28"',
+        "gold_answer": "A project team can have a maximum of 5 students",
+        "gold_confidence": "V",
+        # Originally marked trap ("not yet posted") from browsing the "Course
+        # materials" module, which stops at Week 6. Wrong: "01 CourseInfoF26.pdf"
+        # (seen by filename in that same module, never opened) has this on p.28
+        # and every mode in the 2026-09-28 sweep found and cited it correctly —
+        # the judge marked all of them "bad" on this bad gold label. Fixed
+        # 2026-09-28 after that sweep exposed it.
     },
     # Concepts the course teaches.
     {
@@ -206,11 +206,19 @@ CASES = [
     # Concepts the course materials don't explain (yet).
     {
         "id": "G1",
-        "kind": "concept_covered",  # was not_in_course — the course has both a deck and a recording on this
+        "kind": "not_in_course",  # reverted — see note below
         "turns": ["How does mutation testing work?"],
-        "gold_source": '"12 MutationTesting.pdf" + "Mutation testing - lecture recording" page',
-        "gold_answer": None,  # module items confirmed to exist; slide content not yet read this session
-        "gold_confidence": "U",
+        "gold_source": None,
+        "gold_answer": (
+            "Correct answer is 'not covered' for the system as currently indexed: 4 query variants "
+            "('mutation testing', 'How does mutation testing work?', 'mutant', 'MutationTesting') against "
+            "the real HybridRetriever on 2026-09-28 returned zero hits for '12 MutationTesting.pdf' or the "
+            "'Mutation testing - lecture recording' page. The course *does* cover this on Canvas (both "
+            "exist as module items) — this is an index/Canvas sync gap, not a content gap. Briefly "
+            "recategorized concept_covered on 2026-09-28 from the Canvas module listing alone, before "
+            "checking retrieval; reverted after direct retrieval testing found nothing."
+        ),
+        "gold_confidence": "V",
     },
     {
         "id": "G2",
@@ -574,36 +582,42 @@ HELDOUT_CASES = [
         "course": TST,
         "kind": "course_fact",
         "turns": ["Which IDE and build tool does the instructor use for starter code?"],
-        "gold_source": None,
-        "gold_answer": (
-            "Not confirmed this session — needs '01 SVTIntro.pdf' or '01 CourseInfoF26.pdf', not yet read"
-        ),
-        "gold_confidence": "U",
+        "gold_source": '"01 CourseInfoF26.pdf · p.11"',
+        "gold_answer": "IntelliJ and Maven",
+        "gold_confidence": "V",
+        # Fixed 2026-09-28: was marked U ("not confirmed"), but this is the same
+        # "01 CourseInfoF26.pdf" file whose contents F7 also missed — every mode
+        # in the 2026-09-28 sweep found and cited this correctly.
     },
     {
         "id": "H21",
         "course": TST,
-        "kind": "trap",  # was course_fact — see F7's note; same "not yet posted" situation
+        "kind": "course_fact",  # was wrongly marked trap — see F7's note, same root cause
         "turns": ["How many slip days do I get, and can I use them on the Super-Mutant milestones?"],
-        "gold_source": None,
+        "gold_source": '"01 CourseInfoF26.pdf · p.31"',
         "gold_answer": (
-            "Not yet available as of Week 6 — the Super-Mutant project starts Week 8. The syllabus only "
-            "describes a general 2-4 day grace period (10%/day penalty) for labs/assignments, not 'slip "
-            "days' specifically. Recheck once project materials post."
+            "5 late-day tokens per student, usable during weeks 8-13 only; cannot be used on the "
+            "Super-Mutant milestones"
         ),
         "gold_confidence": "V",
+        # Fixed 2026-09-28 after the sweep found and cited this correctly in every mode — same
+        # "01 CourseInfoF26.pdf" gap as F7.
     },
     {
         "id": "H22",
         "course": TST,
         "kind": "concept_covered",
         "turns": ["What is the hyperassertion problem and how do I fix it?"],
-        "gold_source": None,
+        "gold_source": '"UT-Koskela-Part2.pdf" (p.5, p.7) + "03 Unit Testing Principles.pdf" (p.24)',
         "gold_answer": (
-            "Not confirmed this session — not located in the decks read so far ('03 Unit Testing "
-            "Principles.pdf' doesn't cover it)"
+            "A test whose assertions are too broad/sensitive to minor, irrelevant changes in the output, "
+            "so it fails without indicating a real correctness problem — brittle, not a reliable signal. "
+            "Fix: simplify assertions to check only the specific, relevant part of the output; make "
+            "assertions fail only on genuine deviations; break large tests into smaller, focused ones"
         ),
-        "gold_confidence": "U",
+        "gold_confidence": "V",
+        # Fixed 2026-09-28: was marked U (the deck I read stopped at page 12); the real source
+        # is a supplementary reading and a later page of that same deck, found via the sweep.
     },
     {
         "id": "H23",
@@ -1032,6 +1046,8 @@ def main():
                         "case": case["id"],
                         "course": course_id,
                         "kind": case["kind"],
+                        "gold_source": case.get("gold_source"),
+                        "gold_answer": case.get("gold_answer"),
                         "gold_confidence": case.get("gold_confidence"),
                         "turn": turn_num,
                         "mode": mode,
