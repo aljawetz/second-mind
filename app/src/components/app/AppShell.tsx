@@ -9,6 +9,7 @@ import AssignmentView from "./AssignmentView";
 import NewSessionView from "./NewSessionView";
 import SessionDetailView from "./SessionDetailView";
 import ManageCoursesView from "./ManageCoursesView";
+import ManageMemoriesView from "./ManageMemoriesView";
 import OnboardingIndexing from "../onboarding/OnboardingIndexing";
 
 export default function AppShell({
@@ -176,6 +177,9 @@ export default function AppShell({
   function openManageCourses() {
     setView("manageCourses");
   }
+  function openManageMemories() {
+    setView("manageMemories");
+  }
   function handleCourseRemoved(removedId: number) {
     onCourseRemoved(removedId);
   }
@@ -223,8 +227,15 @@ export default function AppShell({
           <Topbar
             courseCode={course.code}
             courseName={course.name}
+            onManageMemories={view === "home" ? openManageMemories : undefined}
             overrideTitle={
-              view === "manageCourses" ? "Manage courses" : view === "indexingCourse" ? "Manage courses" : undefined
+              view === "manageCourses"
+                ? "Manage courses"
+                : view === "manageMemories"
+                  ? "Manage memories"
+                  : view === "indexingCourse"
+                    ? "Manage courses"
+                    : undefined
             }
             syncStatus={
               launchSyncing
@@ -273,6 +284,14 @@ export default function AppShell({
                   onBack={goHome}
                   onCourseRemoved={handleCourseRemoved}
                   onCourseAdded={handleCourseAdded}
+                />
+              )}
+              {view === "manageMemories" && (
+                <ManageMemoriesView
+                  courseId={courseId}
+                  courseCode={course.code}
+                  courseName={course.name}
+                  onBack={goHome}
                 />
               )}
               {view === "indexingCourse" && pendingIndexCourse && (

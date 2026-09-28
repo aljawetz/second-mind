@@ -7,6 +7,7 @@ export type ViewName =
   | "newSession"
   | "sessionDetail"
   | "manageCourses"
+  | "manageMemories"
   | "indexingCourse";
 
 export type OnboardStage = "startup" | "keys" | "courses" | "indexing" | "app";
