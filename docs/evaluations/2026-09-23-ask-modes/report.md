@@ -229,7 +229,7 @@ Build option D: the AI searches as a tool, sees the whole chat, and may add gene
 
 Don't build option B. It looks safest on paper but made things up the most convincingly.
 
-This also replaces the follow-up questions plan (`docs/superpowers/plans/2026-09-23-follow-up-questions.md`). Follow-ups work with no special code once the AI sees the chat.
+This also replaces the previously-considered follow-up questions plan. Follow-ups work with no special code once the AI sees the chat.
 
 ### Fixes to make with it
 
