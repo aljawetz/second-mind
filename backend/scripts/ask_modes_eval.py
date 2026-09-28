@@ -744,16 +744,26 @@ def run_a(index, question: str, _history: list[dict], _course_name: str) -> dict
     elapsed = time.perf_counter() - start
     citations = generation.build_citations(response.source_nodes)
     answer = str(response) if citations else generation.NOT_COVERED_MESSAGE
+    # citations is every node CitationQueryEngine handed the LLM as numbered
+    # context, not just the ones the answer actually cited with [n] — unlike
+    # modes B-F, whose "sources" is already cited-only. Filtering here too
+    # keeps citation_accuracy (judge()) comparable across modes: otherwise
+    # the judge sees every retrieved-but-unused source as something to
+    # grade, understating accuracy for no real reason.
+    cited = sorted({int(m) for m in CITATION_MARK.findall(answer)})
+    sources = [citations[i - 1]["label"] for i in cited if 0 < i <= len(citations)]
     return {
         "answer": answer,
         "searches": [question],
-        "sources": [c["label"] for c in citations],
+        "sources": sources,
         # One retrieval call (the question itself), top-k=5 by default —
         # response.source_nodes traces back through CitationQueryEngine's
         # own node splitting to the same underlying sources (generation.py's
         # build_citations docstring), so it stands in for "what retrieval
         # for this query surfaced" even though the node count may differ
-        # from 5 after splitting.
+        # from 5 after splitting. Kept as every retrieved node (not just
+        # cited ones) since recall@5 asks whether retrieval found the right
+        # source at all, regardless of what the model went on to cite.
         "retrieved": [[c["label"] for c in citations]],
         "seconds": round(elapsed, 2),
         "llm_calls": len(counter.llm_token_counts),
