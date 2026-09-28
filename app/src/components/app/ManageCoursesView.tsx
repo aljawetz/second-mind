@@ -14,7 +14,6 @@ export default function ManageCoursesView({
   onCourseAdded: (course: AvailableCourse) => void;
 }) {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
-  const [confirmText, setConfirmText] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
 
@@ -38,6 +37,7 @@ export default function ManageCoursesView({
   const addable = (catalog ?? []).filter((c) => !selectedIds.has(c.id));
 
   async function handleArchive(courseId: number) {
+    setConfirmingDeleteId(null);
     setBusyId(courseId);
     setError("");
     try {
@@ -51,7 +51,6 @@ export default function ManageCoursesView({
   }
 
   async function handleDelete(course: AvailableCourse) {
-    if (confirmText.trim() !== course.code) return;
     setBusyId(course.id);
     setError("");
     try {
@@ -62,7 +61,6 @@ export default function ManageCoursesView({
     } finally {
       setBusyId(null);
       setConfirmingDeleteId(null);
-      setConfirmText("");
     }
   }
 
@@ -98,26 +96,17 @@ export default function ManageCoursesView({
             </span>
             {confirmingDeleteId === c.id ? (
               <span className="manage-confirm">
-                <input
-                  type="text"
-                  placeholder={`Type "${c.code}" to confirm`}
-                  value={confirmText}
-                  onChange={(e) => setConfirmText(e.target.value)}
-                  autoFocus
-                />
                 <button
                   className="btn-danger"
-                  disabled={confirmText.trim() !== c.code || busyId === c.id}
-                  onClick={() => handleDelete(c)}
+                  disabled={busyId === c.id}
+                  onClick={() => void handleDelete(c)}
                 >
                   Confirm delete
                 </button>
                 <button
                   className="icon-btn"
-                  onClick={() => {
-                    setConfirmingDeleteId(null);
-                    setConfirmText("");
-                  }}
+                  disabled={busyId === c.id}
+                  onClick={() => setConfirmingDeleteId(null)}
                 >
                   Cancel
                 </button>
