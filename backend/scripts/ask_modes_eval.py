@@ -55,38 +55,258 @@ MAX_TOOL_ROUNDS = 4
 # kind: course_fact | concept_covered | not_in_course | trap | study_help | follow_up
 CASES = [
     # Facts about the course: must come from the materials, never guessed.
-    {"id": "F1", "kind": "course_fact", "turns": ["When is the midterm exam?"]},
-    {"id": "F2", "kind": "course_fact", "turns": ["How much is the final exam worth?"]},
-    {"id": "F3", "kind": "course_fact", "turns": ["What happens if I submit an assignment late?"]},
-    {"id": "F4", "kind": "course_fact", "turns": ["When are the TA office hours?"]},
-    {"id": "F5", "kind": "course_fact", "turns": ["Can I use ChatGPT for my assignments in this course?"]},
-    {"id": "F6", "kind": "course_fact", "turns": ["What did the professor say about boundary values in class?"]},
-    {"id": "F7", "kind": "course_fact", "turns": ["How many people can be on a project team?"]},
+    {
+        "id": "F1",
+        "kind": "course_fact",
+        "turns": ["When is the midterm exam?"],
+        "gold_source": "syllabus — Grading Algorithm / Tentative Course Calendar (Week 7)",
+        "gold_answer": "Oct 7 (Wed of Week 7; Monday 10/05 is the Midterm Review day, not the exam)",
+        "gold_confidence": "V",
+    },
+    {
+        "id": "F2",
+        "kind": "course_fact",
+        "turns": ["How much is the final exam worth?"],
+        "gold_source": "syllabus — Grading Algorithm",
+        "gold_answer": "20%",
+        "gold_confidence": "V",
+    },
+    {
+        "id": "F3",
+        "kind": "course_fact",
+        "turns": ["What happens if I submit an assignment late?"],
+        "gold_source": "syllabus — Late Work Penalty",
+        "gold_answer": (
+            "10% penalty per day during a 2-4 day grace period (assignment-specific, set in Vocareum); "
+            "not accepted once the grace period ends or solutions/grades are published, whichever is first"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "F4",
+        "kind": "course_fact",
+        "turns": ["When are the TA office hours?"],
+        "gold_source": "syllabus — Teaching Assistants",
+        "gold_answer": (
+            "Chih-Cheng Hsu: Tue 3-5pm in-person (Room 129B); Lan Luo: Thu 3-4pm (Zoom); "
+            "Michael Pham: Fri 9-10am (Zoom)"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "F5",
+        "kind": "course_fact",
+        "turns": ["Can I use ChatGPT for my assignments in this course?"],
+        "gold_source": "syllabus — Course-Specific Policy on Using AI and Generative AI Tools",
+        "gold_answer": (
+            "Permitted with conditions for take-home assignments (must disclose use/extent); not permitted "
+            "in graded in-class assignments, quizzes, or exams unless explicitly allowed"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "F6",
+        "kind": "course_fact",
+        "turns": ["What did the professor say about boundary values in class?"],
+        "gold_source": '"08 - BoundaryValues.pdf" (37-slide deck)',
+        "gold_answer": (
+            "Off-by-one errors framed via a Jeff Atwood quote; boundary value defined as 'a value near the "
+            "extreme points of an ordinal input domain, or at/around some special location'; applied to "
+            "input-space modeling; four strategies weakest-to-strongest: Normal, Robust, Worst-case, Robust "
+            "worst-case; worked example is the NextDate function (month/day/year boundaries, leap years). "
+            "No dedicated lecture recording exists for this topic, so verbal-only commentary beyond the "
+            "slides can't be confirmed"
+        ),
+        "gold_confidence": "V",  # slide content only, not a transcript
+    },
+    {
+        "id": "F7",
+        "kind": "trap",  # was course_fact — see note below
+        "turns": ["How many people can be on a project team?"],
+        "gold_source": None,
+        "gold_answer": (
+            "Not yet available as of this eval's Canvas state (2026-09-28, Week 6 of 14): the 'Course "
+            "materials' module stops exactly at Week 6 content, and team formation happens in Week 7 per "
+            "the syllabus calendar. Correct behavior says this isn't posted yet, not a guessed number. "
+            "Recheck once Week 7+ materials post — the original report's repeat-run noted '5', from an "
+            "earlier/different point in the semester or a different source not re-confirmed this session."
+        ),
+        "gold_confidence": "V",  # the "not yet posted" finding is confirmed; the number itself is not
+    },
     # Concepts the course teaches.
-    {"id": "K1", "kind": "concept_covered", "turns": ["What is the difference between a stub and a mock?"]},
-    {"id": "K2", "kind": "concept_covered", "turns": ["What is a fake object in testing?"]},
-    {"id": "K3", "kind": "concept_covered", "turns": ["What is combinatorial testing?"]},
-    {"id": "K4", "kind": "concept_covered", "turns": ["What is test-driven development?"]},
-    {"id": "K5", "kind": "concept_covered", "turns": ["What is dependency injection and why does it help testing?"]},
+    {
+        "id": "K1",
+        "kind": "concept_covered",
+        "turns": ["What is the difference between a stub and a mock?"],
+        "gold_source": '"06 Isolating Components - Test Doubles.pdf" (40-slide deck, read in full)',
+        "gold_answer": (
+            "Taxonomy: Test double -> Stub (aka Dummy), Fake, Spy, Mock, ordered by intrusiveness "
+            "Stub < Fake < Spy < Mock. Stub: 'a crude, static stand-in... one-liner methods each returning "
+            "a default/prerecorded value.' Mock: 'an object configured at runtime to behave in a certain "
+            "way... can verify object interactions, not just results... difficult to implement without a "
+            "mocking framework' (EasyMock, JMock, Mockito). Heuristic: 'stub queries, mock actions' (J.B. "
+            "Rainsberger) — stub when the test just needs a valid answer, mock when verifying which methods "
+            "were called, how many times, how"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "K2",
+        "kind": "concept_covered",
+        "turns": ["What is a fake object in testing?"],
+        "gold_source": '"06 Isolating Components - Test Doubles.pdf", fake-definition slide',
+        "gold_answer": (
+            "'an optimized, thinned-down version of the real thing that replicates the behavior of the real "
+            "thing, but without the persistent or expensive side effects...' A full fake substitutes for "
+            "the real object in every context; a restricted/partial fake only in some. Example given: an "
+            "in-memory FakeUserRepository standing in for a DB-backed one"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "K3",
+        "kind": "concept_covered",
+        "turns": ["What is combinatorial testing?"],
+        "gold_source": '"08 - CombinatorialTesting.pdf"',
+        "gold_answer": (
+            "Motivated by defects caused by interactions among blocks/characteristics (cites a stat: 98% of "
+            "medical-device defects from pairs of parameters). Three strategies: All-Choice/AC (every "
+            "combination — combinatorial explosion), Each-Choice/EC (each block covered at least once — "
+            "fewest cases, weakest coverage), All-Pairs aka Pair-Wise/AP (every block paired with every "
+            "block of every other characteristic at least once — the practical middle ground)"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "K4",
+        "kind": "concept_covered",
+        "turns": ["What is test-driven development?"],
+        "gold_source": '"L1 - TDD Lab" assignment description + required "TDD Primer.pdf" reading',
+        "gold_answer": (
+            "'Always lead by tests' — add/modify a test first, then follow compiler errors/IDE suggestions "
+            "to add minimal stubbed-out production code, then complete it: 'Test first. Then code. Then "
+            "improve, if necessary. Red, Green, Refactor.' Practiced via 'ping-pong' pair programming"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "K5",
+        "kind": "concept_covered",
+        "turns": ["What is dependency injection and why does it help testing?"],
+        "gold_source": '"04 Design For Testability.pdf"',
+        "gold_answer": (
+            "'Dependency: collaborator that you'd like to replace with a double for testing. Collaborators "
+            "should not be instantiated where they are used' — inject via constructor or property/setter "
+            "injection so tests can substitute doubles. Supports the course's 'Approximation principle': "
+            "doubles approximate collaborators that are unavailable, expensive (slow/resource-intensive), "
+            "or non-deterministic"
+        ),
+        "gold_confidence": "V",
+    },
     # Concepts the course materials don't explain (yet).
-    {"id": "G1", "kind": "not_in_course", "turns": ["How does mutation testing work?"]},
-    {"id": "G2", "kind": "not_in_course", "turns": ["What is property-based testing?"]},
-    {"id": "G3", "kind": "not_in_course", "turns": ["How does Docker layer caching work?"]},
-    {"id": "G4", "kind": "not_in_course", "turns": ["What is the difference between Kubernetes and Docker Swarm?"]},
+    {
+        "id": "G1",
+        "kind": "concept_covered",  # was not_in_course — the course has both a deck and a recording on this
+        "turns": ["How does mutation testing work?"],
+        "gold_source": '"12 MutationTesting.pdf" + "Mutation testing - lecture recording" page',
+        "gold_answer": None,  # module items confirmed to exist; slide content not yet read this session
+        "gold_confidence": "U",
+    },
+    {
+        "id": "G2",
+        "kind": "not_in_course",
+        "turns": ["What is property-based testing?"],
+        "gold_source": None,
+        "gold_answer": "Not covered by the course materials, per the original hand-grading",
+        "gold_confidence": "R",
+    },
+    {
+        "id": "G3",
+        "kind": "not_in_course",
+        "turns": ["How does Docker layer caching work?"],
+        "gold_source": None,
+        "gold_answer": (
+            "Docker is covered generally (Weeks 8-9) but layer caching specifically is not, per the "
+            "original hand-grading"
+        ),
+        "gold_confidence": "R",
+    },
+    {
+        "id": "G4",
+        "kind": "not_in_course",
+        "turns": ["What is the difference between Kubernetes and Docker Swarm?"],
+        "gold_source": None,
+        "gold_answer": (
+            "Course covers Docker Swarm (Week 11) but not Kubernetes, so a K8s-vs-Swarm comparison isn't "
+            "in the materials, per the original hand-grading"
+        ),
+        "gold_confidence": "R",
+    },
     # Traps: course facts that are NOT in the materials. The right answer is "I couldn't find that".
-    {"id": "T1", "kind": "trap", "turns": ["When is Assignment 5 due?"]},
-    {"id": "T2", "kind": "trap", "turns": ["Who is the guest lecturer for the operational excellence class?"]},
-    {"id": "T3", "kind": "trap", "turns": ["What grade did I get on A0?"]},
+    {
+        "id": "T1",
+        "kind": "trap",
+        "turns": ["When is Assignment 5 due?"],
+        "gold_source": None,
+        "gold_answer": "No such assignment exists — only A0-A4 per the syllabus calendar",
+        "gold_confidence": "V",
+    },
+    {
+        "id": "T2",
+        "kind": "trap",
+        "turns": ["Who is the guest lecturer for the operational excellence class?"],
+        "gold_source": None,
+        "gold_answer": (
+            "Not named in the syllabus calendar; Week 12 just says 'Operational excellence (guest "
+            "lecture)' with no name given"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "T3",
+        "kind": "trap",
+        "turns": ["What grade did I get on A0?"],
+        "gold_source": None,
+        "gold_answer": "The system has no access to individual grades",
+        "gold_confidence": "V",
+    },
     # Study help.
-    {"id": "S1", "kind": "study_help", "turns": ["Explain test doubles to me like I'm new to programming."]},
-    {"id": "S2", "kind": "study_help", "turns": ["Quiz me with 3 short questions on test doubles."]},
+    {
+        "id": "S1",
+        "kind": "study_help",
+        "turns": ["Explain test doubles to me like I'm new to programming."],
+        "gold_source": None,
+        "gold_answer": "Criterion: correct, simplified explanation of test doubles using the course's own terms (see K1), cites a source",
+        "gold_confidence": None,
+    },
+    {
+        "id": "S2",
+        "kind": "study_help",
+        "turns": ["Quiz me with 3 short questions on test doubles."],
+        "gold_source": None,
+        "gold_answer": "Criterion: 3 questions genuinely testing the test-doubles concept, grounded in course material",
+        "gold_confidence": None,
+    },
     # Follow-ups: only the later turns are the real test.
     {
         "id": "M1",
         "kind": "follow_up",
         "turns": ["What kinds of test doubles does the course cover?", "Explain the second one."],
+        "gold_source": '"06 Isolating Components - Test Doubles.pdf"',
+        "gold_answer": (
+            "Turn 2 must resolve 'the second one' against whatever list turn 1's own answer gave (course "
+            "order: Stub, Fake, Spy, Mock), not re-search cold or pick an unrelated meaning of 'second'"
+        ),
+        "gold_confidence": "V",  # taxonomy order confirmed; depends on turn 1's actual phrasing
     },
-    {"id": "M2", "kind": "follow_up", "turns": ["When is the midterm?", "And the final?"]},
+    {
+        "id": "M2",
+        "kind": "follow_up",
+        "turns": ["When is the midterm?", "And the final?"],
+        "gold_source": "syllabus — Tentative Course Calendar",
+        "gold_answer": "Turn 2: Dec 2 (Wed of Week 14; Monday 11/30 + 2 days)",
+        "gold_confidence": "V",
+    },
     {
         "id": "M3",
         "kind": "follow_up",
@@ -94,6 +314,12 @@ CASES = [
             "What are boundary values?",
             "Give me a simple example with a function that takes a person's age.",
         ],
+        "gold_source": '"08 - BoundaryValues.pdf"',
+        "gold_answer": (
+            "Turn 2: using the course's own boundary-value definition, a correct age example identifies "
+            "min, min+1, max-1, max for the valid range, optionally min-1/max+1 if invoking 'robust' testing"
+        ),
+        "gold_confidence": "V",
     },
     {
         "id": "M4",
@@ -102,12 +328,31 @@ CASES = [
             "What is the difference between a stub and a mock?",
             "Which one should I use to check that my code sends an email?",
         ],
+        "gold_source": '"06 Isolating Components - Test Doubles.pdf"',
+        "gold_answer": (
+            "Turn 2: a mock — per 'stub queries, mock actions', verifying an email-send call happened is "
+            "verifying an action/interaction, which is what mocks (not stubs) are for"
+        ),
+        "gold_confidence": "V",
     },
-    {"id": "M5", "kind": "follow_up", "turns": ["How is the course graded?", "Which part is worth the most?"]},
+    {
+        "id": "M5",
+        "kind": "follow_up",
+        "turns": ["How is the course graded?", "Which part is worth the most?"],
+        "gold_source": "syllabus — Grading Algorithm",
+        "gold_answer": "Turn 2: Assignments, 30% (the largest single line item)",
+        "gold_confidence": "V",
+    },
     {
         "id": "M6",
         "kind": "follow_up",
         "turns": ["What is test-driven development?", "Why does that help?", "When is the project due?"],
+        "gold_source": "syllabus — Tentative Course Calendar",
+        "gold_answer": (
+            "Turn 3: the Super-Mutant project has no single due date — it's milestone-based, spread Weeks "
+            "9-12 (M1 Wk9 Sun EOD, M2 Wk10 Thu EOD, M3 Wk11 Thu EOD, M4 Wk12 Fri EOD)"
+        ),
+        "gold_confidence": "V",
     },
 ]
 
@@ -117,14 +362,89 @@ CASES = [
 REQ, AI, TST = 55016, 56350, 55710
 HELDOUT_CASES = [
     # 18-658 Software Requirements and Interaction Design
-    {"id": "H1", "course": REQ, "kind": "course_fact", "turns": ["When is the final exam and what format is it?"]},
-    {"id": "H2", "course": REQ, "kind": "course_fact", "turns": ["Are the Friday recitations mandatory?"]},
-    {"id": "H3", "course": REQ, "kind": "course_fact", "turns": ["What textbook do I need for this class?"]},
-    {"id": "H4", "course": REQ, "kind": "course_fact", "turns": ["How long should our field project presentation be?"]},
-    {"id": "H5", "course": REQ, "kind": "concept_covered", "turns": ["What makes a good storyboard?"]},
-    {"id": "H6", "course": REQ, "kind": "concept_covered", "turns": ["How many users do I need for a usability test?"]},
-    {"id": "H7", "course": REQ, "kind": "not_in_course", "turns": ["What are Nielsen's 10 usability heuristics? List them."]},
-    {"id": "H8", "course": REQ, "kind": "trap", "turns": ["What are Professor Péraire's office hours?"]},
+    {
+        "id": "H1",
+        "course": REQ,
+        "kind": "course_fact",
+        "turns": ["When is the final exam and what format is it?"],
+        "gold_source": None,
+        "gold_answer": (
+            "Not confirmed this session — not stated in the syllabus tab or the assignments list; likely "
+            "needs a course-calendar/exam page not yet located (the course's Pages tab has search disabled, "
+            "so this means guessing a URL slug, not searching)"
+        ),
+        "gold_confidence": "U",
+    },
+    {
+        "id": "H2",
+        "course": REQ,
+        "kind": "course_fact",
+        "turns": ["Are the Friday recitations mandatory?"],
+        "gold_source": "syllabus — Course Sessions",
+        "gold_answer": (
+            "The syllabus is self-contradictory: one line says recitations are 'mandatory on 9/25 and "
+            "12/4', another says 'mandatory only on December 5' for final presentations. A correct answer "
+            "surfaces both dates and the mismatch rather than silently picking one"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "H3",
+        "course": REQ,
+        "kind": "course_fact",
+        "turns": ["What textbook do I need for this class?"],
+        "gold_source": "syllabus — Required Textbook",
+        "gold_answer": "About Face: The Essentials of Interaction Design, 4th ed. (Cooper, Reimann, Cronin, Noessel; Wiley, 2014)",
+        "gold_confidence": "V",
+    },
+    {
+        "id": "H4",
+        "course": REQ,
+        "kind": "course_fact",
+        "turns": ["How long should our field project presentation be?"],
+        "gold_source": '"Field Project Objective and Plan of Attack" page',
+        "gold_answer": "10-minute presentation",
+        "gold_confidence": "V",
+    },
+    {
+        "id": "H5",
+        "course": REQ,
+        "kind": "concept_covered",
+        "turns": ["What makes a good storyboard?"],
+        "gold_source": None,
+        "gold_answer": "Not confirmed this session — needs a Task 2/3 module page not yet fetched",
+        "gold_confidence": "U",
+    },
+    {
+        "id": "H6",
+        "course": REQ,
+        "kind": "concept_covered",
+        "turns": ["How many users do I need for a usability test?"],
+        "gold_source": None,
+        "gold_answer": (
+            "Not confirmed this session — commonly '5 users' (Nielsen), but the course's own number wasn't "
+            "located"
+        ),
+        "gold_confidence": "U",
+    },
+    {
+        "id": "H7",
+        "course": REQ,
+        "kind": "not_in_course",
+        "turns": ["What are Nielsen's 10 usability heuristics? List them."],
+        "gold_source": None,
+        "gold_answer": "General knowledge only — course doesn't reproduce Nielsen's list verbatim, per the original hand-grading",
+        "gold_confidence": "R",
+    },
+    {
+        "id": "H8",
+        "course": REQ,
+        "kind": "trap",
+        "turns": ["What are Professor Péraire's office hours?"],
+        "gold_source": "syllabus — Professor",
+        "gold_answer": "The syllabus lists no office hours for Prof. Péraire, only her email — correct answer is 'not listed', not a guess",
+        "gold_confidence": "V",
+    },
     {
         "id": "H9",
         "course": REQ,
@@ -134,26 +454,107 @@ HELDOUT_CASES = [
             "Which single component is worth the most?",
             "And how much is attendance worth?",
         ],
+        "gold_source": "syllabus — Grading Rubric",
+        "gold_answer": (
+            "Turn1 full table: Exam 20%, Jama Lab 5%, Innovation Tasks 1-2 20%, Tasks 3-5 25%, Final "
+            "Presentation 5%, Heuristic Eval Lab 5%, Field Project 8%, Class Participation & Attendance "
+            "10%, CATME/FCE 2%. Turn2: Innovation Project Tasks 3-5 at 25% is the single largest component. "
+            "Turn3: Class Participation and Attendance is 10%"
+        ),
+        "gold_confidence": "V",
     },
     {
         "id": "H10",
         "course": REQ,
         "kind": "follow_up",
         "turns": ["What are the deliverables for Task 3?", "Which of those involves a video?", "How long can it be?"],
+        "gold_source": '"Task 3: Submitting Your Work" page',
+        "gold_answer": (
+            "Turn1 deliverables: Product Vision, Minimum Valuable Product, Competitive Analysis, Landing "
+            "Page w/ Before/After Concept Video & Data Analytics. Turn2: the Landing Page deliverable "
+            "involves the video. Turn3: no more than 2 minutes"
+        ),
+        "gold_confidence": "V",
     },
     # Advanced AI for Industry & Society
-    {"id": "H11", "course": AI, "kind": "course_fact", "turns": ["What are the Big Four AI conferences according to the course?"]},
-    {"id": "H12", "course": AI, "kind": "course_fact", "turns": ["How many students can be on a project team?"]},
-    {"id": "H13", "course": AI, "kind": "course_fact", "turns": ["Which citation style should I pick in Zotero?"]},
-    {"id": "H14", "course": AI, "kind": "course_fact", "turns": ["How recent should the papers in my literature search be?"]},
-    {"id": "H15", "course": AI, "kind": "trap", "turns": ["When is the Sprint 3 deliverable due?"]},
-    {"id": "H16", "course": AI, "kind": "trap", "turns": ["What percentage of my grade is the LLM certificate?"]},
-    {"id": "H17", "course": AI, "kind": "not_in_course", "turns": ["What is a reranker and why would I use one in a RAG pipeline?"]},
+    # AI course (id 49797): list_course_files/list_pages/list_assignments all 403'd this session
+    # (confirmed real access block, retried with both course ids). H11/H12/H14/H18/H19/H15/H16/H17
+    # stay at gold_confidence "R" — the original report's hand-grading, not re-verified — until
+    # Canvas access is fixed (per user decision 2026-09-28: fix access, don't block on it).
+    {
+        "id": "H11",
+        "course": AI,
+        "kind": "course_fact",
+        "turns": ["What are the Big Four AI conferences according to the course?"],
+        "gold_source": None,
+        "gold_answer": "Not independently confirmed (course 49797 access 403'd); original hand-grading scored all four options Good",
+        "gold_confidence": "R",
+    },
+    {
+        "id": "H12",
+        "course": AI,
+        "kind": "course_fact",
+        "turns": ["How many students can be on a project team?"],
+        "gold_source": None,
+        "gold_answer": "Not independently confirmed (course 49797 access 403'd); original hand-grading scored all four options Good",
+        "gold_confidence": "R",
+    },
+    {
+        "id": "H13",
+        "course": AI,
+        "kind": "course_fact",
+        "turns": ["Which citation style should I pick in Zotero?"],
+        "gold_source": "Zotero tutorial PDF (used in Sprint 3's own ingestion baseline)",
+        "gold_answer": (
+            "IEEE — Sprint 3's report found a red box around 'IEEE' marking it as the correct answer on "
+            "this exact slide"
+        ),
+        "gold_confidence": "V",  # via Sprint 3's design doc, not direct Canvas access this session
+    },
+    {
+        "id": "H14",
+        "course": AI,
+        "kind": "course_fact",
+        "turns": ["How recent should the papers in my literature search be?"],
+        "gold_source": None,
+        "gold_answer": "Not independently confirmed (course 49797 access 403'd)",
+        "gold_confidence": "R",
+    },
+    {
+        "id": "H15",
+        "course": AI,
+        "kind": "trap",
+        "turns": ["When is the Sprint 3 deliverable due?"],
+        "gold_source": None,
+        "gold_answer": "No such Canvas item found, per the original hand-grading",
+        "gold_confidence": "R",
+    },
+    {
+        "id": "H16",
+        "course": AI,
+        "kind": "trap",
+        "turns": ["What percentage of my grade is the LLM certificate?"],
+        "gold_source": None,
+        "gold_answer": "No LLM-certificate grading component exists, per the original hand-grading",
+        "gold_confidence": "R",
+    },
+    {
+        "id": "H17",
+        "course": AI,
+        "kind": "not_in_course",
+        "turns": ["What is a reranker and why would I use one in a RAG pipeline?"],
+        "gold_source": None,
+        "gold_answer": "Not covered — general knowledge only, per the original hand-grading",
+        "gold_confidence": "R",
+    },
     {
         "id": "H18",
         "course": AI,
         "kind": "follow_up",
         "turns": ["What is the BrainEEG research project about?", "Does their model beat the baseline?"],
+        "gold_source": None,
+        "gold_answer": "Not independently confirmed (course 49797 access 403'd); original hand-grading scored all four options Good",
+        "gold_confidence": "R",
     },
     {
         "id": "H19",
@@ -163,24 +564,93 @@ HELDOUT_CASES = [
             "What does the Sprint 1 individual assignment ask me to do?",
             "Show me what a filled-in value proposition looks like, using a made-up bike-sharing app.",
         ],
+        "gold_source": None,
+        "gold_answer": "Not independently confirmed (course 49797 access 403'd)",
+        "gold_confidence": "R",
     },
     # 18-654 Software Testing & Operations, topics the first run didn't ask about
-    {"id": "H20", "course": TST, "kind": "course_fact", "turns": ["Which IDE and build tool does the instructor use for starter code?"]},
+    {
+        "id": "H20",
+        "course": TST,
+        "kind": "course_fact",
+        "turns": ["Which IDE and build tool does the instructor use for starter code?"],
+        "gold_source": None,
+        "gold_answer": (
+            "Not confirmed this session — needs '01 SVTIntro.pdf' or '01 CourseInfoF26.pdf', not yet read"
+        ),
+        "gold_confidence": "U",
+    },
     {
         "id": "H21",
         "course": TST,
-        "kind": "course_fact",
+        "kind": "trap",  # was course_fact — see F7's note; same "not yet posted" situation
         "turns": ["How many slip days do I get, and can I use them on the Super-Mutant milestones?"],
+        "gold_source": None,
+        "gold_answer": (
+            "Not yet available as of Week 6 — the Super-Mutant project starts Week 8. The syllabus only "
+            "describes a general 2-4 day grace period (10%/day penalty) for labs/assignments, not 'slip "
+            "days' specifically. Recheck once project materials post."
+        ),
+        "gold_confidence": "V",
     },
-    {"id": "H22", "course": TST, "kind": "concept_covered", "turns": ["What is the hyperassertion problem and how do I fix it?"]},
-    {"id": "H23", "course": TST, "kind": "concept_covered", "turns": ["Which kind of test double is the least intrusive?"]},
-    {"id": "H24", "course": TST, "kind": "not_in_course", "turns": ["How do I set up JaCoCo in a Maven project?"]},
-    {"id": "H25", "course": TST, "kind": "trap", "turns": ["What did the professor cover in Class #2?"]},
+    {
+        "id": "H22",
+        "course": TST,
+        "kind": "concept_covered",
+        "turns": ["What is the hyperassertion problem and how do I fix it?"],
+        "gold_source": None,
+        "gold_answer": (
+            "Not confirmed this session — not located in the decks read so far ('03 Unit Testing "
+            "Principles.pdf' doesn't cover it)"
+        ),
+        "gold_confidence": "U",
+    },
+    {
+        "id": "H23",
+        "course": TST,
+        "kind": "concept_covered",
+        "turns": ["Which kind of test double is the least intrusive?"],
+        "gold_source": '"06 Isolating Components - Test Doubles.pdf"',
+        "gold_answer": (
+            "'(-intrusive) Stub (Dummy) < Fake < Spy < Mock (+intrusive)' — the stub/dummy is the least "
+            "intrusive. Guidance given: 'Use weakest double that will do the job'"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "H24",
+        "course": TST,
+        "kind": "not_in_course",
+        "turns": ["How do I set up JaCoCo in a Maven project?"],
+        "gold_source": None,
+        "gold_answer": "Not covered — course discusses coverage concepts, not JaCoCo/Maven setup specifically, per the original hand-grading",
+        "gold_confidence": "R",
+    },
+    {
+        "id": "H25",
+        "course": TST,
+        "kind": "trap",
+        "turns": ["What did the professor cover in Class #2?"],
+        "gold_source": None,
+        "gold_answer": (
+            "Per the original hand-grading, the Class #2 recording is one sentence long — correct behavior "
+            "says almost nothing was covered, not an invented agenda"
+        ),
+        "gold_confidence": "R",
+    },
     {
         "id": "H26",
         "course": TST,
         "kind": "follow_up",
         "turns": ["What does 'stub queries, mock actions' mean?", "Show me a short Java example of the second part."],
+        "gold_source": '"06 Isolating Components - Test Doubles.pdf", slide "Stub queries, mock actions*" (J.B. Rainsberger)',
+        "gold_answer": (
+            "Turn1: 'Stub queries' = test needs a valid answer from a collaborator, doesn't care what it "
+            "is; 'Mock actions' = test needs to know which methods were called, how many times, how. "
+            "Turn2 needs a correct minimal Java/Mockito example of a mocked action (verifying a call "
+            "happened)"
+        ),
+        "gold_confidence": "V",
     },
 ]
 
