@@ -1062,7 +1062,31 @@ def main():
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(results, indent=2))
     print(f"wrote {len(results)} results to {out_path}")
+    grades_path = write_grades(results, out_path)
+    print(f"wrote grades (no quoted content — safe to commit) to {grades_path}")
     print_report(results, modes)
+
+
+# Fields safe to commit: metrics and grades only, nothing that could quote
+# course material (an "answer" or "sources" string can; even gold_source/
+# gold_answer can, e.g. F4's TA names and office hours) — matches why the
+# existing *-grades.json files, not the raw run output, are what's shared.
+GRADES_FIELDS = (
+    "case", "course", "kind", "gold_confidence", "turn", "mode",
+    "seconds", "cost", "recall_at_5", "correct", "citation_accuracy",
+    "faithful", "abstained_correctly",
+)
+
+
+def write_grades(results: list[dict], out_path: Path) -> Path:
+    """Writes <out_path>-grades.json (e.g. results.json -> results-grades.json)
+    alongside the raw output: the same rows, stripped to GRADES_FIELDS. This
+    is the file safe to commit — the raw output never is (see this folder's
+    .gitignore)."""
+    grades_path = out_path.with_name(f"{out_path.stem}-grades{out_path.suffix}")
+    rows = [{k: r.get(k) for k in GRADES_FIELDS} for r in results]
+    grades_path.write_text(json.dumps(rows, indent=2))
+    return grades_path
 
 
 def _percentile(values: list[float], pct: float) -> float | None:
