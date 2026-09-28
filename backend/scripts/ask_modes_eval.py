@@ -748,6 +748,13 @@ def run_a(index, question: str, _history: list[dict], _course_name: str) -> dict
         "answer": answer,
         "searches": [question],
         "sources": [c["label"] for c in citations],
+        # One retrieval call (the question itself), top-k=5 by default —
+        # response.source_nodes traces back through CitationQueryEngine's
+        # own node splitting to the same underlying sources (generation.py's
+        # build_citations docstring), so it stands in for "what retrieval
+        # for this query surfaced" even though the node count may differ
+        # from 5 after splitting.
+        "retrieved": [[c["label"] for c in citations]],
         "seconds": round(elapsed, 2),
         "llm_calls": len(counter.llm_token_counts),
         "prompt_tokens": counter.prompt_llm_token_count,
@@ -769,6 +776,7 @@ def run_tool_loop(index, question: str, history: list[dict], system_prompt: str)
 
     searches: list[str] = []
     sources: list[str] = []  # sources[n-1] is source number n
+    retrieved: list[list[str]] = []  # one list of labels per search call, for recall@5
     prompt_tokens = completion_tokens = llm_calls = 0
     start = time.perf_counter()
     for round_num in range(MAX_TOOL_ROUNDS + 1):
@@ -788,6 +796,7 @@ def run_tool_loop(index, question: str, history: list[dict], system_prompt: str)
             query = json.loads(call.function.arguments).get("query", "")
             searches.append(query)
             nodes = retriever.retrieve(query)
+            retrieved.append([source_label(n) for n in nodes])
             if not nodes:
                 result = "No matching course material found."
             else:
@@ -804,6 +813,7 @@ def run_tool_loop(index, question: str, history: list[dict], system_prompt: str)
         "answer": answer,
         "searches": searches,
         "sources": [sources[i - 1] for i in cited if 0 < i <= len(sources)],
+        "retrieved": retrieved,
         "seconds": round(elapsed, 2),
         "llm_calls": llm_calls,
         "prompt_tokens": prompt_tokens,
@@ -825,24 +835,29 @@ def run_d(index, question, history, course_name):
 
 def run_shipped(index, question, history, course_name, cutoff):
     searches: list[str] = []
+    retrieved: list[list[str]] = []
     base_search = chat.make_search(index, cutoff)
 
     def search(query):
         searches.append(query)
-        return base_search(query)
+        nodes = base_search(query)
+        retrieved.append([source_label(n) for n in nodes])
+        return nodes
 
     start = time.perf_counter()
     events = list(chat.answer(question, history, course_name, search, llm.OpenAIProvider(temperature=TEMPERATURE)))
     elapsed = time.perf_counter() - start
     final = next(e for e in events if "citations" in e)
+    usage = final.get("usage")  # None unless OpenAIProvider reported it (see llm.py's TurnEnd.usage)
     return {
         "answer": "".join(e.get("delta", "") for e in events),
         "searches": searches,
         "sources": [c["label"] for c in final["citations"]],
+        "retrieved": retrieved,
         "seconds": round(elapsed, 2),
-        "llm_calls": None,  # not exposed by the provider interface
-        "prompt_tokens": 0,
-        "completion_tokens": 0,
+        "llm_calls": None,  # round count isn't exposed by the provider interface, only token totals
+        "prompt_tokens": usage["prompt_tokens"] if usage else 0,
+        "completion_tokens": usage["completion_tokens"] if usage else 0,
     }
 
 
@@ -857,6 +872,115 @@ def run_f(index, question, history, course_name):
 MODES = {"A": run_a, "B": run_b, "C": run_c, "D": run_d, "E": run_e, "F": run_f}
 
 
+# --- metrics: recall@5, LLM-judge (correctness / citation accuracy /
+# faithfulness / abstention), and cost ---------------------------------------
+
+# gpt-4o, not MODEL (gpt-4o-mini) — a model judging its own answers risks
+# self-grading bias, so the judge is deliberately a separate, stronger model.
+JUDGE_MODEL = "gpt-4o"
+
+# $ per 1M tokens, confirmed 2026-09-24 (unchanged since gpt-4o-mini's July
+# 2024 launch): https://devtk.ai/en/models/gpt-4o-mini/,
+# https://pecollective.com/tools/gpt-4o-mini-pricing/. Only prices MODEL
+# (the system under test); JUDGE_MODEL's own cost isn't a metric here.
+PRICE_PER_1M_TOKENS = {"gpt-4o-mini": {"prompt": 0.15, "completion": 0.60}}
+
+
+def cost(prompt_tokens: int | None, completion_tokens: int | None) -> float | None:
+    price = PRICE_PER_1M_TOKENS.get(MODEL)
+    if price is None or not prompt_tokens and not completion_tokens:
+        return None
+    return (prompt_tokens or 0) / 1_000_000 * price["prompt"] + (completion_tokens or 0) / 1_000_000 * price["completion"]
+
+
+def source_key(gold_source: str) -> str:
+    """The short substring to match a prose gold_source against citation
+    labels (generation.build_citations' "<source> · p.N" / "· slide N"
+    shape): the quoted filename in e.g. '"08 - BoundaryValues.pdf" (37-slide
+    deck)', else the text before an em dash or parenthesis, e.g. 'syllabus'
+    from 'syllabus — Grading Algorithm'. Approximate by design — gold_source
+    is prose for a human reader first, a match key second; recall@5 results
+    are a signal to spot-check, not a number to trust blindly."""
+    quoted = re.search(r'"([^"]+)"', gold_source)
+    if quoted:
+        return quoted.group(1)
+    return re.split(r"[—(]", gold_source)[0].strip()
+
+
+def recall_at_5(gold_source: str | None, retrieved: list[list[str]]) -> bool | None:
+    """None when gold_source is None: recall isn't meaningful for a trap,
+    not_in_course, or study_help case — there's no "right" source to find."""
+    if not gold_source:
+        return None
+    key = source_key(gold_source).lower()
+    return any(key in label.lower() for labels in retrieved for label in labels)
+
+
+JUDGE_PROMPT = """You are grading one chat-assistant answer for an evaluation. You did not write the \
+answer and have no stake in it scoring well or badly — grade strictly against the gold facts given below, \
+not against how confident or polished the answer sounds.
+
+Course: {course_name}
+Question: {question}
+Question kind: {kind}
+Gold source: {gold_source}
+Gold answer / correct behavior: {gold_answer}
+
+The assistant's answer:
+{answer}
+
+Sources the assistant cited: {sources}
+
+Grade on four axes and return ONLY a JSON object with these exact keys:
+- "correct": "good" | "ok" | "bad" — good = matches the gold answer's facts, useful, sources make sense; \
+ok = not wrong but unhelpful, incomplete, or unlabeled; bad = wrong, made up, or failed to answer something \
+it should have.
+- "citation_accuracy": a number from 0 to 1 — the fraction of the answer's citations that point to a \
+source actually supporting the claim next to it (1.0 if there's nothing to check, e.g. the answer \
+correctly said it couldn't find anything and cited nothing).
+- "faithful": true | false — false only if the answer states a course-specific fact (a date, a number, a \
+name, a policy, what was said in class) that is not backed by the gold answer or a real citation. General \
+knowledge that is clearly labeled as such does not break faithfulness.
+- "abstained_correctly": true | false | null — only meaningful when the gold answer says the correct \
+behavior is to say the information isn't available (a trap question, or materials not yet posted): true if \
+the assistant said so, false if it guessed or invented something instead, null for every other case.
+
+Return nothing but the JSON object, no markdown fences."""
+
+
+def judge(client, course_name: str, case: dict, question: str, answer: str, sources: list[str]) -> dict:
+    """One gpt-4o call grading an answer against its case's gold data. A
+    case with gold_confidence "U" (no real gold_answer yet) still gets
+    judged, against whatever's in gold_answer (often just "not confirmed
+    this session") — the report should read gold_confidence before trusting
+    the grade, not this function silently downgrading it."""
+    prompt = JUDGE_PROMPT.format(
+        course_name=course_name,
+        question=question,
+        kind=case["kind"],
+        gold_source=case.get("gold_source") or "(none — see gold_answer for the correct behavior)",
+        gold_answer=case.get("gold_answer") or "(not established this session — grade cautiously)",
+        answer=answer,
+        sources=", ".join(sources) or "(none)",
+    )
+    response = client.chat.completions.create(
+        model=JUDGE_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+        response_format={"type": "json_object"},
+    )
+    try:
+        result = json.loads(response.choices[0].message.content or "{}")
+    except json.JSONDecodeError:
+        result = {}
+    return {
+        "correct": result.get("correct") if result.get("correct") in ("good", "ok", "bad") else None,
+        "citation_accuracy": result.get("citation_accuracy") if isinstance(result.get("citation_accuracy"), (int, float)) else None,
+        "faithful": result.get("faithful") if isinstance(result.get("faithful"), bool) else None,
+        "abstained_correctly": result.get("abstained_correctly") if isinstance(result.get("abstained_correctly"), bool) else None,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", default="A,B,C")
@@ -866,9 +990,13 @@ def main():
         "--out",
         default=str(Path(__file__).parent.parent.parent / "docs/evaluations/2026-09-23-ask-modes/results.json"),
     )
+    parser.add_argument(
+        "--no-judge", action="store_true", help="skip the gpt-4o judge pass (correctness/citation/faithfulness/abstention)"
+    )
     args = parser.parse_args()
     modes = args.only.split(",")
     wanted = set(filter(None, args.cases.split(",")))
+    judge_client = None if args.no_judge else openai.OpenAI(api_key=generation._get_llm_key())
 
     cases = HELDOUT_CASES if args.set == "heldout" else CASES
     indexes = {}
@@ -885,13 +1013,76 @@ def main():
             for turn_num, question in enumerate(case["turns"], start=1):
                 out = MODES[mode](index, question, history, COURSE_NAMES[course_id])
                 history.append({"question": question, "answer": out["answer"]})
-                results.append({"case": case["id"], "course": course_id, "kind": case["kind"], "turn": turn_num, "mode": mode, "question": question, **out})
-                print(f"[{case['id']}.{turn_num} {mode}] {out['seconds']}s  searches={out['searches']}", flush=True)
+                out["recall_at_5"] = recall_at_5(case.get("gold_source"), out["retrieved"])
+                out["cost"] = cost(out["prompt_tokens"], out["completion_tokens"])
+                if judge_client is not None:
+                    out.update(judge(judge_client, COURSE_NAMES[course_id], case, question, out["answer"], out["sources"]))
+                results.append(
+                    {
+                        "case": case["id"],
+                        "course": course_id,
+                        "kind": case["kind"],
+                        "gold_confidence": case.get("gold_confidence"),
+                        "turn": turn_num,
+                        "mode": mode,
+                        "question": question,
+                        **out,
+                    }
+                )
+                judged = f" correct={out.get('correct')}" if judge_client is not None else ""
+                print(f"[{case['id']}.{turn_num} {mode}] {out['seconds']}s  searches={out['searches']}{judged}", flush=True)
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(results, indent=2))
     print(f"wrote {len(results)} results to {out_path}")
+    print_report(results, modes)
+
+
+def _percentile(values: list[float], pct: float) -> float | None:
+    if not values:
+        return None
+    values = sorted(values)
+    index = min(len(values) - 1, round((pct / 100) * (len(values) - 1)))
+    return values[index]
+
+
+def print_report(results: list[dict], modes: list[str]) -> None:
+    """A per-mode summary table: good/ok/bad counts, mean citation accuracy,
+    faithfulness rate, correct-abstention rate, recall@5, latency p50/p95,
+    and mean cost per query. Each average is over only the turns where that
+    metric applies (e.g. abstention only over trap-like cases) — printed as
+    "n/a" when a mode has zero such turns, never as a misleading 0%."""
+
+    def avg(values):
+        # Unrounded here — pct() only needs whole percent, but cost needs
+        # 5 decimal places (a 3dp round zeroed a real $0.00035 to $0.00000).
+        values = [v for v in values if v is not None]
+        return sum(values) / len(values) if values else None
+
+    def pct(values):
+        a = avg(values)
+        return f"{a * 100:.0f}%" if a is not None else "n/a"
+
+    print("\n## Summary\n")
+    header = "| mode | good | ok | bad | citation acc | faithful | correct abstention | recall@5 | p50 (s) | p95 (s) | avg cost |"
+    print(header)
+    print("|" + "---|" * (header.count("|") - 1))
+    for mode in modes:
+        rows = [r for r in results if r["mode"] == mode]
+        correctness = [r.get("correct") for r in rows]
+        good, ok, bad = (correctness.count(v) for v in ("good", "ok", "bad"))
+        seconds = [r["seconds"] for r in rows]
+        costs = [r.get("cost") for r in rows]
+        avg_cost = avg(costs)
+        cost_str = f"${avg_cost:.5f}" if avg_cost is not None else "n/a"
+        print(
+            f"| {mode} | {good} | {ok} | {bad} | {pct([r.get('citation_accuracy') for r in rows])} | "
+            f"{pct([1 if r.get('faithful') else 0 if r.get('faithful') is False else None for r in rows])} | "
+            f"{pct([1 if r.get('abstained_correctly') else 0 if r.get('abstained_correctly') is False else None for r in rows])} | "
+            f"{pct([1 if r.get('recall_at_5') else 0 if r.get('recall_at_5') is False else None for r in rows])} | "
+            f"{_percentile(seconds, 50) or 'n/a'} | {_percentile(seconds, 95) or 'n/a'} | {cost_str} |"
+        )
 
 
 if __name__ == "__main__":

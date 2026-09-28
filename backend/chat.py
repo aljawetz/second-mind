@@ -333,6 +333,11 @@ def answer(
             messages.append({"role": "tool", "tool_call_id": "recall-0", "content": show(hits)})
 
     renumberer = CitationRenumberer(lambda n: 1 <= n <= len(sources))
+    # None until a provider reports real usage (only OpenAIProvider does,
+    # via stream_chat's TurnEnd.usage) — kept absent from `final` below
+    # rather than reported as zero, so callers that cost a call (the
+    # ask-modes evaluation) can tell "not tracked" from "free".
+    usage_total: dict | None = None
     for round_num in range(MAX_TOOL_ROUNDS + 1):
         round_tools = tools if round_num < MAX_TOOL_ROUNDS else None
         # In a follow-up ("And the final?") the student's exact words rarely
@@ -346,6 +351,10 @@ def answer(
         for item in provider.stream_chat(messages, round_tools, require_tool=require_tool):
             if isinstance(item, TurnEnd):
                 end = item
+                if item.usage:
+                    usage_total = usage_total or {"prompt_tokens": 0, "completion_tokens": 0}
+                    usage_total["prompt_tokens"] += item.usage["prompt_tokens"]
+                    usage_total["completion_tokens"] += item.usage["completion_tokens"]
                 continue
             round_text += item
             out = renumberer.feed(item)
@@ -368,6 +377,8 @@ def answer(
         yield {"delta": tail}
     citations = generation.build_citations([sources[n - 1] for n in renumberer.order])
     final = {"citations": citations, "grounded": bool(citations)}
+    if usage_total is not None:
+        final["usage"] = usage_total
     if memory is not None:
         final["memories_used"] = [{"id": i, "text": text} for i, text in used.items() if i not in forgotten]
     yield final
