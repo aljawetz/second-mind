@@ -152,6 +152,25 @@ def test_a_student_edit_rewrites_text_and_embedding(service_for):
     assert svc.list()[0].text == "The student is on team 5."
 
 
+def test_a_student_edit_rejects_superseded_memories(service_for):
+    svc = service_for(ScriptedLLM(_extraction("The student is on team 4.")))
+    svc.observe(_turn("Team 4."), conversation_id="c-1", turn_index=0)
+    old_id = svc.list()[0].id
+    new_id = svc._store.add(
+        kind="fact",
+        text="The student is on team 5.",
+        importance=4,
+        embedding=embed("The student is on team 5."),
+        created_at=T0,
+        provenance=[("c-1", 1)],
+        reason="test",
+    )
+    svc._store.supersede(old_id, by=new_id, valid_to=T1)
+
+    with pytest.raises(ValueError, match="inactive"):
+        svc.update_text(old_id, "Changed.")
+
+
 def test_deleting_a_chat_forgets_what_came_only_from_it(service_for, clock):
     llm = ScriptedLLM(
         _extraction("The student is on team 4 with Priya and Ken."),

@@ -349,7 +349,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(200, detail)
 
     def do_POST(self):
-        if self.path == "/config":
+        path, _, _ = self.path.partition("?")
+        if path == "/config":
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length)
             try:
@@ -364,7 +365,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200, merged)
             return
 
-        if self.path == "/credentials/validate":
+        if path == "/credentials/validate":
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length)
             try:
@@ -376,47 +377,47 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200, {"valid": valid, "reason": reason})
             return
 
-        unselect_match = UNSELECT_PATH.match(self.path)
+        unselect_match = UNSELECT_PATH.match(path)
         if unselect_match:
             self._handle_unselect(unselect_match.group(1))
             return
 
-        ask_match = ASK_PATH.match(self.path)
+        ask_match = ASK_PATH.match(path)
         if ask_match:
             self._handle_ask(ask_match.group(1))
             return
 
-        sync_match = SYNC_PATH.match(self.path)
+        sync_match = SYNC_PATH.match(path)
         if sync_match:
             self._handle_course_sync(sync_match.group(1))
             return
 
-        explain_match = EXPLAIN_PATH.match(self.path)
+        explain_match = EXPLAIN_PATH.match(path)
         if explain_match:
             self._handle_explain(explain_match.group(1), explain_match.group(2))
             return
 
-        session_start_match = SESSION_START_PATH.match(self.path)
+        session_start_match = SESSION_START_PATH.match(path)
         if session_start_match:
             self._handle_session_start(session_start_match.group(1))
             return
 
-        session_stop_match = SESSION_STOP_PATH.match(self.path)
+        session_stop_match = SESSION_STOP_PATH.match(path)
         if session_stop_match:
             self._handle_session_stop(session_stop_match.group(1))
             return
 
-        session_notes_match = SESSION_NOTES_PATH.match(self.path)
+        session_notes_match = SESSION_NOTES_PATH.match(path)
         if session_notes_match:
             self._handle_session_notes(session_notes_match.group(1))
             return
 
-        rename_match = SESSION_RENAME_PATH.match(self.path)
+        rename_match = SESSION_RENAME_PATH.match(path)
         if rename_match:
             self._handle_session_rename(rename_match.group(1), rename_match.group(2))
             return
 
-        memory_edit_match = MEMORY_EDIT_PATH.match(self.path)
+        memory_edit_match = MEMORY_EDIT_PATH.match(path)
         if memory_edit_match:
             self._handle_memory_update(memory_edit_match.group(1), memory_edit_match.group(2))
             return

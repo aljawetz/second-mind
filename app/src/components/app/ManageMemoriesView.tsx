@@ -24,6 +24,7 @@ export default function ManageMemoriesView({
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [forgettingId, setForgettingId] = useState<string | null>(null);
+  const [confirmingForgetId, setConfirmingForgetId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -50,6 +51,7 @@ export default function ManageMemoriesView({
     try {
       await deleteMemory(courseId, memory.id);
       if (editingId === memory.id) setEditingId(null);
+      setConfirmingForgetId(null);
       await refresh();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Couldn't forget this memory");
@@ -60,6 +62,7 @@ export default function ManageMemoriesView({
 
   function startEdit(memory: CourseMemory) {
     setActionError("");
+    setConfirmingForgetId(null);
     setEditingId(memory.id);
     setEditDraft(memory.text);
   }
@@ -125,6 +128,23 @@ export default function ManageMemoriesView({
                 Cancel
               </button>
             </>
+          ) : confirmingForgetId === m.id ? (
+            <span className="manage-confirm">
+              <button
+                className="btn-danger"
+                disabled={forgettingId === m.id}
+                onClick={() => void handleForget(m)}
+              >
+                Confirm forget
+              </button>
+              <button
+                className="icon-btn"
+                disabled={forgettingId === m.id}
+                onClick={() => setConfirmingForgetId(null)}
+              >
+                Cancel
+              </button>
+            </span>
           ) : (
             <>
               <button className="icon-btn" title="Edit memory text" onClick={() => startEdit(m)}>
@@ -134,7 +154,7 @@ export default function ManageMemoriesView({
                 className="icon-btn icon-btn-danger"
                 title="Forget — permanently removes this memory"
                 disabled={forgettingId === m.id}
-                onClick={() => handleForget(m)}
+                onClick={() => setConfirmingForgetId(m.id)}
               >
                 Forget
               </button>

@@ -217,6 +217,21 @@ def test_archived_memories_cannot_be_edited(app):
     assert body["error"]["code"] == "memory_inactive"
 
 
+def test_memory_edit_rejects_empty_text(app):
+    _say(app, "I'm on team 4.", remembers="The student is on team 4.")
+    mid = _json(app, "GET", f"/courses/{COURSE}/memories")[1]["memories"][0]["id"]
+
+    status, body = _json(app, "POST", f"/courses/{COURSE}/memories/{mid}/edit", {"text": "   "})
+    assert status == 400
+    assert "empty" in body["error"]["message"].lower()
+
+
+def test_memory_edit_returns_not_found_for_unknown_id(app):
+    status, body = _json(app, "POST", f"/courses/{COURSE}/memories/m-000000000000/edit", {"text": "Nope."})
+    assert status == 404
+    assert body["error"]["code"] == "not_found"
+
+
 def test_chats_can_be_listed_read_and_deleted_taking_their_memories_along(app):
     cid = _say(app, "I'm auditing the course.", remembers="The student is auditing the course.")[0]["conversation_id"]
 

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { AvailableCourse } from "../../types";
 import type { SessionSummary } from "../../sidecar";
+import { useDismissOnOutside } from "../../hooks/useDismissOnOutside";
 import LogoMark from "../LogoMark";
 
 export default function Sidebar({
@@ -25,23 +26,7 @@ export default function Sidebar({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!settingsOpen) return;
-    function handlePointerDown(e: MouseEvent) {
-      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
-        setSettingsOpen(false);
-      }
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setSettingsOpen(false);
-    }
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [settingsOpen]);
+  useDismissOnOutside(settingsRef, settingsOpen, () => setSettingsOpen(false));
 
   return (
     <aside className="sidebar">
@@ -115,9 +100,10 @@ export default function Sidebar({
             </svg>
           </button>
           {settingsOpen && (
-            <div className="settings-menu">
+            <div className="settings-menu" role="menu">
               <button
                 className="settings-menu-item"
+                role="menuitem"
                 onClick={() => {
                   setSettingsOpen(false);
                   onManageCourses();

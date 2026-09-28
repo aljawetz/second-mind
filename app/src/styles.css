@@ -551,6 +551,8 @@ button{font:inherit;color:inherit}
 .manage-actions .icon-btn-danger{border-color:var(--danger-ink)}
 .manage-confirm{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;min-width:0}
 .manage-memories-intro{margin:.5rem 0 1rem}
+#view-manage-memories .course-pick .course-row{cursor:default}
+#view-manage-memories .course-pick .course-row:hover{border-color:var(--line)}
 .memory-edit-area{
   width:100%;min-height:4.5rem;resize:vertical;border:1px solid var(--line-strong);border-radius:10px;
   padding:.5rem .65rem;font-size:.84rem;line-height:1.35;color:var(--ink);background:var(--surface);

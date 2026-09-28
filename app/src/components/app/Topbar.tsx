@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useDismissOnOutside } from "../../hooks/useDismissOnOutside";
 
 export default function Topbar({
   courseCode,
@@ -18,22 +19,14 @@ export default function Topbar({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  useDismissOnOutside(menuRef, menuOpen, () => setMenuOpen(false));
+
   useEffect(() => {
     if (!menuOpen) return;
-    function handlePointerDown(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setMenuOpen(false);
-    }
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
+    const id = requestAnimationFrame(() => {
+      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    });
+    return () => cancelAnimationFrame(id);
   }, [menuOpen]);
 
   const pill = syncStatus && (
