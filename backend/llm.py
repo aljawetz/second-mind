@@ -29,9 +29,15 @@ class ToolCall:
 
 @dataclass
 class TurnEnd:
-    """Last item a stream_chat() call yields: any tool calls the model made."""
+    """Last item a stream_chat() call yields: any tool calls the model made.
+
+    usage: {"prompt_tokens", "completion_tokens"} when the provider reports
+    it (OpenAIProvider always does, via stream_options), else None — callers
+    that cost a call (the ask-modes evaluation) skip it when None rather
+    than assume zero."""
 
     tool_calls: list[ToolCall] = field(default_factory=list)
+    usage: dict | None = None
 
 
 class LLMProvider(Protocol):
@@ -67,15 +73,27 @@ class OpenAIProvider:
     def stream_chat(
         self, messages: list[dict], tools: list[dict] | None, require_tool: bool = False
     ) -> Iterator[str | TurnEnd]:
-        kwargs = {"model": self._model, "messages": messages, "temperature": self._temperature, "stream": True}
+        kwargs = {
+            "model": self._model,
+            "messages": messages,
+            "temperature": self._temperature,
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        }
         if tools:
             kwargs["tools"] = tools
             if require_tool:
                 kwargs["tool_choice"] = "required"
         # Tool calls arrive in pieces across chunks, keyed by index: the id and
-        # name come once, the JSON arguments as string fragments.
+        # name come once, the JSON arguments as string fragments. The usage
+        # chunk (prompt/completion token counts) arrives last, on its own,
+        # with an empty choices list — captured before the empty-choices
+        # continue below, not instead of it.
         partial: dict[int, dict] = {}
+        usage = None
         for chunk in self._client.chat.completions.create(**kwargs):
+            if chunk.usage:
+                usage = {"prompt_tokens": chunk.usage.prompt_tokens, "completion_tokens": chunk.usage.completion_tokens}
             if not chunk.choices:
                 continue
             delta = chunk.choices[0].delta
@@ -96,4 +114,4 @@ class OpenAIProvider:
             except json.JSONDecodeError:
                 arguments = {}
             calls.append(ToolCall(id=slot["id"], name=slot["name"], arguments=arguments))
-        yield TurnEnd(tool_calls=calls)
+        yield TurnEnd(tool_calls=calls, usage=usage)
