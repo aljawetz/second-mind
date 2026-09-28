@@ -27,6 +27,8 @@ Every option used gpt-4o-mini and the same course search.
 | **E. Shipped chat (0.5 cutoff)** | D built into the app (`backend/chat.py`), with the fixes from this evaluation. Deployed. |
 | **F. Shipped chat, 0.4 cutoff** | Same as E, but with a lower search similarity cutoff. Tested to check the cutoff choice; not deployed. |
 
+**On the baseline.** Our Assignment 3 work evaluated a different project concept and isn't a meaningful comparison for Second Mind, so we used an alternative baseline permitted by the Sprint 5 rubric: A, the old chat, above.
+
 **Questions.** First set: 27 chats (34 questions) on 18-654 Software Testing & Operations. Held-out set: 26 chats (33 questions) on 18-654, 18-658 Software Requirements and Interaction Design, and Advanced AI for Industry & Society. Groups: course facts, concepts the course teaches, concepts not in the materials, trick questions (for example an assignment that doesn't exist), study help, and follow-up chats.
 
 ## Method
