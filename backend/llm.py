@@ -44,10 +44,25 @@ class LLMProvider(Protocol):
 
 
 class OpenAIProvider:
-    def __init__(self, model: str = generation.DEFAULT_MODEL, temperature: float = 0.1):
-        self._client = openai.OpenAI(api_key=generation._get_llm_key())
+    def __init__(self, model: str = generation.DEFAULT_MODEL, temperature: float = 0.1, api_key: str | None = None):
+        # api_key: for scripts run outside the app (the memory evaluation);
+        # the app always reads the Keychain.
+        self._client = openai.OpenAI(api_key=api_key or generation._get_llm_key())
         self._model = model
         self._temperature = temperature
+
+    def complete_json(self, messages: list[dict]) -> object:
+        """One non-streaming call in JSON mode, at temperature 0 — memory
+        extraction and consolidation (memory/extract.py's JsonLLM). The
+        reply parsed, or None if it isn't JSON after all: callers treat
+        anything unexpected as "nothing to do", never as an error."""
+        response = self._client.chat.completions.create(
+            model=self._model, messages=messages, temperature=0, response_format={"type": "json_object"}
+        )
+        try:
+            return json.loads(response.choices[0].message.content or "")
+        except json.JSONDecodeError:
+            return None
 
     def stream_chat(
         self, messages: list[dict], tools: list[dict] | None, require_tool: bool = False

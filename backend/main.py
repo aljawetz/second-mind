@@ -1,17 +1,21 @@
 """Sidecar backend — see docs/architecture/implementation-plan.md."""
 
 import errno
+import itertools
 import json
 import multiprocessing
 import os
 import re
 import signal
 import socketserver
+import sqlite3
 import sys
 import threading
 import traceback
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs
 
 import httpx
 import openai
@@ -21,13 +25,17 @@ from onnxruntime.capi.onnxruntime_pybind11_state import NoSuchFile as OnnxModelF
 import canvas
 import chat
 import config
+import conversations
 import course_sync
 import courses
 import explain
 import generation
 import indexing
 import llm
+import memory_jobs
 import sessions
+from memory import MemoryService, compress
+from memory.worker import MemoryWorker
 
 HOST = "127.0.0.1"
 # SM_PORT exists for tests/test_main_lifecycle.py only — the app always
@@ -67,6 +75,81 @@ SESSION_DETAIL_PATH = re.compile(r"^/courses/(\d+)/sessions/([\w-]+)$")
 SESSION_RENAME_PATH = re.compile(r"^/courses/(\d+)/sessions/([\w-]+)/rename$")
 SESSION_STOP_PATH = re.compile(r"^/sessions/([\w-]+)/stop$")
 SESSION_NOTES_PATH = re.compile(r"^/sessions/([\w-]+)/notes$")
+CONVERSATION_LIST_PATH = re.compile(r"^/courses/(\d+)/conversations$")
+CONVERSATION_DETAIL_PATH = re.compile(r"^/courses/(\d+)/conversations/([\w-]+)$")
+MEMORY_LIST_PATH = re.compile(r"^/courses/(\d+)/memories$")
+MEMORY_DETAIL_PATH = re.compile(r"^/courses/(\d+)/memories/([\w-]+)$")
+# Same shape as the route ids above, for ids that arrive in a request body
+# instead (/ask's conversation_id) and end up in a file path.
+SAFE_ID = re.compile(r"[\w-]+")
+
+
+def _memory_enabled() -> bool:
+    # Whether memory should be on by default is still open (agent memory
+    # design spec §12, for responsible-AI review); on for the prototype.
+    return config.read_config(SM_HOME).get("memory_enabled", True) is not False
+
+
+def _memory_service(course_id: int, provider=None, conversation_id: str | None = None) -> MemoryService:
+    """provider: the model memory writes need; reads and deletes don't.
+    conversation_id: the chat being answered, whose own summary recall skips."""
+    return MemoryService(
+        SM_HOME,
+        course_id,
+        llm=provider,
+        embed=memory_jobs.embed,
+        conversation_id=conversation_id,
+        # A forgotten memory's chats must not write it back from their
+        # running summaries (agent memory design spec §5.7).
+        on_forget=lambda cids: conversations.clear_summaries(SM_HOME, course_id, cids),
+    )
+
+
+def _run_memory_job(job: tuple[int, str | None]) -> None:
+    """(course, chat): read the chat's new turns, then sweep the course.
+    (course, None): just the sweep, which needs no model and so no key."""
+    course_id, cid = job
+    if not (SM_HOME / "courses" / str(course_id)).is_dir():
+        return
+    with _memory_service(course_id, llm.OpenAIProvider() if cid else None) as service:
+        if cid:
+            memory_jobs.observe_conversation(SM_HOME, course_id, cid, service)
+        # Fading (agent memory design spec §5.7): a scan of one course's
+        # memories, milliseconds, so after every job rather than every 20th.
+        service.sweep()
+
+
+# Memory writes (extraction, consolidation, fading) run here, after an
+# answer has streamed, never in its way (agent memory design spec §5.1).
+MEMORY_WORKER = MemoryWorker(_run_memory_job)
+
+
+def queue_startup_memory_jobs() -> None:
+    """At startup: turns saved but not yet read by memory when the app last
+    quit, then a sweep of every selected course."""
+    if not _memory_enabled():
+        return
+    selected = config.read_config(SM_HOME).get("selected_courses", [])
+    for job in memory_jobs.pending(SM_HOME, selected):
+        MEMORY_WORKER.submit(job)
+    for course_id in selected:
+        MEMORY_WORKER.submit((course_id, None))
+
+
+def _memory_json(m) -> dict:
+    def iso(t):
+        return t.isoformat() if t else None
+
+    return {
+        "id": m.id,
+        "kind": m.kind,
+        "text": m.text,
+        "importance": m.importance,
+        "event_time": iso(m.event_time),
+        "created_at": iso(m.created_at),
+        "valid_to": iso(m.valid_to),
+        "status": m.status,
+    }
 
 
 class ThreadingHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
@@ -118,26 +201,40 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        if self.path == "/ping":
+        path, _, query = self.path.partition("?")
+        if path == "/ping":
             self._send_json(200, {"status": "ok", "source": "sm-backend", "instance": INSTANCE_TOKEN})
-        elif self.path == "/courses":
+        elif path == "/courses":
             self._handle_list_courses()
-        elif self.path == "/credentials/status":
+        elif path == "/credentials/status":
             self._send_json(200, config.credentials_status())
-        elif self.path == "/config":
+        elif path == "/config":
             self._send_json(200, config.read_config(SM_HOME))
         else:
-            assignments_match = ASSIGNMENTS_PATH.match(self.path)
+            assignments_match = ASSIGNMENTS_PATH.match(path)
             if assignments_match:
                 self._handle_list_assignments(assignments_match.group(1))
                 return
-            list_match = SESSION_LIST_PATH.match(self.path)
+            list_match = SESSION_LIST_PATH.match(path)
             if list_match:
                 self._handle_list_sessions(list_match.group(1))
                 return
-            detail_match = SESSION_DETAIL_PATH.match(self.path)
+            detail_match = SESSION_DETAIL_PATH.match(path)
             if detail_match:
                 self._handle_session_detail(detail_match.group(1), detail_match.group(2))
+                return
+            conversation_list_match = CONVERSATION_LIST_PATH.match(path)
+            if conversation_list_match:
+                self._handle_list_conversations(conversation_list_match.group(1))
+                return
+            conversation_match = CONVERSATION_DETAIL_PATH.match(path)
+            if conversation_match:
+                self._handle_conversation_detail(conversation_match.group(1), conversation_match.group(2))
+                return
+            memory_list_match = MEMORY_LIST_PATH.match(path)
+            if memory_list_match:
+                include_inactive = parse_qs(query).get("include_inactive") == ["1"]
+                self._handle_list_memories(memory_list_match.group(1), include_inactive)
                 return
             self._send_json(404, {"error": {"code": "not_found", "message": "no such route"}})
 
@@ -161,6 +258,11 @@ class Handler(BaseHTTPRequestHandler):
                 return 402, {"error": {"code": "llm_quota_exceeded", "message": "OpenAI quota exceeded"}}
             return 429, {"error": {"code": "llm_rate_limited", "message": "OpenAI rate limit hit — try again shortly"}}
         return 503, {"error": {"code": "llm_unreachable", "message": "could not reach the LLM provider"}}  # openai.APIConnectionError
+
+    def _memory_error(self, e: sqlite3.Error) -> tuple[int, dict]:
+        if isinstance(e, sqlite3.OperationalError):
+            return 503, {"error": {"code": "memory_busy", "message": "memory store is busy, try again shortly"}}
+        return 500, {"error": {"code": "memory_error", "message": "memory store could not be read"}}
 
     def _course_selected(self, course_id: int) -> bool:
         # Real not_found gap (implementation-plan.md Step 13): Canvas
@@ -310,6 +412,14 @@ class Handler(BaseHTTPRequestHandler):
         if detail_match:
             self._handle_session_delete(detail_match.group(1), detail_match.group(2))
             return
+        conversation_match = CONVERSATION_DETAIL_PATH.match(self.path)
+        if conversation_match:
+            self._handle_conversation_delete(conversation_match.group(1), conversation_match.group(2))
+            return
+        memory_match = MEMORY_DETAIL_PATH.match(self.path)
+        if memory_match:
+            self._handle_memory_delete(memory_match.group(1), memory_match.group(2))
+            return
         course_match = COURSE_PATH.match(self.path)
         if course_match:
             self._handle_delete_course(course_match.group(1))
@@ -391,6 +501,69 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send_json(200, {"status": "deleted"})
 
+    def _handle_list_conversations(self, course_id: str):
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        self._send_json(200, {"conversations": conversations.list_conversations(SM_HOME, int(course_id))})
+
+    def _handle_conversation_detail(self, course_id: str, cid: str):
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        conversation = conversations.get_conversation(SM_HOME, int(course_id), cid)
+        if conversation is None:
+            self._not_found("no such conversation")
+            return
+        self._send_json(200, conversation)
+
+    def _handle_conversation_delete(self, course_id: str, cid: str):
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        try:
+            conversations.delete_conversation(SM_HOME, int(course_id), cid)
+        except KeyError:
+            self._not_found("no such conversation")
+            return
+        # What memory learned only from this chat goes with it (agent memory
+        # design spec §5.7). A job still reading it cleans up after itself
+        # (memory_jobs.observe_conversation).
+        try:
+            with _memory_service(int(course_id)) as service:
+                service.forget_conversation(cid)
+        except sqlite3.Error as e:
+            self._send_json(*self._memory_error(e))
+            return
+        self._send_json(200, {"status": "deleted"})
+
+    def _handle_list_memories(self, course_id: str, include_inactive: bool):
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        try:
+            with _memory_service(int(course_id)) as service:
+                memories = [_memory_json(m) for m in service.list(include_inactive)]
+        except sqlite3.Error as e:
+            self._send_json(*self._memory_error(e))
+            return
+        self._send_json(200, {"memories": memories})
+
+    def _handle_memory_delete(self, course_id: str, memory_id: str):
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        try:
+            with _memory_service(int(course_id)) as service:
+                deleted = service.forget([memory_id])
+        except sqlite3.Error as e:
+            self._send_json(*self._memory_error(e))
+            return
+        if not deleted:
+            self._not_found("no such memory")
+            return
+        self._send_json(200, {"status": "deleted"})
+
     def _write_chunk(self, payload: dict):
         # Manual chunked transfer encoding — verified against a real client
         # (implementation-plan.md Step 9) to deliver each line as soon as
@@ -416,45 +589,127 @@ class Handler(BaseHTTPRequestHandler):
         if not question:
             self._send_json(400, {"error": {"code": "bad_request", "message": "question is required"}})
             return
-        try:
-            history = chat.parse_history(data.get("history"))
-        except ValueError as e:
-            self._send_json(400, {"error": {"code": "bad_request", "message": str(e)}})
-            return
+        cid = data.get("conversation_id")
+        summary = ""
+        continuing_conversation = cid is not None
+        memory_on = _memory_enabled()
+        if cid is None:
+            cid = conversations.new_conversation_id()
+            try:
+                history = chat.parse_history(data.get("history"))
+            except ValueError as e:
+                self._send_json(400, {"error": {"code": "bad_request", "message": str(e)}})
+                return
+        else:
+            safe = isinstance(cid, str) and SAFE_ID.fullmatch(cid)
+            saved = conversations.get_conversation(SM_HOME, int(course_id), cid) if safe else None
+            if saved is None:
+                self._not_found("no such conversation")
+                return
+            # The saved chat, not the app's copy of it, which can be stale. A
+            # long one goes as its running summary plus its last few turns
+            # (agent memory design spec §5.6).
+            turns = [{"question": t["question"], "answer": t["answer"]} for t in saved["turns"]]
+            if memory_on:
+                compressed = compress.build_history(turns, saved["summary"], saved["memory_processed_upto"])
+                history, summary = compressed.turns, compressed.summary
+            else:
+                history, summary = turns, ""
         # No local copy of course names exists (config.json keeps ids only),
         # so the app sends the one it shows in the sidebar.
         course_name = str(data.get("course_name") or "this course")
-
-        # chat.answer() yields nothing until the model starts writing, so
-        # everything that can fail early (missing key, embedding model files,
-        # searching, the first model calls) fails here, before any response
-        # bytes, and still gets a clean status code.
+        asked_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        memory = None
         try:
+            # chat.answer() yields nothing until the model starts writing, so
+            # everything that can fail early (missing key, embedding model files,
+            # searching, the first model calls) fails here, before any response
+            # bytes, and still gets a clean status code.
             try:
-                index = indexing.load_index(SM_HOME / "index.lancedb", f"course_{course_id}")
-            except TableNotFoundError:
-                # Course not indexed yet: every search comes back empty and the
-                # model says it couldn't find anything, same as a real miss.
-                index = None
-            events = chat.answer(
-                question, history, course_name, chat.make_search(index, CHAT_SIMILARITY_CUTOFF), llm.OpenAIProvider()
+                try:
+                    index = indexing.load_index(SM_HOME / "index.lancedb", f"course_{course_id}")
+                except TableNotFoundError:
+                    # Course not indexed yet: every search comes back empty and the
+                    # model says it couldn't find anything, same as a real miss.
+                    index = None
+                provider = llm.OpenAIProvider()
+                memory = _memory_service(int(course_id), provider, conversation_id=cid) if memory_on else None
+                events = chat.answer(
+                    question,
+                    history,
+                    course_name,
+                    chat.make_search(index, CHAT_SIMILARITY_CUTOFF),
+                    provider,
+                    memory=memory,
+                    summary=summary,
+                )
+                first = next(events)
+            except OnnxModelFileMissing:
+                self._send_json(500, {"error": {"code": "model_files_missing", "message": "the local embedding model is missing or corrupted"}})
+                return
+            except sqlite3.Error as e:
+                self._send_json(*self._memory_error(e))
+                return
+            except (RuntimeError, openai.AuthenticationError, openai.RateLimitError, openai.APIConnectionError) as e:
+                self._send_json(*self._llm_error(e))
+                return
+            self._stream_answer(
+                int(course_id),
+                cid,
+                question,
+                asked_at,
+                memory_on,
+                first,
+                events,
+                create_if_missing=not continuing_conversation,
             )
-            first = next(events)
-        except OnnxModelFileMissing:
-            self._send_json(500, {"error": {"code": "model_files_missing", "message": "the local embedding model is missing or corrupted"}})
-            return
-        except (RuntimeError, openai.AuthenticationError, openai.RateLimitError, openai.APIConnectionError) as e:
-            self._send_json(*self._llm_error(e))
-            return
+        finally:
+            if memory is not None:
+                memory.close()
 
+    def _stream_answer(
+        self,
+        course_id: int,
+        cid: str,
+        question: str,
+        asked_at: str,
+        memory_on: bool,
+        first: dict,
+        events,
+        *,
+        create_if_missing: bool,
+    ):
+        """Streams chat.answer's events, the first one carrying the
+        conversation id. A finished answer is saved, and queued for memory,
+        before its "done" goes out: the app sends the next question with this
+        id as soon as it sees "done", and the chat must exist by then. An
+        answer that broke off is neither saved nor remembered."""
         self.send_response(200)
         self.send_header("Content-Type", "application/x-ndjson")
         self.send_header("Transfer-Encoding", "chunked")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
+        answer_parts: list[str] = []
+        final: dict = {}
         try:
-            self._write_chunk(first)
-            for event in events:
+            for event in itertools.chain([{**first, "conversation_id": cid}], events):
+                if "delta" in event:
+                    answer_parts.append(event["delta"])
+                if "citations" in event:
+                    final = event
+                if event.get("done"):
+                    turn = {
+                        "question": question,
+                        "answer": "".join(answer_parts),
+                        "citations": final.get("citations", []),
+                        "grounded": final.get("grounded", False),
+                        "asked_at": asked_at,
+                    }
+                    if conversations.append_turn(
+                        SM_HOME, course_id, cid, turn, create_if_missing=create_if_missing
+                    ):
+                        if memory_on:
+                            MEMORY_WORKER.submit((course_id, cid))
                 self._write_chunk(event)
         except (BrokenPipeError, ConnectionResetError):
             return  # the app closed the request (student navigated away)
@@ -594,4 +849,5 @@ if __name__ == "__main__":
             file=sys.stderr,
         )
         _exit_now(1)
+    queue_startup_memory_jobs()
     server.serve_forever()
