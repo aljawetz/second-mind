@@ -84,6 +84,8 @@ class MemoryService:
         they were said, if not now: the worker reads turns after a restart,
         and "last Tuesday" must count from when the student said it."""
         at = at or self._now()
+        if self._store.is_turn_blocked(conversation_id, turn_index):
+            return ObserveResult(summary, [], [])
         extraction = extract.extract(messages, at=at, summary=summary, llm=self._llm)
         decisions = [
             consolidate.consolidate(
@@ -123,6 +125,8 @@ class MemoryService:
         found = [m for m in (self._store.get(mid) for mid in dict.fromkeys(memory_ids)) if m is not None]
         if not found:
             return 0
+        for cid, turn_index in {(cid, ti) for m in found for cid, ti in m.provenance}:
+            self._store.block_forget_turn(cid, turn_index)
         chats = sorted({cid for m in found for cid, _ in m.provenance} | {m.conversation_id for m in found if m.conversation_id})
         doomed = {m.id for m in found}
         doomed |= {

@@ -27,6 +27,22 @@ def embed(text: str) -> list[float]:
     return _embedder.get_text_embedding(text)
 
 
+def _conversation_or_forget(
+    sm_home: Path, course_id: int, cid: str, service: MemoryService
+) -> dict | None:
+    c = conversations.get_conversation(sm_home, course_id, cid)
+    if c is None:
+        service.forget_conversation(cid)
+    return c
+
+
+def _summary_for_progress(summary_before: str, summary_now: str, extracted: str) -> str:
+    """Forget clears a chat's running summary; don't write the LLM's back."""
+    if summary_before and summary_now == "" and extracted:
+        return ""
+    return extracted
+
+
 def observe_conversation(sm_home: Path, course_id: int, cid: str, service: MemoryService) -> int:
     """Reads the turns of this chat memory hasn't read yet, one turn per
     call, each dated when it was asked. Progress is saved after every turn,
@@ -34,19 +50,31 @@ def observe_conversation(sm_home: Path, course_id: int, cid: str, service: Memor
     c = conversations.get_conversation(sm_home, course_id, cid)
     if c is None:
         return 0
-    start, summary = c["memory_processed_upto"], c["summary"]
+    start = c["memory_processed_upto"]
     turns = c["turns"][start:]
     for index, turn in enumerate(turns, start=start):
+        c = _conversation_or_forget(sm_home, course_id, cid, service)
+        if c is None:
+            return index - start
+        summary_before = c["summary"]
         messages = [{"role": "user", "content": turn["question"]}, {"role": "assistant", "content": turn["answer"]}]
         result = service.observe(
             messages,
             conversation_id=cid,
             turn_index=index,
-            summary=summary,
+            summary=summary_before,
             at=datetime.fromisoformat(turn["asked_at"]),
         )
-        summary = result.summary
-        conversations.set_memory_progress(sm_home, course_id, cid, processed_upto=index + 1, summary=summary)
+        c = _conversation_or_forget(sm_home, course_id, cid, service)
+        if c is None:
+            return index + 1 - start
+        conversations.set_memory_progress(
+            sm_home,
+            course_id,
+            cid,
+            processed_upto=index + 1,
+            summary=_summary_for_progress(summary_before, c["summary"], result.summary),
+        )
         # Deleted while this turn was being read: the delete's own cascade
         # may already have run, so forget what this turn added.
         if not conversations.exists(sm_home, course_id, cid):

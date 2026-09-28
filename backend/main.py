@@ -109,6 +109,8 @@ def _run_memory_job(job: tuple[int, str | None]) -> None:
     """(course, chat): read the chat's new turns, then sweep the course.
     (course, None): just the sweep, which needs no model and so no key."""
     course_id, cid = job
+    if not (SM_HOME / "courses" / str(course_id)).is_dir():
+        return
     with _memory_service(course_id, llm.OpenAIProvider() if cid else None) as service:
         if cid:
             memory_jobs.observe_conversation(SM_HOME, course_id, cid, service)
@@ -590,6 +592,7 @@ class Handler(BaseHTTPRequestHandler):
         cid = data.get("conversation_id")
         summary = ""
         continuing_conversation = cid is not None
+        memory_on = _memory_enabled()
         if cid is None:
             cid = conversations.new_conversation_id()
             try:
@@ -607,13 +610,15 @@ class Handler(BaseHTTPRequestHandler):
             # long one goes as its running summary plus its last few turns
             # (agent memory design spec §5.6).
             turns = [{"question": t["question"], "answer": t["answer"]} for t in saved["turns"]]
-            compressed = compress.build_history(turns, saved["summary"], saved["memory_processed_upto"])
-            history, summary = compressed.turns, compressed.summary
+            if memory_on:
+                compressed = compress.build_history(turns, saved["summary"], saved["memory_processed_upto"])
+                history, summary = compressed.turns, compressed.summary
+            else:
+                history, summary = turns, ""
         # No local copy of course names exists (config.json keeps ids only),
         # so the app sends the one it shows in the sidebar.
         course_name = str(data.get("course_name") or "this course")
         asked_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        memory_on = _memory_enabled()
         memory = None
         try:
             # chat.answer() yields nothing until the model starts writing, so

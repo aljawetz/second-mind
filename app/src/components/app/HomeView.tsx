@@ -113,13 +113,10 @@ export default function HomeView({
 
     const update = (patch: Partial<ChatTurn>) =>
       setTurns((prev) => prev.map((t, i) => (i === turnIndex ? { ...t, ...patch } : t)));
-    const conversationIdAtSend = conversationId;
 
+    let streamFailed = false;
     try {
       await askQuestion(courseId, courseName, question, history, conversationId, (event) => {
-        if (event.conversation_id) {
-          setConversationId(event.conversation_id);
-        }
         if (event.delta) {
           setTurns((prev) =>
             prev.map((t, i) => (i === turnIndex ? { ...t, answer: t.answer + event.delta, status: "streaming" } : t))
@@ -129,22 +126,22 @@ export default function HomeView({
           update({ citations: event.citations, grounded: !!event.grounded, memoriesUsed: event.memories_used ?? [] });
         }
         if (event.error) {
+          streamFailed = true;
           update({ status: "error", error: event.error });
-          // A new chat's id is sent before the turn is saved; drop it so the
-          // next question starts fresh instead of 404ing forever.
-          if (conversationIdAtSend === null) {
-            setConversationId(null);
-          }
         }
         if (event.done) {
-          setTurns((prev) => prev.map((t, i) => (i === turnIndex && t.status !== "error" ? { ...t, status: "done" } : t)));
+          if (!streamFailed && event.conversation_id) {
+            setConversationId(event.conversation_id);
+          }
+          setTurns((prev) =>
+            prev[turnIndex]?.status === "error"
+              ? prev
+              : prev.map((t, i) => (i === turnIndex ? { ...t, status: "done" } : t))
+          );
         }
       });
     } catch (err) {
       update({ status: "error", error: err instanceof Error ? err.message : "Something went wrong" });
-      if (conversationIdAtSend === null) {
-        setConversationId(null);
-      }
     }
   }
 

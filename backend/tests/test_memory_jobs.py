@@ -128,6 +128,32 @@ def test_a_missing_chat_reads_nothing(tmp_path, service_with):
     assert llm.calls == []
 
 
+def test_a_blocked_turn_is_not_re_extracted(tmp_path, service_with):
+    _save(tmp_path, "I'm auditing the course.", "2026-09-21T18:00:00Z")
+    llm = ScriptedLLM(_extraction("The student is auditing the course.", "S1"))
+    svc = service_with(llm)
+    svc._store.block_forget_turn(CID, 0)
+
+    assert memory_jobs.observe_conversation(tmp_path, COURSE, CID, svc) == 1
+
+    assert svc.list() == []
+    assert llm.calls == []
+
+
+def test_a_summary_cleared_by_forget_is_not_written_back(tmp_path, service_with):
+    _save(tmp_path, "I'm on team 4.", "2026-09-21T18:00:00Z")
+    _save(tmp_path, "Please use Java.", "2026-09-22T09:30:00Z")
+    conversations.set_memory_progress(tmp_path, COURSE, CID, processed_upto=1, summary="S1")
+    llm = ScriptedLLM(
+        _extraction("The student wants Java.", "S2"),
+        before_each=lambda: conversations.set_memory_progress(tmp_path, COURSE, CID, processed_upto=1, summary=""),
+    )
+
+    memory_jobs.observe_conversation(tmp_path, COURSE, CID, service_with(llm))
+
+    assert conversations.get_conversation(tmp_path, COURSE, CID)["summary"] == ""
+
+
 def test_pending_lists_unread_chats_across_the_selected_courses(tmp_path):
     _save(tmp_path, "q", "2026-09-21T18:00:00Z", cid="c-000000000001")
     _save(tmp_path, "q", "2026-09-21T18:00:00Z", cid="c-000000000002")

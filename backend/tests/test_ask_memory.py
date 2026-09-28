@@ -7,6 +7,7 @@ in for OpenAI. No network, no key."""
 import http.client
 import json
 import re
+import shutil
 import sqlite3
 import threading
 import zlib
@@ -238,6 +239,8 @@ def test_after_a_broken_first_turn_a_fresh_question_without_an_id_works(app):
 
 def test_deleting_a_chat_before_its_in_flight_turn_finishes_does_not_resurrect_it(app):
     cid = _say(app, "First turn.", answer="First answer.")[0]["conversation_id"]
+    assert main.MEMORY_WORKER.wait_idle(10)
+    json_before = len(app.model.json_calls)
     gate = threading.Event()
     held = threading.Event()
 
@@ -268,7 +271,7 @@ def test_deleting_a_chat_before_its_in_flight_turn_finishes_does_not_resurrect_i
     assert status == 200 and events[-1] == {"done": True}
     assert conversations.list_conversations(app.home, COURSE) == []
     assert main.MEMORY_WORKER.wait_idle(10)
-    assert app.model.json_calls == []
+    assert len(app.model.json_calls) == json_before
 
 
 def test_memory_store_errors_on_ask_return_json(app, monkeypatch):
@@ -295,6 +298,54 @@ def test_with_memory_switched_off_chats_are_saved_but_nothing_is_remembered(app)
     assert main.MEMORY_WORKER.wait_idle(10)
     assert app.model.json_calls == []
     assert conversations.get_conversation(app.home, COURSE, events[0]["conversation_id"])["memory_processed_upto"] == 0
+
+
+def test_with_memory_off_a_saved_chat_does_not_send_its_running_summary(app):
+    config.write_config(app.home, {"selected_courses": [COURSE], "memory_enabled": False})
+    cid = "c-000000000001"
+    for i in range(8):
+        turn = {
+            "question": f"Question {i}?",
+            "answer": f"Answer {i}.",
+            "citations": [],
+            "grounded": False,
+            "asked_at": "2026-09-21T18:00:00Z",
+        }
+        conversations.append_turn(app.home, COURSE, cid, turn)
+    conversations.set_memory_progress(app.home, COURSE, cid, processed_upto=8, summary="The student is auditing the course.")
+
+    app.model.chat_replies.append(["Noted."])
+    _ask(app, "Follow-up?", conversation_id=cid)
+
+    sent = app.model.chat_calls[-1]
+    assert "<summary>" not in sent[0]["content"]
+    assert [m["content"] for m in sent if m["role"] == "user"] == [
+        "Question 2?",
+        "Question 3?",
+        "Question 4?",
+        "Question 5?",
+        "Question 6?",
+        "Question 7?",
+        "Follow-up?",
+    ]
+
+
+def test_a_memory_job_does_not_recreate_a_deleted_course_directory(app):
+    turn = {
+        "question": "I'm on team 4.",
+        "answer": "Noted.",
+        "citations": [],
+        "grounded": False,
+        "asked_at": "2026-09-21T18:00:00Z",
+    }
+    conversations.append_turn(app.home, COURSE, "c-000000000001", turn)
+    course_dir = app.home / "courses" / str(COURSE)
+    assert course_dir.is_dir()
+    shutil.rmtree(course_dir)
+
+    main._run_memory_job((COURSE, "c-000000000001"))
+
+    assert not course_dir.exists()
 
 
 def test_a_memory_failure_never_reaches_the_answer(app):

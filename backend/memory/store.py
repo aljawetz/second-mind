@@ -12,7 +12,9 @@ can replay a dated semester.
 
 import re
 import sqlite3
+import sys
 import threading
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -60,6 +62,12 @@ CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(memory_id UNINDEXED, te
 -- Every lifecycle decision, for debugging and for the evaluation's failure
 -- analysis. reason is a label ("consolidation"), never memory text.
 CREATE TABLE IF NOT EXISTS ops_log (at TEXT NOT NULL, op TEXT NOT NULL, memory_id TEXT, reason TEXT NOT NULL);
+-- A turn the student forgot: the worker must not re-extract it (design spec §12).
+CREATE TABLE IF NOT EXISTS forget_turn (
+  conversation_id TEXT NOT NULL,
+  turn_index      INTEGER NOT NULL,
+  PRIMARY KEY (conversation_id, turn_index)
+);
 """
 
 # Words only. Quotes, NOT, *, : and - are FTS5 query syntax, and the
@@ -271,8 +279,31 @@ class MemoryStore:
             # data in its own right.
             self._conn.execute("DELETE FROM entity WHERE id NOT IN (SELECT entity_id FROM memory_entity)")
             self._log(at, "DELETE", None, reason)
+        self._wal_checkpoint_truncate()
+
+    def block_forget_turn(self, conversation_id: str, turn_index: int) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT OR IGNORE INTO forget_turn (conversation_id, turn_index) VALUES (?, ?)",
+                (conversation_id, turn_index),
+            )
+
+    def is_turn_blocked(self, conversation_id: str, turn_index: int) -> bool:
         with self._lock:
-            self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            row = self._conn.execute(
+                "SELECT 1 FROM forget_turn WHERE conversation_id = ? AND turn_index = ?",
+                (conversation_id, turn_index),
+            ).fetchone()
+            return row is not None
+
+    def _wal_checkpoint_truncate(self) -> None:
+        for attempt in range(8):
+            with self._lock:
+                busy, _, _ = self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+            if not busy:
+                return
+            time.sleep(0.05 * (attempt + 1))
+        print("memory store: wal_checkpoint(TRUNCATE) still busy after retries", file=sys.stderr)
 
     def touch(self, memory_ids: list[str], *, at: datetime) -> None:
         """Recall used these. Not logged: it happens on every question, and
