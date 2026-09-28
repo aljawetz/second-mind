@@ -115,6 +115,23 @@ class MemoryService:
     def list(self, include_inactive: bool = False) -> list[Memory]:
         return self._store.list_memories(include_inactive)
 
+    def update_text(self, memory_id: str, text: str) -> Memory | None:
+        """Student edit from Manage memories. Only current memories (active,
+        not superseded or invalidated) can change."""
+        memory = self._store.get(memory_id)
+        if memory is None:
+            return None
+        if memory.status != "active" or memory.valid_to is not None:
+            raise ValueError("inactive")
+        text = text.strip()
+        if not text:
+            raise ValueError("empty")
+        try:
+            self._store.revise(memory_id, text=text, embedding=self._embed(text), at=self._now(), reason="student edited")
+        except KeyError:
+            return None
+        return self._store.get(memory_id)
+
     def forget(self, memory_ids: list[str], reason: str = "student asked to forget") -> int:
         """Hard delete (design spec §5.7): gone from the files, not just
         hidden. Unknown ids are skipped. Returns how many were deleted.

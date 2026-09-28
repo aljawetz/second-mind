@@ -78,7 +78,9 @@ SESSION_NOTES_PATH = re.compile(r"^/sessions/([\w-]+)/notes$")
 CONVERSATION_LIST_PATH = re.compile(r"^/courses/(\d+)/conversations$")
 CONVERSATION_DETAIL_PATH = re.compile(r"^/courses/(\d+)/conversations/([\w-]+)$")
 MEMORY_LIST_PATH = re.compile(r"^/courses/(\d+)/memories$")
+MEMORY_ALL_PATH = re.compile(r"^/courses/(\d+)/memories/all$")
 MEMORY_DETAIL_PATH = re.compile(r"^/courses/(\d+)/memories/([\w-]+)$")
+MEMORY_EDIT_PATH = re.compile(r"^/courses/(\d+)/memories/([\w-]+)/edit$")
 # Same shape as the route ids above, for ids that arrive in a request body
 # instead (/ask's conversation_id) and end up in a file path.
 SAFE_ID = re.compile(r"[\w-]+")
@@ -134,6 +136,11 @@ def queue_startup_memory_jobs() -> None:
         MEMORY_WORKER.submit(job)
     for course_id in selected:
         MEMORY_WORKER.submit((course_id, None))
+
+
+def _parse_include_inactive(query: str) -> bool:
+    val = parse_qs(query).get("include_inactive", [""])[0].strip().lower()
+    return val in ("1", "true", "yes")
 
 
 def _memory_json(m) -> dict:
@@ -231,9 +238,13 @@ class Handler(BaseHTTPRequestHandler):
             if conversation_match:
                 self._handle_conversation_detail(conversation_match.group(1), conversation_match.group(2))
                 return
+            memory_all_match = MEMORY_ALL_PATH.match(path)
+            if memory_all_match:
+                self._handle_list_memories(memory_all_match.group(1), True)
+                return
             memory_list_match = MEMORY_LIST_PATH.match(path)
             if memory_list_match:
-                include_inactive = parse_qs(query).get("include_inactive") == ["1"]
+                include_inactive = _parse_include_inactive(query)
                 self._handle_list_memories(memory_list_match.group(1), include_inactive)
                 return
             self._send_json(404, {"error": {"code": "not_found", "message": "no such route"}})
@@ -338,7 +349,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(200, detail)
 
     def do_POST(self):
-        if self.path == "/config":
+        path, _, _ = self.path.partition("?")
+        if path == "/config":
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length)
             try:
@@ -353,7 +365,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200, merged)
             return
 
-        if self.path == "/credentials/validate":
+        if path == "/credentials/validate":
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length)
             try:
@@ -365,44 +377,49 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200, {"valid": valid, "reason": reason})
             return
 
-        unselect_match = UNSELECT_PATH.match(self.path)
+        unselect_match = UNSELECT_PATH.match(path)
         if unselect_match:
             self._handle_unselect(unselect_match.group(1))
             return
 
-        ask_match = ASK_PATH.match(self.path)
+        ask_match = ASK_PATH.match(path)
         if ask_match:
             self._handle_ask(ask_match.group(1))
             return
 
-        sync_match = SYNC_PATH.match(self.path)
+        sync_match = SYNC_PATH.match(path)
         if sync_match:
             self._handle_course_sync(sync_match.group(1))
             return
 
-        explain_match = EXPLAIN_PATH.match(self.path)
+        explain_match = EXPLAIN_PATH.match(path)
         if explain_match:
             self._handle_explain(explain_match.group(1), explain_match.group(2))
             return
 
-        session_start_match = SESSION_START_PATH.match(self.path)
+        session_start_match = SESSION_START_PATH.match(path)
         if session_start_match:
             self._handle_session_start(session_start_match.group(1))
             return
 
-        session_stop_match = SESSION_STOP_PATH.match(self.path)
+        session_stop_match = SESSION_STOP_PATH.match(path)
         if session_stop_match:
             self._handle_session_stop(session_stop_match.group(1))
             return
 
-        session_notes_match = SESSION_NOTES_PATH.match(self.path)
+        session_notes_match = SESSION_NOTES_PATH.match(path)
         if session_notes_match:
             self._handle_session_notes(session_notes_match.group(1))
             return
 
-        rename_match = SESSION_RENAME_PATH.match(self.path)
+        rename_match = SESSION_RENAME_PATH.match(path)
         if rename_match:
             self._handle_session_rename(rename_match.group(1), rename_match.group(2))
+            return
+
+        memory_edit_match = MEMORY_EDIT_PATH.match(path)
+        if memory_edit_match:
+            self._handle_memory_update(memory_edit_match.group(1), memory_edit_match.group(2))
             return
 
         self._send_json(404, {"error": {"code": "not_found", "message": "no such route"}})
@@ -563,6 +580,37 @@ class Handler(BaseHTTPRequestHandler):
             self._not_found("no such memory")
             return
         self._send_json(200, {"status": "deleted"})
+
+    def _handle_memory_update(self, course_id: str, memory_id: str):
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        length = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(length)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            self._send_json(400, {"error": {"code": "bad_request", "message": "invalid JSON"}})
+            return
+        text = data.get("text", "")
+        try:
+            with _memory_service(int(course_id)) as service:
+                updated = service.update_text(memory_id, text)
+        except ValueError as e:
+            if str(e) == "empty":
+                self._send_json(400, {"error": {"code": "bad_request", "message": "memory text cannot be empty"}})
+                return
+            if str(e) == "inactive":
+                self._send_json(409, {"error": {"code": "memory_inactive", "message": "only active memories can be edited"}})
+                return
+            raise
+        except sqlite3.Error as e:
+            self._send_json(*self._memory_error(e))
+            return
+        if updated is None:
+            self._not_found("no such memory")
+            return
+        self._send_json(200, {"memory": _memory_json(updated)})
 
     def _write_chunk(self, payload: dict):
         # Manual chunked transfer encoding — verified against a real client

@@ -96,8 +96,8 @@ def _request(app, method, path, body=None):
     return res.status, raw
 
 
-def _json(app, method, path):
-    status, raw = _request(app, method, path)
+def _json(app, method, path, body=None):
+    status, raw = _request(app, method, path, body)
     return status, json.loads(raw)
 
 
@@ -182,6 +182,54 @@ def test_memories_can_be_listed_and_deleted(app):
     assert _json(app, "DELETE", f"/courses/{COURSE}/memories/{m['id']}") == (200, {"status": "deleted"})
     assert _json(app, "DELETE", f"/courses/{COURSE}/memories/{m['id']}")[0] == 404
     assert _json(app, "GET", f"/courses/{COURSE}/memories?include_inactive=1") == (200, {"memories": []})
+
+
+def test_archived_memories_appear_when_include_inactive_is_set(app):
+    _remember_long_ago(app.home, "The student missed Class #2.")
+    main.queue_startup_memory_jobs()
+    assert main.MEMORY_WORKER.wait_idle(10)
+
+    assert _json(app, "GET", f"/courses/{COURSE}/memories") == (200, {"memories": []})
+    status, body = _json(app, "GET", f"/courses/{COURSE}/memories/all")
+    assert status == 200
+    assert len(body["memories"]) == 1
+    assert body["memories"][0]["status"] == "archived"
+
+
+def test_active_memories_can_be_edited(app):
+    _say(app, "I'm on team 4.", remembers="The student is on team 4.")
+    mid = _json(app, "GET", f"/courses/{COURSE}/memories")[1]["memories"][0]["id"]
+
+    status, body = _json(app, "POST", f"/courses/{COURSE}/memories/{mid}/edit", {"text": "The student is on team 5."})
+    assert status == 200
+    assert body["memory"]["text"] == "The student is on team 5."
+    assert _json(app, "GET", f"/courses/{COURSE}/memories")[1]["memories"][0]["text"] == "The student is on team 5."
+
+
+def test_archived_memories_cannot_be_edited(app):
+    _remember_long_ago(app.home, "The student missed Class #2.")
+    main.queue_startup_memory_jobs()
+    assert main.MEMORY_WORKER.wait_idle(10)
+    mid = _json(app, "GET", f"/courses/{COURSE}/memories?include_inactive=1")[1]["memories"][0]["id"]
+
+    status, body = _json(app, "POST", f"/courses/{COURSE}/memories/{mid}/edit", {"text": "Changed."})
+    assert status == 409
+    assert body["error"]["code"] == "memory_inactive"
+
+
+def test_memory_edit_rejects_empty_text(app):
+    _say(app, "I'm on team 4.", remembers="The student is on team 4.")
+    mid = _json(app, "GET", f"/courses/{COURSE}/memories")[1]["memories"][0]["id"]
+
+    status, body = _json(app, "POST", f"/courses/{COURSE}/memories/{mid}/edit", {"text": "   "})
+    assert status == 400
+    assert "empty" in body["error"]["message"].lower()
+
+
+def test_memory_edit_returns_not_found_for_unknown_id(app):
+    status, body = _json(app, "POST", f"/courses/{COURSE}/memories/m-000000000000/edit", {"text": "Nope."})
+    assert status == 404
+    assert body["error"]["code"] == "not_found"
 
 
 def test_chats_can_be_listed_read_and_deleted_taking_their_memories_along(app):

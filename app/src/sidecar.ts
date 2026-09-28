@@ -325,3 +325,48 @@ export async function unselectCourse(courseId: number): Promise<void> {
 export async function deleteCourse(courseId: number): Promise<void> {
   await fetch(`http://127.0.0.1:8756/courses/${courseId}`, { method: "DELETE" });
 }
+
+export interface CourseMemory {
+  id: string;
+  kind: string;
+  text: string;
+  importance: number;
+  event_time: string | null;
+  created_at: string | null;
+  valid_to: string | null;
+  status: string;
+}
+
+export async function listMemories(courseId: number, includeInactive = false): Promise<CourseMemory[]> {
+  const url = includeInactive
+    ? `http://127.0.0.1:8756/courses/${courseId}/memories/all`
+    : `http://127.0.0.1:8756/courses/${courseId}/memories`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `failed to list memories (${res.status})`);
+  }
+  return data.memories ?? [];
+}
+
+export async function updateMemory(courseId: number, memoryId: string, text: string): Promise<CourseMemory> {
+  // POST, not PATCH: Tauri's fetch builds a web Request() in WKWebView, which
+  // rejects PATCH with "The string did not match the expected pattern."
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/memories/${memoryId}/edit`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `failed to update memory (${res.status})`);
+  }
+  return data.memory;
+}
+
+export async function deleteMemory(courseId: number, memoryId: string): Promise<void> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/memories/${memoryId}`, { method: "DELETE" });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `failed to delete memory (${res.status})`);
+  }
+}
