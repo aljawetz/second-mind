@@ -45,6 +45,38 @@ export async function getCredentialsStatus(): Promise<CredentialsStatus> {
   return res.json();
 }
 
+// Sign in with GitHub for the Copilot provider (backend/github_signin.py,
+// OAuth device flow): start gets a code to show, then poll once every
+// `interval` seconds until it isn't "pending". On "done" the backend has
+// already put the token in the Keychain; it never comes through here.
+export interface GithubDeviceCode {
+  user_code: string;
+  verification_uri: string;
+  interval: number;
+  expires_in: number;
+}
+
+export interface GithubSignInPoll {
+  status: "pending" | "done" | "denied" | "expired" | "error";
+  interval?: number;
+  login?: string | null;
+  message?: string;
+}
+
+export async function startGithubSignIn(): Promise<GithubDeviceCode> {
+  const res = await fetch("http://127.0.0.1:8756/github/device/start", { method: "POST", body: "{}" });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `couldn't start GitHub sign-in (${res.status})`);
+  }
+  return data;
+}
+
+export async function pollGithubSignIn(): Promise<GithubSignInPoll> {
+  const res = await fetch("http://127.0.0.1:8756/github/device/poll", { method: "POST", body: "{}" });
+  return res.json();
+}
+
 // config.json (data-model.md §3) — non-sensitive settings persisted by
 // main.py at ~/.secondmind/config.json. Used at startup to skip onboarding for a
 // returning user (real credentials + a remembered course list already on

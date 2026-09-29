@@ -557,6 +557,15 @@ button{font:inherit;color:inherit}
 .model-provider-actions{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
 .model-provider-actions .btn-primary{width:auto;padding:.6rem 1.4rem}
 .form-ok{font-size:.78rem;color:var(--moss)}
+.field .btn-secondary{padding:.6rem 1rem}
+.link-btn{
+  align-self:flex-start;background:none;border:none;padding:0;cursor:pointer;
+  font-size:.74rem;color:var(--indigo);
+}
+.link-btn:hover{text-decoration:underline}
+.signin-code{display:flex;flex-direction:column;gap:.45rem;border:1px solid var(--line-strong);border-radius:12px;padding:.8rem}
+.signin-user-code{font-family:'IBM Plex Mono',monospace;font-size:1.3rem;font-weight:600;letter-spacing:.12em;color:var(--ink);user-select:all}
+.signin-actions{display:flex;gap:1rem}
 #view-manage-memories .course-pick .course-row{cursor:default}
 #view-manage-memories .course-pick .course-row:hover{border-color:var(--line)}
 .memory-edit-area{

@@ -430,6 +430,26 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200, merged)
             return
 
+        if path in ("/github/device/start", "/github/device/poll"):
+            # No body is used, but an unread one would be parsed as the
+            # next request on a kept-alive connection.
+            self.rfile.read(int(self.headers.get("Content-Length", 0)))
+
+        if path == "/github/device/start":
+            import github_signin
+
+            try:
+                self._send_json(200, github_signin.start())
+            except github_signin.SignInError as e:
+                self._send_json(503, {"error": {"code": "github_signin_unavailable", "message": str(e)}})
+            return
+
+        if path == "/github/device/poll":
+            import github_signin
+
+            self._send_json(200, github_signin.poll())
+            return
+
         if path == "/credentials/validate":
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length)
