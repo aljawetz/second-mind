@@ -1,9 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 
 // Backed by the macOS Keychain via the `keyring` Rust crate (lib.rs) — not a
-// config file. Python reads the same Keychain item independently when it
-// needs the credential for a real API call; there's no handoff between the
-// two, both just address the same OS-level store.
+// config file. Only the app touches the Keychain: it passes credentials to
+// the Python backend over the backend's stdin (backend/credentials.py), so
+// macOS asks about one program, not two.
 export type CredentialKey = "canvas-token" | "openai-key" | "deepseek-key" | "github-copilot-token";
 
 // Mirrors backend/providers.py: which model provider answers, chosen during

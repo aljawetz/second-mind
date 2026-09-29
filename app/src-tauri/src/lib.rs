@@ -1,15 +1,18 @@
-// Credential storage (implementation-plan.md Step 2): both Rust and Python
-// read/write the same macOS Keychain item directly via this service name —
-// no handoff between them, confirmed by a real cross-process test (an item
-// created by one process was read cleanly by a different one, no prompt).
-// Rust owns the onboarding UI's read/write; Python reads the same item
-// independently later when it needs the credential for a real API call.
+// Credential storage: this app is the only process that touches the macOS
+// Keychain. The backend used to read the same items itself, which made macOS
+// ask about two programs — and "Always Allow" for an ad-hoc signed program
+// only lasts until it's rebuilt, so students kept seeing prompts. Now the
+// backend gets every stored credential on stdin at launch and each change
+// after (backend/credentials.py), and hands back what it obtains itself
+// (Sign in with GitHub) as a CREDENTIAL_SAVE_PREFIX line on stdout.
 const CREDENTIAL_SERVICE: &str = "com.secondmind.app";
+// Every item the app keeps — credentials.ts's CredentialKey.
+const CREDENTIAL_KEYS: [&str; 4] = ["canvas-token", "openai-key", "deepseek-key", "github-copilot-token"];
+const CREDENTIAL_SAVE_PREFIX: &str = "sm-credential:";
 
-#[tauri::command]
-fn get_credential(key: String) -> Result<Option<String>, String> {
+fn read_credential(key: &str) -> Result<Option<String>, String> {
     use keyring::v1::Entry;
-    let entry = Entry::new(CREDENTIAL_SERVICE, &key).map_err(|e| e.to_string())?;
+    let entry = Entry::new(CREDENTIAL_SERVICE, key).map_err(|e| e.to_string())?;
     match entry.get_password() {
         Ok(value) => Ok(Some(value)),
         Err(keyring::v1::Error::NoEntry) => Ok(None),
@@ -17,11 +20,37 @@ fn get_credential(key: String) -> Result<Option<String>, String> {
     }
 }
 
-#[tauri::command]
-fn set_credential(key: String, value: String) -> Result<(), String> {
+fn save_credential(key: &str, value: &str) -> Result<(), String> {
     use keyring::v1::Entry;
-    let entry = Entry::new(CREDENTIAL_SERVICE, &key).map_err(|e| e.to_string())?;
-    entry.set_password(&value).map_err(|e| e.to_string())
+    let entry = Entry::new(CREDENTIAL_SERVICE, key).map_err(|e| e.to_string())?;
+    entry.set_password(value).map_err(|e| e.to_string())
+}
+
+// A line the backend printed after CREDENTIAL_SAVE_PREFIX: {key: value}.
+// Only known keys are saved, and nothing here logs a value.
+fn save_credentials_from_backend(json: &str) {
+    let Ok(update) = serde_json::from_str::<std::collections::HashMap<String, String>>(json) else {
+        eprintln!("[credentials] ignored a malformed save request from the backend");
+        return;
+    };
+    for (key, value) in update {
+        if !CREDENTIAL_KEYS.contains(&key.as_str()) {
+            eprintln!("[credentials] ignored unknown credential '{key}' from the backend");
+        } else if let Err(e) = save_credential(&key, &value) {
+            eprintln!("[credentials] couldn't save '{key}' to the Keychain: {e}");
+        }
+    }
+}
+
+#[tauri::command]
+fn get_credential(key: String) -> Result<Option<String>, String> {
+    read_credential(&key)
+}
+
+#[tauri::command]
+fn set_credential(backend: tauri::State<Backend>, key: String, value: String) -> Result<(), String> {
+    save_credential(&key, &value)?;
+    backend.send_credentials(&[(key, value)].into_iter().collect())
 }
 
 // Held for the app's whole lifetime. Dropping the CommandChild closes the
@@ -32,8 +61,21 @@ fn set_credential(key: String, value: String) -> Result<(), String> {
 // (quit, crash, force quit), which is what stops the backend outliving
 // the app and holding port 8756 for the next launch.
 struct Backend {
-    _child: tauri_plugin_shell::process::CommandChild,
+    child: std::sync::Mutex<tauri_plugin_shell::process::CommandChild>,
     instance_token: String,
+}
+
+impl Backend {
+    // One JSON line on the backend's stdin (backend/credentials.py).
+    fn send_credentials(&self, credentials: &std::collections::HashMap<String, String>) -> Result<(), String> {
+        let mut line = serde_json::to_vec(credentials).map_err(|e| e.to_string())?;
+        line.push(b'\n');
+        self.child
+            .lock()
+            .map_err(|e| e.to_string())?
+            .write(&line)
+            .map_err(|e| format!("couldn't pass the credential to the backend: {e}"))
+    }
 }
 
 #[tauri::command]
@@ -102,20 +144,44 @@ pub fn run() {
                 .command(backend_path)
                 .env("SM_INSTANCE_TOKEN", &instance_token)
                 .env("SM_EXIT_ON_STDIN_EOF", "1")
+                .env("SM_CREDENTIALS_ON_STDIN", "1")
                 // Windows text I/O defaults to the ANSI code page, not UTF-8.
                 .env("PYTHONUTF8", "1")
                 .spawn()
                 .expect("failed to spawn sm-backend");
-            app.manage(Backend {
-                _child: child,
+            let backend = Backend {
+                child: std::sync::Mutex::new(child),
                 instance_token,
-            });
+            };
+
+            // The backend waits for this line before serving, so read the
+            // Keychain after spawning: its startup overlaps any prompt. A
+            // credential that can't be read is left out — the backend then
+            // reports it missing, as if never stored.
+            let stored = CREDENTIAL_KEYS
+                .iter()
+                .filter_map(|key| match read_credential(key) {
+                    Ok(value) => value.map(|v| (key.to_string(), v)),
+                    Err(e) => {
+                        eprintln!("[credentials] couldn't read '{key}' from the Keychain: {e}");
+                        None
+                    }
+                })
+                .collect();
+            if let Err(e) = backend.send_credentials(&stored) {
+                eprintln!("[credentials] {e}");
+            }
+            app.manage(backend);
 
             tauri::async_runtime::spawn(async move {
                 while let Some(event) = rx.recv().await {
                     match event {
                         CommandEvent::Stdout(line) => {
-                            println!("[backend] {}", String::from_utf8_lossy(&line));
+                            let line = String::from_utf8_lossy(&line);
+                            match line.strip_prefix(CREDENTIAL_SAVE_PREFIX) {
+                                Some(json) => save_credentials_from_backend(json.trim_end()),
+                                None => println!("[backend] {line}"),
+                            }
                         }
                         CommandEvent::Stderr(line) => {
                             eprintln!("[backend] {}", String::from_utf8_lossy(&line));

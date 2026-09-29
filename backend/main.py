@@ -22,6 +22,7 @@ import openai
 
 import canvas
 import config
+import credentials
 import providers
 
 HOST = "127.0.0.1"
@@ -977,12 +978,14 @@ def _exit_now(code: int) -> None:
 
 def _exit_when_app_closes() -> None:
     """The Tauri app holds the write end of our stdin for as long as it
-    runs and never writes to it, so EOF means the app is gone — quit,
-    crash, or force quit alike. Without this the backend outlived the app
-    and kept port 8756, and the next launch talked to the stale process."""
+    runs, so EOF means the app is gone — quit, crash, or force quit alike.
+    Without this the backend outlived the app and kept port 8756, and the
+    next launch talked to the stale process. The only thing the app writes
+    there is credential updates (credentials.py), one line each."""
     try:
-        while sys.stdin.buffer.read(4096):
-            pass
+        for line in sys.stdin.buffer:
+            if credentials.from_app():
+                credentials.receive(line)
     finally:
         _exit_now(0)
 
@@ -1003,6 +1006,11 @@ if __name__ == "__main__":
 
     # SIGTERM (which PyInstaller's bootloader forwards) exits the same way.
     signal.signal(signal.SIGTERM, lambda *_: _exit_now(0))
+
+    # The app writes every stored credential as the first stdin line;
+    # waiting for it means no request can see them missing.
+    if credentials.from_app() and sys.stdin is not None:
+        credentials.receive(sys.stdin.buffer.readline())
 
     if os.environ.get("SM_EXIT_ON_STDIN_EOF") == "1" and sys.stdin is not None:
         threading.Thread(target=_exit_when_app_closes, name="app-watchdog", daemon=True).start()

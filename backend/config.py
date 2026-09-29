@@ -2,16 +2,15 @@
 First real code for this file; only `main.py`'s startup-skip check and
 onboarding-completion write use it so far.
 
-Credentials themselves are never in here — only whether Keychain has them
-(credentials_status), read the same way canvas.py/providers.py already do.
+Credentials themselves are never in here — only whether the student has
+stored them (credentials_status), via credentials.py like canvas.py and
+providers.py.
 """
 
 import json
 from pathlib import Path
 
-import keyring
-
-CREDENTIAL_SERVICE = "com.secondmind.app"
+import credentials
 
 
 def config_path(sm_home: Path) -> Path:
@@ -53,6 +52,6 @@ def credentials_status(llm_credential: str) -> dict:
     """llm_credential: the Keychain item of the provider the student chose
     (providers.current().credential)."""
     return {
-        "canvas": bool(keyring.get_password(CREDENTIAL_SERVICE, "canvas-token")),
-        "llm": bool(keyring.get_password(CREDENTIAL_SERVICE, llm_credential)),
+        "canvas": bool(credentials.get("canvas-token")),
+        "llm": bool(credentials.get(llm_credential)),
     }

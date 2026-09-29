@@ -17,6 +17,7 @@ from copilot.session_events import (
 )
 
 import copilot_llm
+import credentials
 import llm
 import providers
 
@@ -253,7 +254,7 @@ def test_llama_llm_completes_through_copilot(monkeypatch):
 
 def test_current_provider_is_copilot_when_chosen(tmp_path, monkeypatch):
     monkeypatch.setattr(providers, "SM_HOME", tmp_path)
-    monkeypatch.setattr(providers.keyring, "get_password", lambda service, key: "github_pat_x")
+    monkeypatch.setattr(credentials, "get", lambda key: "github_pat_x")
     providers.config.write_config(tmp_path, {"llm_provider": "copilot"})
     assert isinstance(llm.current_provider(), copilot_llm.CopilotProvider)
     assert isinstance(providers.llama_llm(), copilot_llm.CopilotLLM)
@@ -261,6 +262,6 @@ def test_current_provider_is_copilot_when_chosen(tmp_path, monkeypatch):
 
 def test_current_provider_is_openai_compatible_otherwise(tmp_path, monkeypatch):
     monkeypatch.setattr(providers, "SM_HOME", tmp_path)
-    monkeypatch.setattr(providers.keyring, "get_password", lambda service, key: "sk-x" * 10)
+    monkeypatch.setattr(credentials, "get", lambda key: "sk-x" * 10)
     providers.config.write_config(tmp_path, {"llm_provider": "deepseek"})
     assert isinstance(llm.current_provider(), llm.OpenAIProvider)

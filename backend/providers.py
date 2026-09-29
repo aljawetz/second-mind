@@ -15,10 +15,10 @@ answer /credentials/status, and keeps the LlamaIndex stack out of that path.
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import keyring
 import openai
 
 import config
+import credentials
 
 SM_HOME = Path.home() / ".secondmind"  # set to the real value by main.py at startup; tests monkeypatch this directly
 
@@ -82,7 +82,7 @@ def current() -> Provider:
 
 
 def api_key(provider: Provider) -> str:
-    key = keyring.get_password(config.CREDENTIAL_SERVICE, provider.credential)
+    key = credentials.get(provider.credential)
     if not key:
         raise RuntimeError(f"no {provider.name} API key stored — onboarding hasn't completed")
     return key

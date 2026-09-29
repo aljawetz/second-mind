@@ -63,6 +63,11 @@ asks for consent rather than silently trusting an unrecognized signer. This is t
 category as step 1's Gatekeeper delay. A real user on a properly signed, notarized build (step 14)
 should see this at most once ever, the first time they save a credential; subsequent *reads* did
 not re-prompt even after a full app restart on the same (unrebuilt) binary.
+**Later change (2026-09-29):** in practice students still got repeated password prompts: Rust and
+Python were two programs to approve per item, and "Always Allow" for an ad-hoc signature is lost
+at every rebuild or update. Now only the app touches the Keychain and passes credentials to the
+backend over its stdin (`backend/credentials.py`), and builds are signed with a stable local
+certificate (`scripts/make-signing-cert.sh`) so one approval lasts.
 
 **Update — real `config.json` written for the first time, onboarding skipped for returning
 users** (a user-requested fixup, out of step sequence): a fresh app launch always re-ran the full
