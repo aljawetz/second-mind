@@ -34,7 +34,7 @@ was built into the app (`backend/chat.py`). It gave 28 good answers on the first
 29 on the held-out set (of 33), against 21 and 21 for the old chat, and it answered 13 of 14
 follow-ups correctly in every run. An indexing fix later raised the first set to 32 good and 0
 bad. We did not yet measure precision@k or a formal citation groundedness score. Concise report:
-[docs/evaluations/sprint-5-evaluation-report.md](../evaluations/sprint-5-evaluation-report.md).
+[docs/evaluations/sprint-5-deliverable.md](../evaluations/sprint-5-deliverable.md).
 Full working report: [docs/evaluations/2026-09-23-ask-modes/report.md](../evaluations/2026-09-23-ask-modes/report.md).
 
 **Earlier pre-validation.** Two pieces got a real pass in Sprint 4 while designing the
