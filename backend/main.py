@@ -22,6 +22,7 @@ import openai
 
 import canvas
 import config
+import providers
 
 HOST = "127.0.0.1"
 # SM_PORT exists for tests/test_main_lifecycle.py only — the app always
@@ -41,6 +42,13 @@ INSTANCE_TOKEN = os.environ.get("SM_INSTANCE_TOKEN", "")
 # oversight).
 SM_HOME = Path(os.environ.get("SM_HOME", str(Path.home() / ".secondmind")))
 canvas.SM_HOME = SM_HOME
+providers.SM_HOME = SM_HOME
+
+# Everything a model call can raise that _llm_error turns into a clean error:
+# RuntimeError is a missing key or an unknown provider in config.json;
+# openai.APIError covers OpenAI and DeepSeek (both through the openai SDK),
+# CopilotError GitHub Copilot.
+LLM_ERRORS = (RuntimeError, openai.APIError, providers.CopilotError)
 
 # Same value as generation.SIMILARITY_CUTOFF — kept here so /ping can be
 # served without importing generation (and its LlamaIndex stack) at startup.
@@ -126,7 +134,7 @@ def _run_memory_job(job: tuple[int, str | None]) -> None:
     course_id, cid = job
     if not (SM_HOME / "courses" / str(course_id)).is_dir():
         return
-    with _memory_service(course_id, llm.OpenAIProvider() if cid else None) as service:
+    with _memory_service(course_id, llm.current_provider() if cid else None) as service:
         if cid:
             memory_jobs.observe_conversation(SM_HOME, course_id, cid, service)
         # Fading (agent memory design spec §5.7): a scan of one course's
@@ -178,8 +186,9 @@ class ThreadingHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
 
 
 def validate_credential(kind: str, value: str) -> tuple[bool, str]:
-    """Format check only (Step 2) — not a real Canvas/OpenAI call yet (Step 3
-    upgrades this exact endpoint to do that, same interface)."""
+    """Format check only (Step 2) — not a real Canvas/model provider call yet
+    (Step 3 upgrades this exact endpoint to do that, same interface). kind is
+    "canvas" or a providers.PROVIDERS id."""
     value = value.strip()
     if not value:
         return False, "empty"
@@ -187,11 +196,21 @@ def validate_credential(kind: str, value: str) -> tuple[bool, str]:
         if len(value) < 20:
             return False, "too short for a Canvas API token"
         return True, ""
-    if kind == "openai":
+    if kind == providers.COPILOT.id:
+        if value.startswith("ghp_"):
+            return False, "classic tokens don't work with Copilot — create a fine-grained token with the Copilot Requests permission"
+        if not value.startswith(("github_pat_", "gho_", "ghu_")):
+            return False, "expected a fine-grained GitHub token (starts with 'github_pat_')"
+        if len(value) < 30:
+            return False, "too short for a GitHub token"
+        return True, ""
+    if kind in providers.PROVIDERS:
+        # OpenAI and DeepSeek keys share a shape.
+        name = providers.PROVIDERS[kind].name
         if not value.startswith("sk-"):
-            return False, "OpenAI keys start with 'sk-'"
+            return False, f"{name} keys start with 'sk-'"
         if len(value) < 20:
-            return False, "too short for an OpenAI API key"
+            return False, f"too short for a {name} API key"
         return True, ""
     return False, f"unknown credential kind '{kind}'"
 
@@ -224,7 +243,11 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/courses":
             self._handle_list_courses()
         elif path == "/credentials/status":
-            self._send_json(200, config.credentials_status())
+            try:
+                credential = providers.current().credential
+            except RuntimeError:
+                credential = providers.OPENAI.credential  # unknown provider: its key can't be there either
+            self._send_json(200, config.credentials_status(credential))
         elif path == "/config":
             self._send_json(200, config.read_config(SM_HOME))
         else:
@@ -272,13 +295,39 @@ class Handler(BaseHTTPRequestHandler):
     def _llm_error(self, e: Exception) -> tuple[int, dict]:
         if isinstance(e, RuntimeError):
             return 401, {"error": {"code": "llm_auth_failed", "message": str(e)}}
+        if isinstance(e, openai.APIConnectionError) or (isinstance(e, providers.CopilotError) and e.status == 503):
+            return 503, {"error": {"code": "llm_unreachable", "message": "could not reach the LLM provider"}}
+        try:
+            name = providers.current().name
+        except RuntimeError:
+            name = "The LLM provider"
+        if isinstance(e, providers.CopilotError):
+            # The runtime's own message is long and mostly headers; the
+            # terminal gets it whole, the student gets the short version.
+            print(f"[copilot] {e}", file=sys.stderr, flush=True)
+            codes = {401: "llm_auth_failed", 402: "llm_quota_exceeded", 429: "llm_rate_limited"}
+            missing_permission = "Copilot Requests" in str(e)
+            messages = {
+                401: "Your GitHub token is missing the Copilot Requests permission — create a new fine-grained token with it"
+                if missing_permission
+                else f"{name} token invalid, expired, or without a Copilot plan",
+                402: f"{name} premium requests used up",
+                429: f"{name} rate limit hit — try again shortly",
+            }
+            if e.status in codes:
+                return e.status, {"error": {"code": codes[e.status], "message": messages[e.status]}}
+            return 502, {"error": {"code": "llm_error", "message": f"{name} returned an error: {e}"}}
         if isinstance(e, openai.AuthenticationError):
-            return 401, {"error": {"code": "llm_auth_failed", "message": "OpenAI API key invalid or expired"}}
+            return 401, {"error": {"code": "llm_auth_failed", "message": f"{name} API key invalid or expired"}}
+        # OpenAI reports an empty balance as a 429 with insufficient_quota;
+        # DeepSeek as a 402.
+        if (isinstance(e, openai.RateLimitError) and e.code == "insufficient_quota") or (
+            isinstance(e, openai.APIStatusError) and e.status_code == 402
+        ):
+            return 402, {"error": {"code": "llm_quota_exceeded", "message": f"{name} quota exceeded"}}
         if isinstance(e, openai.RateLimitError):
-            if e.code == "insufficient_quota":
-                return 402, {"error": {"code": "llm_quota_exceeded", "message": "OpenAI quota exceeded"}}
-            return 429, {"error": {"code": "llm_rate_limited", "message": "OpenAI rate limit hit — try again shortly"}}
-        return 503, {"error": {"code": "llm_unreachable", "message": "could not reach the LLM provider"}}  # openai.APIConnectionError
+            return 429, {"error": {"code": "llm_rate_limited", "message": f"{name} rate limit hit — try again shortly"}}
+        return 502, {"error": {"code": "llm_error", "message": f"{name} returned an error: {e}"}}
 
     def _memory_error(self, e: sqlite3.Error) -> tuple[int, dict]:
         if isinstance(e, sqlite3.OperationalError):
@@ -724,7 +773,7 @@ class Handler(BaseHTTPRequestHandler):
                     # Course not indexed yet: every search comes back empty and the
                     # model says it couldn't find anything, same as a real miss.
                     index = None
-                provider = llm.OpenAIProvider()
+                provider = llm.current_provider()
                 memory = _memory_service(int(course_id), provider, conversation_id=cid) if memory_on else None
                 events = chat.answer(
                     question,
@@ -742,7 +791,7 @@ class Handler(BaseHTTPRequestHandler):
             except sqlite3.Error as e:
                 self._send_json(*self._memory_error(e))
                 return
-            except (RuntimeError, openai.AuthenticationError, openai.RateLimitError, openai.APIConnectionError) as e:
+            except LLM_ERRORS as e:
                 self._send_json(*self._llm_error(e))
                 return
             self._stream_answer(
@@ -812,8 +861,7 @@ class Handler(BaseHTTPRequestHandler):
             # search round, or the model connection dropping). The status line
             # is long gone, so the error travels as a stream event instead.
             traceback.print_exc()
-            llm_errors = (RuntimeError, openai.AuthenticationError, openai.RateLimitError, openai.APIConnectionError)
-            message = self._llm_error(e)[1]["error"]["message"] if isinstance(e, llm_errors) else "the answer was interrupted"
+            message = self._llm_error(e)[1]["error"]["message"] if isinstance(e, LLM_ERRORS) else "the answer was interrupted"
             self._write_chunk({"error": message})
             self._write_chunk({"done": True})
         self.wfile.write(b"0\r\n\r\n")
@@ -868,7 +916,7 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             breakdown = explain.build_breakdown(name, description_text)
-        except (RuntimeError, openai.AuthenticationError, openai.RateLimitError, openai.APIConnectionError) as e:
+        except LLM_ERRORS as e:
             self._send_json(*self._llm_error(e))
             return
 

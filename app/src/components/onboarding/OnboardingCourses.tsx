@@ -46,7 +46,7 @@ export default function OnboardingCourses({
     // with a visible error instead of silently continuing.
     const selectedIds = courses.filter((c) => c.checked).map((c) => c.id);
     try {
-      await writeConfig({ selected_courses: selectedIds, llm_provider: "openai", onboarding_complete: true });
+      await writeConfig({ selected_courses: selectedIds, onboarding_complete: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save your course selection");
       return;

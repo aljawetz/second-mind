@@ -98,7 +98,11 @@ locally-owned metadata that Canvas doesn't provide — chiefly the weekly meetin
 }
 ```
 `llm_provider` names *which* provider the Keychain-stored key belongs to (so the backend knows
-which API shape to call) — never the key itself.
+which API shape to call) — never the key itself. One of `openai`, `deepseek`, `copilot`
+(`backend/providers.py`); absent means `openai`, for configs written before there was a choice.
+Each provider's key is its own Keychain item (`openai-key`, `deepseek-key`,
+`github-copilot-token`), so switching doesn't lose the other keys, and `/credentials/status`
+reports `{canvas, llm}` — `llm` for the chosen provider's key.
 
 `selected_courses` is what `unselect`/`DELETE` ([overview.md](overview.md) §2) actually mutate.
 Unselecting a course removes its ID from this array only — `courses/<id>/` stays on disk

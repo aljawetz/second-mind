@@ -29,10 +29,10 @@ from pathlib import Path
 
 from faster_whisper import WhisperModel
 from llama_index.core.prompts import PromptTemplate
-from llama_index.llms.openai import OpenAI
 
 import generation
 import indexing
+import providers
 
 MODEL_DIR = Path(__file__).parent / "models" / "faster-whisper-base"
 
@@ -187,7 +187,7 @@ def _process_session(session_id: str, audio_path: Path, db_path: Path) -> None:
 
 
 def _enhance_notes(transcript_text: str) -> str:
-    llm = OpenAI(model=generation.DEFAULT_MODEL, api_key=generation._get_llm_key())
+    llm = providers.llama_llm()
     return str(llm.complete(SUMMARY_TEMPLATE.format(transcript=transcript_text)))
 
 

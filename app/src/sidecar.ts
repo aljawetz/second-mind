@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { fetch } from "@tauri-apps/plugin-http";
+import type { LlmProvider } from "./credentials";
 
 // Routed through the Rust backend via IPC, not the webview's own fetch:
 // WKWebView blocks a plain fetch() to http://127.0.0.1 from this app's
@@ -17,9 +18,9 @@ export function getBackendInstanceToken(): Promise<string> {
   return invoke("backend_instance_token");
 }
 
-export type CredentialKind = "canvas" | "openai";
+export type CredentialKind = "canvas" | LlmProvider;
 
-// Format check only (Step 2) — not a real Canvas/OpenAI call yet. Step 3
+// Format check only (Step 2) — not a real Canvas/model provider call yet. Step 3
 // upgrades main.py's handler for this same endpoint to do that; the
 // frontend's interface here doesn't need to change when it does.
 export async function validateCredential(
@@ -33,9 +34,10 @@ export async function validateCredential(
   return res.json();
 }
 
+// llm: whether the key for the provider config.json names is stored.
 export interface CredentialsStatus {
   canvas: boolean;
-  openai: boolean;
+  llm: boolean;
 }
 
 export async function getCredentialsStatus(): Promise<CredentialsStatus> {
@@ -49,7 +51,7 @@ export async function getCredentialsStatus(): Promise<CredentialsStatus> {
 // disk) instead of always starting fresh.
 export interface SsbConfig {
   selected_courses?: number[];
-  llm_provider?: string;
+  llm_provider?: LlmProvider;
   onboarding_complete?: boolean;
   canvas_base_url?: string;
 }

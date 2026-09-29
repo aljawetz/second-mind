@@ -6,18 +6,16 @@ chat format (role/content/tool_calls/tool_call_id, JSON-schema tools) as the
 shared shape, since every major provider maps onto it; a provider for
 another vendor translates to and from that shape inside its own class.
 
-Only OpenAI exists today. generation.py, explain.py and sessions.py still
-build their own llama_index OpenAI clients — moving them here is separate
-work.
+OpenAI and DeepSeek speak OpenAI's chat completions API themselves, so
+OpenAIProvider serves both; GitHub Copilot's translation lives in
+copilot_llm.CopilotProvider. current_provider() picks between them.
 """
 
 import json
 from dataclasses import dataclass, field
 from typing import Iterator, Protocol
 
-import openai
-
-import generation
+import providers
 
 
 @dataclass
@@ -32,7 +30,7 @@ class TurnEnd:
     """Last item a stream_chat() call yields: any tool calls the model made.
 
     usage: {"prompt_tokens", "completion_tokens"} when the provider reports
-    it (OpenAIProvider always does, via stream_options), else None — callers
+    it (OpenAIProvider does, via stream_options), else None — callers
     that cost a call (the ask-modes evaluation) skip it when None rather
     than assume zero."""
 
@@ -49,13 +47,28 @@ class LLMProvider(Protocol):
         ...
 
 
+def current_provider() -> LLMProvider:
+    """The provider the student chose at onboarding (providers.current())."""
+    provider = providers.current()
+    if provider.kind == "copilot":
+        import copilot_llm
+
+        return copilot_llm.CopilotProvider(provider)
+    return OpenAIProvider(provider)
+
+
 class OpenAIProvider:
-    def __init__(self, model: str = generation.DEFAULT_MODEL, temperature: float = 0.1, api_key: str | None = None):
+    """Any provider speaking OpenAI's chat completions API."""
+
+    def __init__(self, provider: providers.Provider | None = None, temperature: float = 0.1, api_key: str | None = None):
+        # provider: the student's choice (providers.current()) unless given.
         # api_key: for scripts run outside the app (the memory evaluation);
         # the app always reads the Keychain.
-        self._client = openai.OpenAI(api_key=api_key or generation._get_llm_key())
-        self._model = model
+        self._provider = provider or providers.current()
+        self._client = providers.openai_client(self._provider, api_key)
+        self._model = self._provider.model
         self._temperature = temperature
+        self._extra = {"extra_body": self._provider.extra_body} if self._provider.extra_body else {}
 
     def complete_json(self, messages: list[dict]) -> object:
         """One non-streaming call in JSON mode, at temperature 0 — memory
@@ -63,7 +76,7 @@ class OpenAIProvider:
         reply parsed, or None if it isn't JSON after all: callers treat
         anything unexpected as "nothing to do", never as an error."""
         response = self._client.chat.completions.create(
-            model=self._model, messages=messages, temperature=0, response_format={"type": "json_object"}
+            model=self._model, messages=messages, temperature=0, response_format={"type": "json_object"}, **self._extra
         )
         try:
             return json.loads(response.choices[0].message.content or "")
@@ -79,6 +92,7 @@ class OpenAIProvider:
             "temperature": self._temperature,
             "stream": True,
             "stream_options": {"include_usage": True},
+            **self._extra,
         }
         if tools:
             kwargs["tools"] = tools

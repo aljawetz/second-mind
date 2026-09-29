@@ -176,15 +176,18 @@ after it), not just via scripts.
 
 ## 5. Generation — where LLM provider calls happen
 
-**OpenAI only right now, not the pluggable multi-provider setup this section previously
-described.** `generation.py`, `explain.py`, and `sessions.py` each import
-`llama_index.llms.openai.OpenAI` directly and hardcode `DEFAULT_MODEL = "gpt-4o-mini"` — there's
-no `llama-index-llms-anthropic` dependency, and nothing reads `config.json`'s `llm_provider` back
-to select between providers (`OnboardingCourses.tsx` writes it as a static `"openai"` during
-onboarding, but no backend code ever reads it). The design intent — LlamaIndex's own multi-
-provider LLM abstraction, selected by `llm_provider` with the matching key pulled from Keychain —
-is still the plan, just not built; real multi-provider support is future work, not implemented
-despite `config.json` already carrying a field that implies it is. The system prompt is what
+**Three providers, chosen at onboarding (since 2026-09-29):** OpenAI (`gpt-4o-mini`), DeepSeek
+(`deepseek-flash`) and GitHub Copilot (the student's own Copilot plan, model `auto`).
+`config.json`'s `llm_provider` names the choice and each provider keeps its key in its own Keychain
+item; `providers.py` is the one place that turns that into clients, for chat and memory
+(`llm.current_provider()`) and for the LlamaIndex callers (`providers.llama_llm()` — explainer,
+session notes). DeepSeek speaks OpenAI's chat completions API, so it's a base URL plus a request
+field: thinking mode is turned off, because it ignores temperature and demands every earlier
+reply's reasoning back on tool-calling turns. Copilot has no such endpoint — `copilot_llm.py`
+drives the Copilot SDK's agent runtime instead: one session per model call, in "empty" mode with
+only our tools offered (declaration-only, so `chat.py` still runs them) and every permission
+refused, the conversation written out as one message since the runtime takes no transcript. No
+`tool_choice` there, so a required first search is an instruction, not a guarantee. The system prompt is what
 actually encodes the grounding rules from design spec §7 — answer-first, cite every factual claim,
 never blend in open-domain knowledge unless the (separately labeled) web-search path was
 explicitly used.

@@ -23,12 +23,18 @@ def test_write_creates_sm_home_if_missing(tmp_path: Path):
 
 def test_credentials_status_reports_missing_when_no_keyring_entry(monkeypatch):
     monkeypatch.setattr(config.keyring, "get_password", lambda service, key: None)
-    assert config.credentials_status() == {"canvas": False, "openai": False}
+    assert config.credentials_status("openai-key") == {"canvas": False, "llm": False}
 
 
 def test_credentials_status_reports_present(monkeypatch):
     monkeypatch.setattr(config.keyring, "get_password", lambda service, key: "some-value")
-    assert config.credentials_status() == {"canvas": True, "openai": True}
+    assert config.credentials_status("openai-key") == {"canvas": True, "llm": True}
+
+
+def test_credentials_status_checks_the_chosen_providers_key(monkeypatch):
+    stored = {"canvas-token": "t", "openai-key": "sk-openai"}
+    monkeypatch.setattr(config.keyring, "get_password", lambda service, key: stored.get(key))
+    assert config.credentials_status("deepseek-key") == {"canvas": True, "llm": False}
 
 
 def test_normalize_canvas_base_url_adds_scheme():

@@ -6,16 +6,14 @@ grounding rules: answer-first, cite every factual claim, never blend in
 open-domain knowledge.
 """
 
-import keyring
 from llama_index.core.base.base_retriever import BaseRetriever
 from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.core.prompts import PromptTemplate
 from llama_index.core.query_engine import CitationQueryEngine
 from llama_index.core.schema import NodeRelationship, NodeWithScore, QueryBundle
 from llama_index.core.vector_stores.utils import metadata_dict_to_node
-from llama_index.llms.openai import OpenAI
 
-CREDENTIAL_SERVICE = "com.secondmind.app"
+import providers
 
 # Shown when grounded=False (design spec §7: "if indexed material does not
 # support an answer, Second Mind says so rather than falling back to open-domain
@@ -57,12 +55,6 @@ SIMILARITY_CUTOFF = 0.5
 # weak match included, rather than fabricating an answer from it.
 FTS_TOP_K = 1
 
-# config.json (data-model.md §3) doesn't exist as real code yet — nothing
-# in this codebase reads/writes it (Step 2 only built Keychain
-# credentials). Hardcoded here deliberately rather than building config
-# file I/O this step doesn't otherwise need.
-DEFAULT_MODEL = "gpt-4o-mini"
-
 ANSWER_FIRST_TEMPLATE = PromptTemplate(
     "You are Second Mind, a study assistant. Answer the question directly and "
     "concisely using only the numbered sources below. Cite every "
@@ -75,13 +67,6 @@ ANSWER_FIRST_TEMPLATE = PromptTemplate(
     "Query: {query_str}\n"
     "Answer: "
 )
-
-
-def _get_llm_key() -> str:
-    key = keyring.get_password(CREDENTIAL_SERVICE, "openai-key")
-    if not key:
-        raise RuntimeError("no LLM API key stored — onboarding hasn't completed")
-    return key
 
 
 class HybridRetriever(BaseRetriever):
@@ -132,7 +117,7 @@ class HybridRetriever(BaseRetriever):
 
 
 def build_query_engine(index, streaming: bool = True) -> CitationQueryEngine:
-    llm = OpenAI(model=DEFAULT_MODEL, api_key=_get_llm_key())
+    llm = providers.llama_llm()
     return CitationQueryEngine.from_args(
         index,
         llm=llm,

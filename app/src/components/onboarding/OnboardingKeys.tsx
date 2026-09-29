@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getCredential, setCredential } from "../../credentials";
+import { getCredential, LLM_PROVIDERS, setCredential, type LlmProvider } from "../../credentials";
 import { getConfig, validateCredential, writeConfig } from "../../sidecar";
 import LogoMark from "../LogoMark";
 
@@ -10,47 +10,61 @@ import LogoMark from "../LogoMark";
 export default function OnboardingKeys({ onNext }: { onNext: (canvasUrl: string) => void }) {
   const [canvasUrl, setCanvasUrl] = useState("");
   const [canvasKey, setCanvasKey] = useState("");
-  const [openaiKey, setOpenaiKey] = useState("");
+  const [provider, setProvider] = useState<LlmProvider>("openai");
+  const [llmKey, setLlmKey] = useState("");
   const [canvasError, setCanvasError] = useState("");
-  const [openaiError, setOpenaiError] = useState("");
+  const [llmError, setLlmError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const providerInfo = LLM_PROVIDERS[provider];
 
   useEffect(() => {
-    Promise.all([getCredential("canvas-token"), getCredential("openai-key"), getConfig()]).then(
-      ([canvas, openai, cfg]) => {
-        if (canvas) setCanvasKey(canvas);
-        if (openai) setOpenaiKey(openai);
-        if (cfg.canvas_base_url) setCanvasUrl(cfg.canvas_base_url);
-        setLoaded(true);
-      }
-    );
+    Promise.all([getCredential("canvas-token"), getConfig()]).then(([canvas, cfg]) => {
+      if (canvas) setCanvasKey(canvas);
+      if (cfg.canvas_base_url) setCanvasUrl(cfg.canvas_base_url);
+      if (cfg.llm_provider && cfg.llm_provider in LLM_PROVIDERS) setProvider(cfg.llm_provider);
+      setLoaded(true);
+    });
   }, []);
 
+  // Each provider's key lives in its own Keychain item: show whichever one
+  // is already stored for the provider picked.
+  useEffect(() => {
+    let current = true;
+    setLlmKey("");
+    setLlmError("");
+    getCredential(LLM_PROVIDERS[provider].credential).then((key) => {
+      if (current && key) setLlmKey(key);
+    });
+    return () => {
+      current = false;
+    };
+  }, [provider]);
+
   const canProceed =
-    loaded && !submitting && canvasUrl.trim() !== "" && canvasKey.trim() !== "" && openaiKey.trim() !== "";
+    loaded && !submitting && canvasUrl.trim() !== "" && canvasKey.trim() !== "" && llmKey.trim() !== "";
 
   async function handleConnect() {
     setSubmitting(true);
     setCanvasError("");
-    setOpenaiError("");
+    setLlmError("");
 
-    const [canvasResult, openaiResult] = await Promise.all([
+    const [canvasResult, llmResult] = await Promise.all([
       validateCredential("canvas", canvasKey),
-      validateCredential("openai", openaiKey),
+      validateCredential(provider, llmKey),
     ]);
 
-    if (!canvasResult.valid || !openaiResult.valid) {
+    if (!canvasResult.valid || !llmResult.valid) {
       if (!canvasResult.valid) setCanvasError(canvasResult.reason);
-      if (!openaiResult.valid) setOpenaiError(openaiResult.reason);
+      if (!llmResult.valid) setLlmError(llmResult.reason);
       setSubmitting(false);
       return;
     }
 
     const [, , savedConfig] = await Promise.all([
       setCredential("canvas-token", canvasKey),
-      setCredential("openai-key", openaiKey),
-      writeConfig({ canvas_base_url: canvasUrl }),
+      setCredential(providerInfo.credential, llmKey),
+      writeConfig({ canvas_base_url: canvasUrl, llm_provider: provider }),
     ]);
     setSubmitting(false);
     onNext(savedConfig.canvas_base_url ?? canvasUrl);
@@ -97,17 +111,27 @@ export default function OnboardingKeys({ onNext }: { onNext: (canvasUrl: string)
           )}
         </div>
         <div className="field">
-          <label htmlFor="key-openai">OpenAI API key</label>
+          <label htmlFor="llm-provider">Model provider</label>
+          <select id="llm-provider" value={provider} onChange={(e) => setProvider(e.target.value as LlmProvider)}>
+            {(Object.keys(LLM_PROVIDERS) as LlmProvider[]).map((id) => (
+              <option key={id} value={id}>
+                {LLM_PROVIDERS[id].name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="key-llm">{providerInfo.keyLabel}</label>
           <input
             type="password"
-            id="key-openai"
-            value={openaiKey}
-            onChange={(e) => setOpenaiKey(e.target.value)}
+            id="key-llm"
+            value={llmKey}
+            onChange={(e) => setLlmKey(e.target.value)}
           />
-          {openaiError ? (
-            <span className="field-error">{openaiError}</span>
+          {llmError ? (
+            <span className="field-error">{llmError}</span>
           ) : (
-            <span className="hint">platform.openai.com/api-keys</span>
+            <span className="hint">{providerInfo.keyHint}</span>
           )}
         </div>
         <button className="btn-primary" disabled={!canProceed} onClick={handleConnect}>
