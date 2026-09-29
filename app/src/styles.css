@@ -552,6 +552,11 @@ button{font:inherit;color:inherit}
 .manage-actions .icon-btn-danger{border-color:var(--danger-ink)}
 .manage-confirm{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;min-width:0}
 .manage-memories-intro{margin:.5rem 0 1rem}
+.model-provider-form{display:flex;flex-direction:column;gap:1rem;max-width:30rem}
+.model-provider-form .section-label{margin-bottom:0}
+.model-provider-actions{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.model-provider-actions .btn-primary{width:auto;padding:.6rem 1.4rem}
+.form-ok{font-size:.78rem;color:var(--moss)}
 #view-manage-memories .course-pick .course-row{cursor:default}
 #view-manage-memories .course-pick .course-row:hover{border-color:var(--line)}
 .memory-edit-area{

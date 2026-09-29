@@ -8,6 +8,7 @@ export type ViewName =
   | "sessionDetail"
   | "manageCourses"
   | "manageMemories"
+  | "modelProvider"
   | "indexingCourse";
 
 export type OnboardStage = "startup" | "keys" | "courses" | "indexing" | "app";

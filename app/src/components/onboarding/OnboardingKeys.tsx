@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { getCredential, LLM_PROVIDERS, setCredential, type LlmProvider } from "../../credentials";
+import { getCredential, LLM_PROVIDERS, setCredential } from "../../credentials";
 import { getConfig, validateCredential, writeConfig } from "../../sidecar";
 import LogoMark from "../LogoMark";
+import ProviderKeyFields, { useProviderKey } from "../ProviderKeyFields";
 
 // canvasUrl comes back from onNext already normalized (config.py's
 // normalize_canvas_base_url, applied server-side on write) rather than
@@ -10,44 +11,27 @@ import LogoMark from "../LogoMark";
 export default function OnboardingKeys({ onNext }: { onNext: (canvasUrl: string) => void }) {
   const [canvasUrl, setCanvasUrl] = useState("");
   const [canvasKey, setCanvasKey] = useState("");
-  const [provider, setProvider] = useState<LlmProvider>("openai");
-  const [llmKey, setLlmKey] = useState("");
+  const llm = useProviderKey();
+  const { provider, key: llmKey } = llm;
   const [canvasError, setCanvasError] = useState("");
-  const [llmError, setLlmError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const providerInfo = LLM_PROVIDERS[provider];
 
   useEffect(() => {
     Promise.all([getCredential("canvas-token"), getConfig()]).then(([canvas, cfg]) => {
       if (canvas) setCanvasKey(canvas);
       if (cfg.canvas_base_url) setCanvasUrl(cfg.canvas_base_url);
-      if (cfg.llm_provider && cfg.llm_provider in LLM_PROVIDERS) setProvider(cfg.llm_provider);
       setLoaded(true);
     });
   }, []);
 
-  // Each provider's key lives in its own Keychain item: show whichever one
-  // is already stored for the provider picked.
-  useEffect(() => {
-    let current = true;
-    setLlmKey("");
-    setLlmError("");
-    getCredential(LLM_PROVIDERS[provider].credential).then((key) => {
-      if (current && key) setLlmKey(key);
-    });
-    return () => {
-      current = false;
-    };
-  }, [provider]);
-
   const canProceed =
-    loaded && !submitting && canvasUrl.trim() !== "" && canvasKey.trim() !== "" && llmKey.trim() !== "";
+    loaded && llm.loaded && !submitting && canvasUrl.trim() !== "" && canvasKey.trim() !== "" && llmKey.trim() !== "";
 
   async function handleConnect() {
     setSubmitting(true);
     setCanvasError("");
-    setLlmError("");
+    llm.setError("");
 
     const [canvasResult, llmResult] = await Promise.all([
       validateCredential("canvas", canvasKey),
@@ -56,14 +40,14 @@ export default function OnboardingKeys({ onNext }: { onNext: (canvasUrl: string)
 
     if (!canvasResult.valid || !llmResult.valid) {
       if (!canvasResult.valid) setCanvasError(canvasResult.reason);
-      if (!llmResult.valid) setLlmError(llmResult.reason);
+      if (!llmResult.valid) llm.setError(llmResult.reason);
       setSubmitting(false);
       return;
     }
 
     const [, , savedConfig] = await Promise.all([
       setCredential("canvas-token", canvasKey),
-      setCredential(providerInfo.credential, llmKey),
+      setCredential(LLM_PROVIDERS[provider].credential, llmKey),
       writeConfig({ canvas_base_url: canvasUrl, llm_provider: provider }),
     ]);
     setSubmitting(false);
@@ -110,30 +94,7 @@ export default function OnboardingKeys({ onNext }: { onNext: (canvasUrl: string)
             <span className="hint">Your Canvas → Account → Settings → New access token</span>
           )}
         </div>
-        <div className="field">
-          <label htmlFor="llm-provider">Model provider</label>
-          <select id="llm-provider" value={provider} onChange={(e) => setProvider(e.target.value as LlmProvider)}>
-            {(Object.keys(LLM_PROVIDERS) as LlmProvider[]).map((id) => (
-              <option key={id} value={id}>
-                {LLM_PROVIDERS[id].name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="key-llm">{providerInfo.keyLabel}</label>
-          <input
-            type="password"
-            id="key-llm"
-            value={llmKey}
-            onChange={(e) => setLlmKey(e.target.value)}
-          />
-          {llmError ? (
-            <span className="field-error">{llmError}</span>
-          ) : (
-            <span className="hint">{providerInfo.keyHint}</span>
-          )}
-        </div>
+        <ProviderKeyFields state={llm} />
         <button className="btn-primary" disabled={!canProceed} onClick={handleConnect}>
           {submitting ? "Connecting…" : "Connect →"}
         </button>

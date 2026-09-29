@@ -13,6 +13,7 @@ export default function Sidebar({
   activeSessionId,
   onOpenSession,
   onManageCourses,
+  onModelProvider,
 }: {
   courses: AvailableCourse[];
   activeCourseId: number;
@@ -22,6 +23,7 @@ export default function Sidebar({
   activeSessionId: string | null;
   onOpenSession: (id: string) => void;
   onManageCourses: () => void;
+  onModelProvider: () => void;
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
@@ -110,6 +112,16 @@ export default function Sidebar({
                 }}
               >
                 Manage courses
+              </button>
+              <button
+                className="settings-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  setSettingsOpen(false);
+                  onModelProvider();
+                }}
+              >
+                Model provider
               </button>
             </div>
           )}
