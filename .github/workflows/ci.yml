@@ -64,6 +64,10 @@ jobs:
 
       - name: Install dependencies
         working-directory: backend
+        # Copy instead of hardlink from the uv cache: nltk's pathsec refuses
+        # files with st_nlink > 1 when it loads its bundled stopwords.
+        env:
+          UV_LINK_MODE: copy
         run: uv sync --all-groups
 
       - name: Generate the embedding model
