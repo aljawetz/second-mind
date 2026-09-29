@@ -30,6 +30,9 @@ uv sync --all-groups   # or at minimum --group test
 uv run pytest tests/ -v
 ```
 
+Subprocess lifecycle tests (`tests/test_main_lifecycle.py`) are marked `integration`; CI runs them on
+pushes to `main` only. Locally: `uv run pytest tests/ -m integration`.
+
 The Canvas tests (`tests/test_canvas.py`) replay real captured fixtures — no live Canvas access
 needed. The embedding tests (`tests/test_embeddings.py`) skip cleanly with a clear reason until
 you've generated the model (next section).

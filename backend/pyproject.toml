@@ -45,3 +45,6 @@ convert = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+markers = [
+    "integration: subprocess lifecycle tests against real main.py",
+]
