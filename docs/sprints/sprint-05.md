@@ -28,7 +28,16 @@ the metrics to evaluate against.
 
 ## What we did
 
-Not started, but two pieces got a real pre-validation pass in Sprint 4 while designing the
+**Evaluation.** We compared the old chat (the baseline) against three designs where the model
+decides when to search, on 67 questions across three real courses, graded blind. The best design
+was built into the app (`backend/chat.py`). It gave 28 good answers on the first set (of 34) and
+29 on the held-out set (of 33), against 21 and 21 for the old chat, and it answered 13 of 14
+follow-ups correctly in every run. An indexing fix later raised the first set to 32 good and 0
+bad. We did not yet measure precision@k or a formal citation groundedness score. Concise report:
+[docs/evaluations/sprint-5-deliverable.md](../evaluations/sprint-5-deliverable.md).
+Full working report: [docs/evaluations/2026-09-23-ask-modes/report.md](../evaluations/2026-09-23-ask-modes/report.md).
+
+**Earlier pre-validation.** Two pieces got a real pass in Sprint 4 while designing the
 architecture, not just planned on paper:
 
 - **Retrieval smoke test.** Indexed real Sprint-3 tiered-extraction content into an actual
@@ -42,5 +51,5 @@ architecture, not just planned on paper:
   accents, room acoustics) is still untested — the synthetic sample was clean, single-voice
   speech, which validates speed, not real-world accuracy.
 
-Generation (an LLM actually synthesizing a cited answer via `CitationQueryEngine`) is untested —
-no LLM API key was available to exercise it outside this sprint's own scope.
+Generation was untested at that point because no LLM API key was available. The evaluation above
+now exercises it with gpt-4o-mini.

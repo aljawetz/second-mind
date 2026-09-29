@@ -1,0 +1,6 @@
+# Raw model answers quote course material (slides, staff names and emails).
+# Kept local; results-grades.json and heldout-grades.json (written
+# automatically by ask_modes_eval.py, stripped to metrics only — see
+# GRADES_FIELDS in the script) are what's shared.
+*.json
+!*-grades.json
