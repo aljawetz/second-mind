@@ -62,6 +62,23 @@ need a Canvas API token (Account → Settings → New access token, on whatever 
 school uses) and an OpenAI API key. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev
 workflow.
 
+### Windows (from source, experimental)
+
+Install the [Rust MSVC toolchain](https://rustup.rs) with the Visual Studio C++ Build Tools,
+[uv](https://docs.astral.sh/uv/getting-started/installation/), Node, Python 3.13, and
+[Tesseract](https://github.com/UB-Mannheim/tesseract/wiki) (on `PATH`). WebView2 ships with
+Windows 11. Then, from PowerShell:
+
+```powershell
+git clone https://github.com/aljawetz/second-mind.git
+cd second-mind
+python scripts\bootstrap.py
+cd app; npm run tauri dev
+```
+
+No Windows installer is built yet. If `uv sync --frozen` complains about the lockfile, run
+`uv lock` in `backend/` on Windows.
+
 ---
 
 ## Why

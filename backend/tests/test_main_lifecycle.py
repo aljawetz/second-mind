@@ -128,6 +128,7 @@ def test_stdin_eof_is_ignored_without_the_opt_in_flag(backend):
     assert _wait_for_ping(proc, port)["status"] == "ok"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="send_signal(SIGTERM) is TerminateProcess on Windows, so there is no graceful exit to assert")
 def test_sigterm_exits_cleanly(backend):
     port = _free_port()
     proc = backend(port)

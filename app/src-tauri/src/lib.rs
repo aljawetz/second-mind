@@ -81,20 +81,29 @@ pub fn run() {
             // binaries/, and a release gets it copied into
             // Contents/Resources/ by scripts/package-macos.sh (ditto keeps
             // the symlinks) before the bundle is re-signed.
+            //
+            // EXE_SUFFIX is ".exe" on Windows (PyInstaller's output name
+            // there) and empty elsewhere.
+            let backend_exe = format!("sm-backend{}", std::env::consts::EXE_SUFFIX);
             #[cfg(debug_assertions)]
-            let backend_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("binaries/sm-backend/sm-backend");
+            let backend_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("binaries/sm-backend")
+                .join(&backend_exe);
             #[cfg(not(debug_assertions))]
             let backend_path = app
                 .path()
                 .resource_dir()
                 .expect("failed to resolve the app's resource directory")
-                .join("sm-backend/sm-backend");
+                .join("sm-backend")
+                .join(&backend_exe);
             let instance_token = new_instance_token();
             let (mut rx, child) = app
                 .shell()
                 .command(backend_path)
                 .env("SM_INSTANCE_TOKEN", &instance_token)
                 .env("SM_EXIT_ON_STDIN_EOF", "1")
+                // Windows text I/O defaults to the ANSI code page, not UTF-8.
+                .env("PYTHONUTF8", "1")
                 .spawn()
                 .expect("failed to spawn sm-backend");
             app.manage(Backend {

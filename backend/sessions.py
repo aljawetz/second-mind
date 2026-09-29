@@ -106,18 +106,18 @@ def _next_class_num(sm_home: Path, course_id: int) -> int:
     counter_path = sm_home / "courses" / str(course_id) / "class_counter.json"
     with _counter_lock:
         counter_path.parent.mkdir(parents=True, exist_ok=True)
-        current = json.loads(counter_path.read_text())["next"] if counter_path.exists() else 1
-        counter_path.write_text(json.dumps({"next": current + 1}))
+        current = json.loads(counter_path.read_text(encoding="utf-8"))["next"] if counter_path.exists() else 1
+        counter_path.write_text(json.dumps({"next": current + 1}), encoding="utf-8")
         return current
 
 
 def _read_meta(session_dir: Path) -> dict:
     meta_path = session_dir / "meta.json"
-    return json.loads(meta_path.read_text()) if meta_path.exists() else {}
+    return json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
 
 
 def _write_meta(session_dir: Path, meta: dict) -> None:
-    (session_dir / "meta.json").write_text(json.dumps(meta))
+    (session_dir / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
 
 
 def start_session(sm_home: Path, course_id: int) -> dict:
@@ -141,7 +141,7 @@ def start_session(sm_home: Path, course_id: int) -> dict:
 
 def save_notes(session_id: str, text: str) -> None:
     info = _SESSIONS[session_id]
-    (info["dir"] / "notes.md").write_text(text)
+    (info["dir"] / "notes.md").write_text(text, encoding="utf-8")
 
 
 def stop_session(session_id: str, audio_bytes: bytes, db_path: Path) -> dict:
@@ -159,18 +159,18 @@ def _process_session(session_id: str, audio_path: Path, db_path: Path) -> None:
         raw_segments, _ = _get_model().transcribe(str(audio_path))
         segments = [{"start": s.start, "end": s.end, "text": s.text} for s in raw_segments]
         transcript_text = " ".join(s["text"].strip() for s in segments).strip()
-        (info["dir"] / "transcript.json").write_text(json.dumps(segments, indent=2))
+        (info["dir"] / "transcript.json").write_text(json.dumps(segments, indent=2), encoding="utf-8")
 
         audio_path.unlink(missing_ok=True)  # data-model.md §1 — raw audio not kept
 
         summary = _enhance_notes(transcript_text) if transcript_text else ""
-        (info["dir"] / "summary.md").write_text(summary)
+        (info["dir"] / "summary.md").write_text(summary, encoding="utf-8")
 
         source_label = info["source_label"]
         nodes = indexing.transcript_to_nodes(segments, source_label, session_id)
         notes_path = info["dir"] / "notes.md"
         if notes_path.exists():
-            nodes += indexing.notes_to_nodes(notes_path.read_text(), source_label, session_id)
+            nodes += indexing.notes_to_nodes(notes_path.read_text(encoding="utf-8"), source_label, session_id)
         if nodes:
             indexing.add_nodes(nodes, db_path, f"course_{info['course_id']}")
 
@@ -239,14 +239,14 @@ def get_session_detail(sm_home: Path, course_id: int, session_id: str) -> dict |
         detail["error"] = live["error"]
     transcript_path = session_dir / "transcript.json"
     if transcript_path.exists():
-        segments = json.loads(transcript_path.read_text())
+        segments = json.loads(transcript_path.read_text(encoding="utf-8"))
         detail["transcript"] = " ".join(s["text"].strip() for s in segments)
     summary_path = session_dir / "summary.md"
     if summary_path.exists():
-        detail["summary"] = summary_path.read_text()
+        detail["summary"] = summary_path.read_text(encoding="utf-8")
     notes_path = session_dir / "notes.md"
     if notes_path.exists():
-        detail["notes"] = notes_path.read_text()
+        detail["notes"] = notes_path.read_text(encoding="utf-8")
     return detail
 
 
