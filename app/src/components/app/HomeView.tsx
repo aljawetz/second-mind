@@ -1,43 +1,23 @@
-import { useRef, useState } from "react";
-import type { ArtifactType } from "../../types";
-import { ARTIFACT_TYPES } from "../../data";
-import { askQuestion, type Citation, type MemoryUsed } from "../../sidecar";
+import { useState } from "react";
 import { splitAssignments, statusPill } from "../../assignmentStatus";
-import type { CanvasAssignment } from "../../sidecar";
+import type { CanvasAssignment, Citation, SessionSummary } from "../../sidecar";
 import { openCitation } from "../../citations";
+import ChatPanel from "./ChatPanel";
 
-// Must match chat.py's GENERAL_KNOWLEDGE_LABEL: the model starts the part of
-// its answer that isn't from the course with this exact line.
-const GENERAL_KNOWLEDGE_LABEL = "General knowledge (not from your course materials):";
+const Chevron = () => (
+  <svg className="chev" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="m9 6 6 6-6 6" />
+  </svg>
+);
 
-// Shows the general-knowledge part as its own marked block, so the student
-// can tell it apart from the cited course answer without relying on the
-// model's wording alone.
-function AnswerText({ answer }: { answer: string }) {
-  const at = answer.indexOf(GENERAL_KNOWLEDGE_LABEL);
-  const course = (at === -1 ? answer : answer.slice(0, at)).trim();
-  const general = at === -1 ? null : answer.slice(at + GENERAL_KNOWLEDGE_LABEL.length).trim();
-  return (
-    <>
-      {course && <p className="qa-text">{course}</p>}
-      {general !== null && (
-        <div className="qa-general">
-          <div className="qa-general-head">General knowledge · not from your course materials</div>
-          {general && <p className="qa-text">{general}</p>}
-        </div>
-      )}
-    </>
-  );
-}
-
-interface ChatTurn {
-  question: string;
-  answer: string;
-  citations: Citation[];
-  grounded: boolean;
-  memoriesUsed: MemoryUsed[];
-  status: "loading" | "streaming" | "done" | "error";
-  error?: string;
+// Starting points for an empty chat, from what the course actually has.
+function suggestionsFor(upcoming: CanvasAssignment[], sessions: SessionSummary[]): string[] {
+  const out: string[] = [];
+  if (upcoming[0]) out.push(`What does ${upcoming[0].name} ask me to do?`);
+  const lecture = sessions.find((s) => s.status === "done");
+  if (lecture) out.push(`Summarize ${lecture.title}`);
+  out.push("What topics has this course covered so far?");
+  return out;
 }
 
 export default function HomeView({
@@ -46,7 +26,9 @@ export default function HomeView({
   canvasBaseUrl,
   assignments,
   assignmentsError,
-  onOpenArtifact,
+  sessions,
+  conversationId,
+  onConversationSaved,
   onOpenAssignment,
   onOpenSession,
 }: {
@@ -55,205 +37,72 @@ export default function HomeView({
   canvasBaseUrl: string;
   assignments: CanvasAssignment[];
   assignmentsError: string | null;
-  onOpenArtifact: (type: ArtifactType) => void;
+  sessions: SessionSummary[];
+  conversationId: string | null;
+  onConversationSaved: (conversationId: string) => void;
   onOpenAssignment: (id: number) => void;
   onOpenSession: (sessionId: string) => void;
 }) {
-  const [askValue, setAskValue] = useState("");
-  const [turns, setTurns] = useState<ChatTurn[]>([]);
-  // The backend's id for this chat, from its first answer: sent with every
-  // later question so the chat continues where it is saved. AppShell mounts
-  // a fresh HomeView per course, which starts a new chat.
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const threadRef = useRef<HTMLDivElement>(null);
   const { upcoming, past } = splitAssignments(assignments);
-  const lastTurn = turns[turns.length - 1];
-  const busy = lastTurn?.status === "loading" || lastTurn?.status === "streaming";
+  // Upcoming work is what needs attention; past work is there to check.
+  const [pastOpen, setPastOpen] = useState(false);
 
-  // Past assignments start collapsed — upcoming work is what needs
-  // attention, past/completed is there to check but not worth the space.
-  const [openGroups, setOpenGroups] = useState({ upcoming: true, past: false });
-  function toggleGroup(key: "upcoming" | "past") {
-    setOpenGroups((g) => ({ ...g, [key]: !g[key] }));
-  }
-
-  function renderAssignList(list: CanvasAssignment[]) {
-    return (
-      <div className="assign-list">
-        {list.map((a) => {
-          const pill = statusPill(a);
-          return (
-            <button className="assign-card" key={a.id} onClick={() => onOpenAssignment(a.id)}>
-              <span className="main">
-                <div className="ttl">{a.name}</div>
-                <div className="crs">{courseName}</div>
-              </span>
-              <span className={`pill ${pill.cls}`}>{pill.text}</span>
-              <span className="go">›</span>
-            </button>
-          );
-        })}
-      </div>
-    );
-  }
-
-  async function send() {
-    const question = askValue.trim();
-    if (!question || busy) return;
-    setAskValue("");
-    const turnIndex = turns.length;
-    // Only finished turns: an errored or half-streamed answer would give the
-    // model a wrong picture of what it already said.
-    const history = turns.filter((t) => t.status === "done").map((t) => ({ question: t.question, answer: t.answer }));
-    setTurns((prev) => [
-      ...prev,
-      { question, answer: "", citations: [], grounded: false, memoriesUsed: [], status: "loading" },
-    ]);
-    threadRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-
-    const update = (patch: Partial<ChatTurn>) =>
-      setTurns((prev) => prev.map((t, i) => (i === turnIndex ? { ...t, ...patch } : t)));
-
-    let streamFailed = false;
-    try {
-      await askQuestion(courseId, courseName, question, history, conversationId, (event) => {
-        if (event.delta) {
-          setTurns((prev) =>
-            prev.map((t, i) => (i === turnIndex ? { ...t, answer: t.answer + event.delta, status: "streaming" } : t))
-          );
-        }
-        if (event.citations !== undefined) {
-          update({ citations: event.citations, grounded: !!event.grounded, memoriesUsed: event.memories_used ?? [] });
-        }
-        if (event.error) {
-          streamFailed = true;
-          update({ status: "error", error: event.error });
-        }
-        if (event.done) {
-          if (!streamFailed && event.conversation_id) {
-            setConversationId(event.conversation_id);
-          }
-          setTurns((prev) =>
-            prev[turnIndex]?.status === "error"
-              ? prev
-              : prev.map((t, i) => (i === turnIndex ? { ...t, status: "done" } : t))
-          );
-        }
-      });
-    } catch (err) {
-      update({ status: "error", error: err instanceof Error ? err.message : "Something went wrong" });
-    }
+  function renderRows(list: CanvasAssignment[]) {
+    return list.map((a) => {
+      const pill = statusPill(a);
+      return (
+        <button className="assign-row" key={a.id} type="button" onClick={() => onOpenAssignment(a.id)}>
+          <span className="body">
+            <span className="ttl">{a.name}</span>
+            <span className={`pill ${pill.cls}`}>{pill.text}</span>
+          </span>
+          <Chevron />
+        </button>
+      );
+    });
   }
 
   return (
     <section id="view-home">
-      <div className="home-left">
-        <div className="home-block">
-          <div className="section-label">Study artifacts</div>
-          <div className="artifact-row">
-            {ARTIFACT_TYPES.map((t) => (
-              <button className={`artifact-btn artifact-${t.key}`} key={t.key} onClick={() => onOpenArtifact(t.key)}>
-                <span className="lbl">{t.lbl}</span>
-                <span className="sub">{t.sub}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+      <ChatPanel
+        courseId={courseId}
+        courseName={courseName}
+        conversationId={conversationId}
+        suggestions={suggestionsFor(upcoming, sessions)}
+        onConversationSaved={onConversationSaved}
+        onOpenCitation={(c: Citation) => void openCitation(canvasBaseUrl, courseId, c, onOpenSession)}
+      />
 
-        <div className="chat-panel">
-          <div className="chat-head">Ask about this course</div>
-          <div className="qa-thread" ref={threadRef}>
-            {turns.length === 0 && <div className="qa-empty">Ask a question about this course to get started.</div>}
-            {turns.map((turn, i) => (
-              <div key={i}>
-                <div className="qa-q">{turn.question}</div>
-                {turn.status === "error" ? (
-                  <div className="qa-a qa-a-error">{turn.error}</div>
-                ) : (
-                  <div className="qa-a">
-                    {turn.status === "loading" ? (
-                      <p className="qa-thinking">Searching your course…</p>
-                    ) : (
-                      <>
-                        <AnswerText answer={turn.answer} />
-                        {turn.grounded && turn.citations.length > 0 && (
-                          <div className="qa-sources">
-                            <span>Sources</span>
-                            {turn.citations.map((c, ci) => (
-                              <button
-                                className="cite cite-link"
-                                key={ci}
-                                onClick={() => openCitation(canvasBaseUrl, courseId, c, onOpenSession)}
-                              >
-                                [{ci + 1}] {c.label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        {turn.memoriesUsed.length > 0 && (
-                          <div className="qa-memories">
-                            <span>From what you told me before</span>
-                            {turn.memoriesUsed.map((m) => (
-                              <span className="memory-chip" key={m.id}>
-                                {m.text}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="ask-bar">
-            <input
-              type="text"
-              placeholder="Ask about this course…"
-              value={askValue}
-              disabled={busy}
-              onChange={(e) => setAskValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && send()}
-            />
-            <button className="ask-send" onClick={send} disabled={busy}>
-              Ask
-            </button>
-          </div>
+      <section className="assign-panel" aria-label="Assignments">
+        <div className="assign-top">
+          <h2>Assignments</h2>
+          {!assignmentsError && assignments.length > 0 && <span>{upcoming.length} upcoming</span>}
         </div>
-      </div>
-
-      <div className="home-right">
-        <div className="home-block">
-          <div className="section-label">Assignments</div>
-          {assignmentsError && <div className="qa-a-error">{assignmentsError}</div>}
-          {!assignmentsError && assignments.length === 0 && <div className="qa-empty">No assignments found.</div>}
+        <div className="assign-body">
+          {assignmentsError && <p className="qa-a-error">{assignmentsError}</p>}
+          {!assignmentsError && assignments.length === 0 && <p className="qa-empty">No assignments found.</p>}
           {!assignmentsError && assignments.length > 0 && (
-            <div className="assign-scroll">
-              <div className="assign-group">
-                <button className="assign-group-head" onClick={() => toggleGroup("upcoming")}>
-                  <span className="chevron">{openGroups.upcoming ? "▾" : "▸"}</span>
-                  Upcoming
-                  <span className="count">{upcoming.length}</span>
-                </button>
-                {openGroups.upcoming &&
-                  (upcoming.length > 0 ? renderAssignList(upcoming) : <div className="qa-empty">Nothing upcoming.</div>)}
-              </div>
-
+            <>
+              {upcoming.length > 0 ? renderRows(upcoming) : <p className="qa-empty">Nothing upcoming.</p>}
               {past.length > 0 && (
-                <div className="assign-group">
-                  <button className="assign-group-head" onClick={() => toggleGroup("past")}>
-                    <span className="chevron">{openGroups.past ? "▾" : "▸"}</span>
-                    Past &amp; completed
-                    <span className="count">{past.length}</span>
+                <>
+                  <button
+                    className="assign-toggle"
+                    type="button"
+                    aria-expanded={pastOpen}
+                    onClick={() => setPastOpen((o) => !o)}
+                  >
+                    <Chevron />
+                    Past and completed
+                    <span className="n">{past.length}</span>
                   </button>
-                  {openGroups.past && renderAssignList(past)}
-                </div>
+                  {pastOpen && renderRows(past)}
+                </>
               )}
-            </div>
+            </>
           )}
         </div>
-      </div>
+      </section>
     </section>
   );
 }

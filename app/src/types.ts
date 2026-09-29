@@ -1,8 +1,5 @@
-export type ArtifactType = "mocktest" | "mindmap" | "cards";
-
 export type ViewName =
   | "home"
-  | "artifact"
   | "assignment"
   | "newSession"
   | "sessionDetail"

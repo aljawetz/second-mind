@@ -215,6 +215,55 @@ export async function askQuestion(
   }
 }
 
+// Saved course chats (conversations.py): one per conversation id, newest
+// first. A saved turn has no memories_used; only the live /ask stream does.
+export interface ConversationSummary {
+  conversation_id: string;
+  title: string;
+  updated_at: string;
+  turn_count: number;
+}
+
+export interface SavedTurn {
+  question: string;
+  answer: string;
+  citations: Citation[];
+  grounded: boolean;
+  asked_at: string;
+}
+
+export async function listConversations(courseId: number): Promise<ConversationSummary[]> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/conversations`);
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `failed to list chats (${res.status})`);
+  }
+  return data.conversations ?? [];
+}
+
+export async function getConversation(
+  courseId: number,
+  conversationId: string
+): Promise<{ conversation_id: string; title: string; turns: SavedTurn[] }> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/conversations/${conversationId}`);
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `failed to open chat (${res.status})`);
+  }
+  return data;
+}
+
+// Also makes agent memory forget what it learned only from this chat.
+export async function deleteConversation(courseId: number, conversationId: string): Promise<void> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/conversations/${conversationId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error?.message ?? `failed to delete chat (${res.status})`);
+  }
+}
+
 export interface SyncEvent {
   item?: string;
   status?: "done" | "failed";
