@@ -43,7 +43,7 @@ def _write(path: Path, data: dict) -> None:
     # Through a temp file, so a crash mid-write can't leave half a JSON file.
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(data))
+    tmp.write_text(json.dumps(data), encoding="utf-8")
     os.replace(tmp, path)
 
 
@@ -60,7 +60,7 @@ def append_turn(sm_home: Path, course_id: int, cid: str, turn: dict, *, create_i
     path = _path(sm_home, course_id, cid)
     with _lock:
         if path.exists():
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
         elif not create_if_missing:
             return False
         else:
@@ -81,7 +81,7 @@ def append_turn(sm_home: Path, course_id: int, cid: str, turn: dict, *, create_i
 def get_conversation(sm_home: Path, course_id: int, cid: str) -> dict | None:
     path = _path(sm_home, course_id, cid)
     with _lock:
-        return json.loads(path.read_text()) if path.exists() else None
+        return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
 
 
 def list_conversations(sm_home: Path, course_id: int) -> list[dict]:
@@ -91,7 +91,7 @@ def list_conversations(sm_home: Path, course_id: int) -> list[dict]:
     summaries = []
     with _lock:
         for path in directory.glob("*.json"):
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
             summaries.append(
                 {
                     "conversation_id": data["conversation_id"],
@@ -119,7 +119,7 @@ def set_memory_progress(sm_home: Path, course_id: int, cid: str, *, processed_up
     with _lock:
         if not path.exists():
             return
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         data["memory_processed_upto"] = processed_upto
         data["summary"] = summary
         _write(path, data)
@@ -134,7 +134,7 @@ def clear_summaries(sm_home: Path, course_id: int, cids: list[str]) -> None:
             path = _path(sm_home, course_id, cid)
             if not path.exists():
                 continue
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
             data["summary"] = ""
             _write(path, data)
 
@@ -148,7 +148,7 @@ def pending_memory(sm_home: Path, course_id: int) -> list[str]:
     pending = []
     with _lock:
         for path in sorted(directory.glob("*.json")):
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
             if data["memory_processed_upto"] < len(data["turns"]):
                 pending.append(data["conversation_id"])
     return pending

@@ -22,12 +22,12 @@ def read_config(sm_home: Path) -> dict:
     path = config_path(sm_home)
     if not path.exists():
         return {}
-    return json.loads(path.read_text())
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def write_config(sm_home: Path, data: dict) -> None:
     sm_home.mkdir(parents=True, exist_ok=True)
-    config_path(sm_home).write_text(json.dumps(data, indent=2))
+    config_path(sm_home).write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 def normalize_canvas_base_url(raw: str) -> str:

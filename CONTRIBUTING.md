@@ -24,7 +24,8 @@ cd app
 PATH="$HOME/.cargo/bin:$PATH" npm run tauri dev
 ```
 
-macOS only for now — see
+Windows: run `python scripts\bootstrap.py` instead, then `npm run tauri dev` from `app` (setup
+notes in the README). Released builds are macOS only for now — see
 [docs/architecture/contribution-and-distribution-plan.md](docs/architecture/contribution-and-distribution-plan.md)
 for why, and what's planned.
 
