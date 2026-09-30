@@ -3,7 +3,7 @@ so a student doesn't have to create a fine-grained token by hand.
 
 The app shows a short code, the student approves it at
 github.com/login/device, and the resulting OAuth token (gho_…) goes straight
-into the Keychain as the Copilot credential — the webview only ever sees the
+into the Keychain as the Copilot credential (via the app, credentials.py) — the webview only ever sees the
 code. Copilot bills that student's own plan (copilot_llm.py).
 
 CLIENT_ID is Second Mind's OAuth App (GitHub → Settings → Developer
@@ -18,9 +18,7 @@ import threading
 import time
 
 import httpx
-import keyring
-
-import config
+import credentials
 import providers
 
 CLIENT_ID = "Ov23linVKlGHPXSemOp0"
@@ -91,7 +89,7 @@ def poll() -> dict:
 
     token = data.get("access_token")
     if token:
-        keyring.set_password(config.CREDENTIAL_SERVICE, providers.COPILOT.credential, token)
+        credentials.store(providers.COPILOT.credential, token)
         with _lock:
             _pending = None
         return {"status": "done", "login": _login(token)}

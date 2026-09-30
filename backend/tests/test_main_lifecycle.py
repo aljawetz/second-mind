@@ -193,6 +193,30 @@ def test_sigterm_exits_cleanly(warm):
     assert proc.wait(timeout=EXIT_TIMEOUT) == 0
 
 
+def _credentials_status(port: int) -> dict:
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}/credentials/status", timeout=5) as res:
+        return json.loads(res.read())
+
+
+def test_credentials_come_from_the_app_on_stdin(backend):
+    port = _free_port()
+    proc = backend(port, SM_CREDENTIALS_ON_STDIN="1", SM_EXIT_ON_STDIN_EOF="1")
+    proc.stdin.write(b'{"canvas-token": "t"}\n')
+    proc.stdin.flush()
+    _wait_for_ping(proc, port)
+    assert _credentials_status(port) == {"canvas": True, "llm": False}
+
+    proc.stdin.write(b'{"openai-key": "sk-test"}\n')
+    proc.stdin.flush()
+    deadline = time.monotonic() + EXIT_TIMEOUT
+    while _credentials_status(port)["llm"] is False and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert _credentials_status(port) == {"canvas": True, "llm": True}
+
+    proc.stdin.close()
+    assert proc.wait(timeout=EXIT_TIMEOUT) == 0
+
+
 def test_port_in_use_exits_with_a_readable_message(backend):
     port = _free_port()
     with socket.socket() as squatter:

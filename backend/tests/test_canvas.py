@@ -10,6 +10,7 @@ import respx
 
 import canvas
 import config
+import credentials
 
 FIXTURES = Path(__file__).parent / "fixtures" / "canvas"
 BASE = canvas.CANVAS_API_URL
@@ -21,7 +22,7 @@ def load(name: str) -> dict:
 
 @pytest.fixture(autouse=True)
 def fake_token(monkeypatch):
-    monkeypatch.setattr(canvas.keyring, "get_password", lambda service, key: "fake-token-for-tests")
+    monkeypatch.setattr(credentials, "get", lambda key: "fake-token-for-tests")
 
 
 @pytest.fixture(autouse=True)

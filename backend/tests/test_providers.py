@@ -8,6 +8,7 @@ import pytest
 import respx
 
 import config
+import credentials
 import providers
 
 DEEPSEEK_COMPLETIONS = "https://api.deepseek.com/chat/completions"
@@ -37,13 +38,13 @@ def test_an_unknown_provider_is_an_error_not_a_silent_fallback(sm_home):
 
 def test_api_key_reads_the_providers_own_keychain_item(monkeypatch):
     asked = []
-    monkeypatch.setattr(providers.keyring, "get_password", lambda service, key: asked.append(key) or "sk-deepseek")
+    monkeypatch.setattr(credentials, "get", lambda key: asked.append(key) or "sk-deepseek")
     assert providers.api_key(providers.DEEPSEEK) == "sk-deepseek"
     assert asked == ["deepseek-key"]
 
 
 def test_api_key_missing_is_a_runtime_error(monkeypatch):
-    monkeypatch.setattr(providers.keyring, "get_password", lambda service, key: None)
+    monkeypatch.setattr(credentials, "get", lambda key: None)
     with pytest.raises(RuntimeError, match="DeepSeek"):
         providers.api_key(providers.DEEPSEEK)
 
@@ -63,7 +64,7 @@ def _completion(content):
 def test_llama_llm_for_deepseek_calls_deepseek_with_thinking_off(sm_home, monkeypatch):
     # llama_index's own OpenAI class rejects model names it doesn't know and
     # would send a non-OpenAI model to the legacy completions endpoint.
-    monkeypatch.setattr(providers.keyring, "get_password", lambda service, key: "sk-deepseek")
+    monkeypatch.setattr(credentials, "get", lambda key: "sk-deepseek")
     config.write_config(sm_home, {"llm_provider": "deepseek"})
     route = respx.post(DEEPSEEK_COMPLETIONS).mock(return_value=httpx.Response(200, json=_completion("hello")))
 

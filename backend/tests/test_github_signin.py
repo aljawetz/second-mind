@@ -6,6 +6,7 @@ import httpx
 import pytest
 import respx
 
+import credentials
 import github_signin
 import providers
 
@@ -19,7 +20,7 @@ def app(monkeypatch):
     monkeypatch.setattr(github_signin, "CLIENT_ID", "Ov23test")
     monkeypatch.setattr(github_signin, "_pending", None)
     stored = {}
-    monkeypatch.setattr(github_signin.keyring, "set_password", lambda service, key, value: stored.__setitem__(key, value))
+    monkeypatch.setattr(credentials, "store", lambda key, value: stored.__setitem__(key, value))
     return stored
 
 

@@ -15,15 +15,14 @@ import time
 from pathlib import Path
 
 import httpx
-import keyring
 
 import config
+import credentials
 
 # Default when nothing's configured yet — real base URL is a config.json
 # value (contribution-and-distribution-plan.md step 2), not a constant;
 # Second Mind used to only work against CMU's Canvas at all.
 CANVAS_API_URL = "https://canvas.cmu.edu/api/v1"
-CREDENTIAL_SERVICE = "com.secondmind.app"
 SM_HOME = Path.home() / ".secondmind"  # set to the real value by main.py at startup; tests monkeypatch this directly
 
 _LINK_RE = re.compile(r'<([^>]+)>;\s*rel="([^"]+)"')
@@ -34,7 +33,7 @@ class CanvasError(Exception):
 
 
 def _token() -> str:
-    token = keyring.get_password(CREDENTIAL_SERVICE, "canvas-token")
+    token = credentials.get("canvas-token")
     if not token:
         raise CanvasError("no Canvas token stored — onboarding hasn't completed")
     return token

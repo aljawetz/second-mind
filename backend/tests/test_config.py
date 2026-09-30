@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import config
+import credentials
 
 
 def test_read_config_missing_file_returns_empty_dict(tmp_path: Path):
@@ -21,19 +22,19 @@ def test_write_creates_sm_home_if_missing(tmp_path: Path):
     assert (sm_home / "config.json").exists()
 
 
-def test_credentials_status_reports_missing_when_no_keyring_entry(monkeypatch):
-    monkeypatch.setattr(config.keyring, "get_password", lambda service, key: None)
+def test_credentials_status_reports_missing_when_nothing_stored(monkeypatch):
+    monkeypatch.setattr(credentials, "get", lambda key: None)
     assert config.credentials_status("openai-key") == {"canvas": False, "llm": False}
 
 
 def test_credentials_status_reports_present(monkeypatch):
-    monkeypatch.setattr(config.keyring, "get_password", lambda service, key: "some-value")
+    monkeypatch.setattr(credentials, "get", lambda key: "some-value")
     assert config.credentials_status("openai-key") == {"canvas": True, "llm": True}
 
 
 def test_credentials_status_checks_the_chosen_providers_key(monkeypatch):
     stored = {"canvas-token": "t", "openai-key": "sk-openai"}
-    monkeypatch.setattr(config.keyring, "get_password", lambda service, key: stored.get(key))
+    monkeypatch.setattr(credentials, "get", lambda key: stored.get(key))
     assert config.credentials_status("deepseek-key") == {"canvas": True, "llm": False}
 
 

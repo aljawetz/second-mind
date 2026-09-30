@@ -9,13 +9,16 @@
 #    Tauri can't bundle itself: externalBin takes a single file, and its
 #    resource copier fails on the folder's symlinks. `ditto` keeps them.
 #
-# 2. Ad-hoc re-signs the finished bundle. Real bug found in v0.1.0: Tauri's
+# 2. Re-signs the finished bundle. Real bug found in v0.1.0: Tauri's
 #    bundler never re-signs the assembled .app after copying in
 #    Contents/Resources, so the only signature is the Rust linker's ad-hoc
 #    one from compile time, whose CodeDirectory claims resources are sealed
 #    when no _CodeSignature dir exists. macOS reports that mismatch as
 #    "Second Mind is damaged and can't be opened". Adding the backend changes
 #    Contents/Resources too, so this has to run after step 1.
+#    Signs with the local certificate from make-signing-cert.sh when this
+#    machine has it (SM_SIGN_IDENTITY names another), so students' Keychain
+#    "Always Allow" survives updates; ad-hoc otherwise, with a warning.
 #
 # 3. Rebuilds the .dmg from the corrected .app instead of trusting Tauri's.
 set -euo pipefail
@@ -31,7 +34,14 @@ BACKEND="$ROOT/backend/dist/sm-backend"
 rm -rf "$APP/Contents/Resources/sm-backend"
 ditto "$BACKEND" "$APP/Contents/Resources/sm-backend"
 
-codesign --force --deep --sign - "$APP"
+IDENTITY="${SM_SIGN_IDENTITY:-Second Mind Local Signing}"
+if security find-identity -v -p codesigning | grep -qF "\"$IDENTITY\""; then
+  SIGN_AS="$IDENTITY"
+else
+  echo "warning: no '$IDENTITY' certificate (scripts/make-signing-cert.sh) — signing ad-hoc, so students will be asked for their Keychain password again after installing this build" >&2
+  SIGN_AS=-
+fi
+codesign --force --deep --sign "$SIGN_AS" "$APP"
 codesign --verify --deep --strict --verbose=4 "$APP"
 
 mkdir -p "$DMG_DIR"
