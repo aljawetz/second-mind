@@ -85,27 +85,19 @@ locate something from a past lecture or reading to move forward on current work.
 
 ### How the problem is addressed today
 
-1. **UniFlow Study** — the closest direct competitor. An AI study assistant that syncs Canvas,
-   Blackboard, and Moodle, answers questions grounded in course data via a "UniMind" engine, and
-   offers live bilingual lecture transcription (Deepgram) and a writing assistant
-   ([uniflowstudy.com](https://www.uniflowstudy.com/)). It is proprietary and cloud-hosted, and
-   meters usage: the free tier caps out at 30 AI conversations/month and one course import; paid
-   tiers run $12.80–$39.20/month for more conversations and transcription hours
-   ([uniflowstudy.com/pricing](https://www.uniflowstudy.com/pricing)). It does not generate mock
-   tests, mindmaps, or flashcards from indexed material.
-2. **A do-it-yourself stack of disconnected tools** — general-purpose ChatGPT for Q&A (not grounded
+1. **A do-it-yourself stack of disconnected tools** — general-purpose ChatGPT for Q&A (not grounded
    in the student's specific course material, no citations, real hallucination risk), Otter.ai or
    manual note-taking for lecture capture, and Quizlet/Anki for flashcards. This is exactly the
    fragmentation problem documented above: it works, but the student pays the integration cost of
    stitching four separate tools together by hand.
-3. **Paying for a human** — office hours, TA sessions, or private tutoring. Tutoring averages
+2. **Paying for a human** — office hours, TA sessions, or private tutoring. Tutoring averages
    $25–$80/hour nationally and can run $60–$150/hour at the college level
    ([Tutors.com, 2026 Tutoring Prices](https://tutors.com/costs/)) — effective, but not scalable to
    "I have a question about last Tuesday's lecture at 11pm."
 
 ## 2. Proposed solution
 
-Second Mind (Second Mind) is one app per student that ingests their real Canvas course material,
+Second Mind is one app per student that ingests their real Canvas course material,
 captures their lectures, answers questions with citations back to the source, and generates the
 study material students otherwise build by hand — mock tests, mindmaps, slides, flashcards. Inputs
 are the student's own Canvas token (their existing course access, nothing more) plus their
@@ -120,17 +112,16 @@ study artifact traceable the same way.
 material, **who struggles with** finding the right slide, transcript, or reading exactly when they
 need it, **our proposed solution provides** grounded, cited answers and auto-generated study
 material **by** indexing each student's own Canvas content, lecture recordings, and notes into a
-private, on-disk store, **unlike** UniFlow Study and the ChatGPT-plus-Otter-plus-Quizlet stack,
-**which** either meter access behind a subscription while keeping data in someone else's cloud, or
-force students to manually integrate several disconnected tools themselves.
+private, on-disk store. Students can search their course material and create study aids in one
+place, with control over their recordings and notes.
 
 ### Why someone would choose it over the alternatives
 
-Open source and self-hosted beats UniFlow Study on cost (unmetered vs. metered conversations) and
-data ownership (the student's own machine vs. vendor cloud) — a meaningful difference for
-recorded lectures specifically, which touch instructor and classmate privacy. Against the DIY
-stack, one integrated, course-aware system beats four disconnected tools on the fragmentation cost
-documented above. And unlike paying a human, it's available at 11pm for the cost of self-hosting.
+Second Mind is open source and self-hosted, with recordings and notes stored on the student's
+own machine. Keeping recorded lectures local matters because they touch instructor and
+classmate privacy. One integrated, course-aware system also reduces the effort of stitching
+together separate tools. Students can use it whenever they need help, including outside
+office hours.
 
 ## 3. Measuring impact
 
@@ -158,5 +149,4 @@ during exam weeks) anchor the evaluation, per the assignment rubric.
 - Grand View Research, [AI in Education Market Report](https://www.grandviewresearch.com/industry-analysis/artificial-intelligence-ai-education-market-report)
 - Research and Markets, [Artificial Intelligence in Education Market Size & Trends](https://www.researchandmarkets.com/report/education-ai)
 - ListEdTech / Cubite, [LMS Market Share 2026](https://cubite.io/blogs/lms-market-share-2026)
-- UniFlow Study, [uniflowstudy.com](https://www.uniflowstudy.com/) and [uniflowstudy.com/pricing](https://www.uniflowstudy.com/pricing)
 - Tutors.com, [2026 Tutoring Prices](https://tutors.com/costs/)

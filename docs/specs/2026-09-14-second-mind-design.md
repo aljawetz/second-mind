@@ -1,4 +1,4 @@
-# Second Mind — Second Mind — Design Spec
+# Second Mind: Design Spec
 
 Course: 49797, Special Topics: Advanced AI for Industry and Society (Fall 2026)
 Date: 2026-09-15
@@ -6,24 +6,22 @@ Supersedes: `2026-09-11-canvas-ai-tutor-design.md`
 
 ## 1. Thesis
 
-**Second Mind (Second Mind) is the open-source alternative to [UniFlow Study](https://www.uniflowstudy.com/).**
+**Second Mind is an open-source study assistant for Canvas courses.**
 
 One app per student that ingests their real course material, captures their lectures, answers
 questions with citations back to the source, and generates the study artifacts they would
 otherwise build by hand — mock tests, mindmaps, slides, flashcards.
 
-Three differentiators:
+Three priorities:
 
-1. **Open source.** Self-hostable, no subscription. UniFlow charges $12.80–$39.20/month and meters
-   AI conversations (30/month on free). More importantly: the student's index, recordings, and
+1. **Open source.** Self-hostable, no subscription. The student's index, recordings, and
    notes live on hardware the student controls.
 2. **Tailored to Canvas.** Built against real Canvas structure — modules, pages, assignments,
    files — rather than a lowest-common-denominator LMS abstraction. Validated first against
    `canvas.cmu.edu` as the pilot instance, but the target user is any Canvas-using student, not a
    CMU-only product.
-3. **Study artifacts, not just answers.** UniFlow does Q&A, transcription, and writing polish. It
-   does not generate mock tests, mindmaps, or flashcards from your indexed material. That is the
-   part of "second brain" that actually changes how you study.
+3. **Study artifacts.** Generate mock tests, mindmaps, slides, and flashcards from indexed
+   course material, with citations back to the sources.
 
 ## 2. Users
 
@@ -34,23 +32,12 @@ Three differentiators:
   ticket. This is a deliberate go-to-market choice, not just an MVP shortcut.
 - **Beneficiary**: students directly. Instructors indirectly, via fewer repeated questions.
 
-## 3. Competitive position
+## 3. Product priorities
 
-| | UniFlow Study | Second Mind |
-| --- | --- | --- |
-| License / cost | Proprietary, $0–$39.20/mo, metered | Open source, self-hosted, unmetered |
-| Data location | Vendor cloud | Student's own machine |
-| Grounded cited Q&A | Yes ("UniMind") | Yes |
-| LMS sync | Canvas, Blackboard, Moodle | Canvas (CMU-first) |
-| Lecture transcription | Yes (Deepgram, bilingual) | Yes (Whisper, local) |
-| Mock tests / mindmaps / flashcards | No | **Yes** |
-| Session notes pages | Partial (editor) | **Yes, auto-created on class schedule** |
-| Writing assistant | Yes | Deferred |
-| Personal data in a vector store | Unknown | **Never** — fetched live, never indexed |
-
-The honest read: UniFlow is broader today (Blackboard/Moodle, bilingual transcription, writing
-assistant). Second Mind wins on ownership, cost, and the generate-study-material axis. We do not claim
-parity and should not.
+Second Mind focuses on student ownership of course data, grounded answers with citations,
+local lecture transcription, and study artifacts generated from indexed material. Canvas is
+its supported LMS; additional LMS integrations and a writing assistant are outside the current
+scope. Study artifact generation is planned and has not started yet.
 
 ## 4. Scope
 
@@ -77,7 +64,7 @@ parity and should not.
   model, is the answer for the Sprint 8 responsible-AI review.
 - **Piazza as a source.** High-value content, but no official public API — an unofficial client is
   fragile and legally murky. Named as planned, not built.
-- **Writing assistant.** UniFlow parity feature, lowest marginal value for us.
+- **Writing assistant.** Lowest marginal value for the current scope.
 
 ## 5. Architecture
 
@@ -267,7 +254,7 @@ recordings, transcripts, or notes.
 
 **Default: answer-first with citations.** A direct, useful answer, with every factual claim
 traceable to a specific indexed page, file, or transcript segment. This matches what students
-actually want under time pressure and matches the UniFlow behavior we are positioned against.
+actually want under time pressure.
 
 **Grounding is non-negotiable for course facts.** Dates, grading, policies, deadlines,
 assignments, staff and what was said in class come only from indexed material, with citations. If
@@ -406,7 +393,7 @@ rediscovering later.
 | Vector store | Embedded, on-disk, per-student (LanceDB, via LlamaIndex's `LanceDBVectorStore`) | Native hybrid vector + full-text (BM25-style) search in one engine — no separate BM25 library or manual reranking step. Zero server processes; one directory per student maps exactly to §5.1 |
 | Embeddings | Local, open-source model (BGE-small class), converted to ONNX and run via `onnxruntime` — not LlamaIndex's `HuggingFaceEmbedding`/`sentence-transformers` path | Anthropic has no public embeddings API, so "pluggable LLM" doesn't cover this layer regardless of provider. The ONNX path specifically avoids bundling torch into the shipped app — a confirmed PyInstaller/macOS packaging problem (docs/architecture/rag-pipeline.md §3), not just a size preference |
 | Canvas access | Direct Canvas REST API calls (`httpx`, sync), backend-owned | A thin, purpose-built client — bearer-token auth, `Link`-header pagination, the specific endpoints in [canvas-integration.md](../architecture/canvas-integration.md) — scoped to exactly what Second Mind needs, nothing more |
-| Transcription | Whisper (`faster-whisper`), local | Open-source thesis; recordings never leave the machine. UniFlow uses hosted Deepgram. Speed validated: 0.04x real-time factor on CPU alone (base model) — comfortably fast on laptop-class hardware. Real classroom accuracy (noise, accents, room acoustics) still untested — validated on clean synthetic speech only |
+| Transcription | Whisper (`faster-whisper`), local | Open-source thesis; recordings never leave the machine. Speed validated: 0.04x real-time factor on CPU alone (base model) — comfortably fast on laptop-class hardware. Real classroom accuracy (noise, accents, room acoustics) still untested — validated on clean synthetic speech only |
 | LLM | Pluggable, default Claude, via LlamaIndex's multi-provider LLM abstraction | Swappable per student's own key without a hand-rolled provider-switch layer; local models possible for full self-hosting |
 | Web search | MCP, explicitly labeled | Never silently blended with course-grounded answers |
 | Credential storage | macOS Keychain | Never a plaintext config file; OS-encrypted at rest, scoped to the app |

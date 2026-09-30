@@ -1,10 +1,10 @@
-# Second Mind (SM)
+# Second Mind
 
 [![CI](https://github.com/aljawetz/second-mind/actions/workflows/ci.yml/badge.svg)](https://github.com/aljawetz/second-mind/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/aljawetz/second-mind?utm_source=oss&utm_medium=github&utm_campaign=aljawetz%2Fsecond-mind&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
-**The open-source alternative to [UniFlow Study](https://www.uniflowstudy.com/).**
+**An open-source study assistant for your Canvas courses.**
 
 One app per student that ingests your real course material, captures your lectures, answers
 questions with citations back to the source, and generates the study material you'd otherwise
@@ -109,24 +109,6 @@ actually in your courses — each traceable to its source.
 lecture and reading material it draws on — never drafts the answer itself. See
 [§7.1 of the design spec](docs/specs/2026-09-14-second-mind-design.md) for exactly where that
 line sits.
-
-## How it compares
-
-| | UniFlow Study | Second Mind |
-| --- | --- | --- |
-| License / cost | Proprietary, $0–$39.20/mo, metered conversations | Open source, self-hosted, unmetered |
-| Where your data lives | Vendor cloud | Your machine |
-| Grounded cited Q&A | Yes | Yes |
-| LMS sync | Canvas, Blackboard, Moodle | Canvas (CMU-first) |
-| Lecture transcription | Yes — Deepgram, hosted, bilingual | Yes — Whisper, local |
-| Mock tests / mindmaps / flashcards | No | **Yes** |
-| Auto session notes pages | Partial | **Yes, on your class schedule** |
-| Writing assistant | Yes | Not yet |
-| Grades & deadlines in a vector store | Unknown | **Never** — fetched live, never indexed |
-
-UniFlow is broader today: more LMS integrations, bilingual transcription, a writing assistant. Second Mind
-wins on ownership, cost, and generating study material rather than just answering questions. We're
-not claiming parity.
 
 ## Architecture
 

@@ -1,4 +1,4 @@
-# Second Mind (Second Mind): Technical Design Document
+# Second Mind: Technical Design Document
 
 **Sprint 4 deliverable** · Team: Richa, Lakshita, Shatakshi (Product); Arthur, Aaron, Yongje
 (Engineering) · Status as of 2026-09-21
@@ -11,8 +11,8 @@ earlier design spec disagree, this document describes the code and says so.
 Second Mind is a native macOS desktop app, one install per student, that indexes the student's real Canvas
 material and answers questions with citations back to the source. It also transcribes lectures
 locally, explains assignments without drafting them, and (planned) generates study artifacts: mock
-tests, mindmaps, flashcards, and slides. It is the open-source alternative to UniFlow Study. Three
-constraints shape every decision below:
+tests, mindmaps, flashcards, and slides. The app is open source. Three constraints shape every
+decision below:
 
 1. **Local-first.** No Second Mind-operated server. Nothing is shared between students.
 2. **Grounded or silent.** If the indexed material doesn't support an answer, Second Mind says so instead

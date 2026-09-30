@@ -4,7 +4,7 @@
 body{font-family:Arial,sans-serif;font-size:11pt;line-height:1.35;max-width:7in;margin:24px auto;padding:0 16px;color:#111}
 h1{font-size:20pt} h2{font-size:14pt;margin-top:18px} h3{font-size:12pt}
 </style></head><body>
-<h1>Second Mind (Second Mind): Technical Design Document</h1>
+<h1>Second Mind: Technical Design Document</h1>
 <p><strong>Sprint 4 deliverable</strong> · Team: Richa, Lakshita, Shatakshi (Product); Arthur, Aaron, Yongje
 (Engineering) · Status as of 2026-09-21</p>
 <p>This is the consolidated design. Detail lives in the documents linked in §7. Where the code and the
@@ -13,8 +13,8 @@ earlier design spec disagree, this document describes the code and says so.</p>
 <p>Second Mind is a native macOS desktop app, one install per student, that indexes the student's real Canvas
 material and answers questions with citations back to the source. It also transcribes lectures
 locally, explains assignments without drafting them, and (planned) generates study artifacts: mock
-tests, mindmaps, flashcards, and slides. It is the open-source alternative to UniFlow Study. Three
-constraints shape every decision below:</p>
+tests, mindmaps, flashcards, and slides. The app is open source. Three constraints shape every
+decision below:</p>
 <ol>
 <li><strong>Local-first.</strong> No Second Mind-operated server. Nothing is shared between students.</li>
 <li><strong>Grounded or silent.</strong> If the indexed material doesn't support an answer, Second Mind says so instead
