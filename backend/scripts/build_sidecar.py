@@ -42,9 +42,10 @@ if torch_modules:
         ".venv-build must only have the build group"
     )
 
-# symlinks=True keeps the onedir folder's symlinks as symlinks (macOS).
+# Keep onedir symlinks on macOS, but dereference them on Windows so model
+# directories are copied into the Tauri bundle rather than left unusable.
 dest = backend.parent / "app" / "src-tauri" / "binaries" / "sm-backend"
 dest.parent.mkdir(parents=True, exist_ok=True)
 shutil.rmtree(dest, ignore_errors=True)
-shutil.copytree(backend / "dist" / "sm-backend", dest, symlinks=True)
+shutil.copytree(backend / "dist" / "sm-backend", dest, symlinks=os.name != "nt")
 print("installed: app/src-tauri/binaries/sm-backend/")

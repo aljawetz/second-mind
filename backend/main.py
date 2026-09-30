@@ -889,7 +889,12 @@ if __name__ == "__main__":
     try:
         server = ThreadingHTTPServer((HOST, PORT), Handler)
     except OSError as e:
-        if e.errno != errno.EADDRINUSE:
+        address_in_use_errors = {
+            errno.EADDRINUSE,
+            errno.EACCES,
+            getattr(errno, "WSAEACCES", 10013),
+        }
+        if e.errno not in address_in_use_errors:
             raise
         print(
             f"sm-backend: port {PORT} is already in use, most likely by another "

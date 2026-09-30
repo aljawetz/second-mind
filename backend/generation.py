@@ -6,7 +6,6 @@ grounding rules: answer-first, cite every factual claim, never blend in
 open-domain knowledge.
 """
 
-import keyring
 from llama_index.core.base.base_retriever import BaseRetriever
 from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.core.prompts import PromptTemplate
@@ -14,6 +13,8 @@ from llama_index.core.query_engine import CitationQueryEngine
 from llama_index.core.schema import NodeRelationship, NodeWithScore, QueryBundle
 from llama_index.core.vector_stores.utils import metadata_dict_to_node
 from llama_index.llms.openai import OpenAI
+
+import config
 
 CREDENTIAL_SERVICE = "com.secondmind.app"
 
@@ -78,7 +79,7 @@ ANSWER_FIRST_TEMPLATE = PromptTemplate(
 
 
 def _get_llm_key() -> str:
-    key = keyring.get_password(CREDENTIAL_SERVICE, "openai-key")
+    key = config.get_credential("openai-key")
     if not key:
         raise RuntimeError("no LLM API key stored — onboarding hasn't completed")
     return key

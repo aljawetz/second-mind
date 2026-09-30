@@ -7,11 +7,21 @@ Credentials themselves are never in here — only whether Keychain has them
 """
 
 import json
+import os
 from pathlib import Path
 
 import keyring
 
 CREDENTIAL_SERVICE = "com.secondmind.app"
+
+
+def get_credential(key: str) -> str | None:
+    value = keyring.get_password(CREDENTIAL_SERVICE, key)
+    if value or os.name != "nt":
+        return value
+    # Rust's Windows keyring backend uses `{username}.{service}` targets,
+    # while Python keyring uses `{username}@{service}` for its compound form.
+    return keyring.get_password(f"{key}.{CREDENTIAL_SERVICE}", key)
 
 
 def config_path(sm_home: Path) -> Path:
@@ -51,6 +61,6 @@ def normalize_canvas_base_url(raw: str) -> str:
 
 def credentials_status() -> dict:
     return {
-        "canvas": bool(keyring.get_password(CREDENTIAL_SERVICE, "canvas-token")),
-        "openai": bool(keyring.get_password(CREDENTIAL_SERVICE, "openai-key")),
+        "canvas": bool(get_credential("canvas-token")),
+        "openai": bool(get_credential("openai-key")),
     }

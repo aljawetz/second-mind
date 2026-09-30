@@ -34,7 +34,7 @@ class CanvasError(Exception):
 
 
 def _token() -> str:
-    token = keyring.get_password(CREDENTIAL_SERVICE, "canvas-token")
+    token = config.get_credential("canvas-token")
     if not token:
         raise CanvasError("no Canvas token stored — onboarding hasn't completed")
     return token
