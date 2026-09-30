@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+reviews:
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    # Keep reviewing new commits instead of pausing after five reviewed commits.
+    auto_pause_after_reviewed_commits: 0
+    drafts: true
+    # Review PRs targeting any branch, not just the default branch.
+    base_branches:
+      - ".*"
+    ignore_title_keywords: []
+    labels: []
+    ignore_usernames: []
