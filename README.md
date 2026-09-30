@@ -59,7 +59,8 @@ cd app && PATH="$HOME/.cargo/bin:$PATH" npm run tauri dev
 
 Prerequisites: `uv`, Node, Rust (`rustup`), `brew install tesseract`. During onboarding you'll
 need a Canvas API token (Account → Settings → New access token, on whatever Canvas instance your
-school uses) and an OpenAI API key. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev
+school uses) and a key for your model provider: an OpenAI or DeepSeek API key, or Sign in with GitHub if you have a
+Copilot plan (a fine-grained token with the Copilot Requests permission works too). See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev
 workflow.
 
 ### Windows (from source, experimental)

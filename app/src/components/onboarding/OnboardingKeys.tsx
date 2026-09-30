@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { getCredential, setCredential } from "../../credentials";
+import { getCredential, LLM_PROVIDERS, setCredential } from "../../credentials";
 import { getConfig, validateCredential, writeConfig } from "../../sidecar";
 import LogoMark from "../LogoMark";
+import ProviderKeyFields, { useProviderKey } from "../ProviderKeyFields";
 
 // canvasUrl comes back from onNext already normalized (config.py's
 // normalize_canvas_base_url, applied server-side on write) rather than
@@ -10,47 +11,44 @@ import LogoMark from "../LogoMark";
 export default function OnboardingKeys({ onNext }: { onNext: (canvasUrl: string) => void }) {
   const [canvasUrl, setCanvasUrl] = useState("");
   const [canvasKey, setCanvasKey] = useState("");
-  const [openaiKey, setOpenaiKey] = useState("");
+  const llm = useProviderKey();
+  const { provider, key: llmKey } = llm;
   const [canvasError, setCanvasError] = useState("");
-  const [openaiError, setOpenaiError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    Promise.all([getCredential("canvas-token"), getCredential("openai-key"), getConfig()]).then(
-      ([canvas, openai, cfg]) => {
-        if (canvas) setCanvasKey(canvas);
-        if (openai) setOpenaiKey(openai);
-        if (cfg.canvas_base_url) setCanvasUrl(cfg.canvas_base_url);
-        setLoaded(true);
-      }
-    );
+    Promise.all([getCredential("canvas-token"), getConfig()]).then(([canvas, cfg]) => {
+      if (canvas) setCanvasKey(canvas);
+      if (cfg.canvas_base_url) setCanvasUrl(cfg.canvas_base_url);
+      setLoaded(true);
+    });
   }, []);
 
   const canProceed =
-    loaded && !submitting && canvasUrl.trim() !== "" && canvasKey.trim() !== "" && openaiKey.trim() !== "";
+    loaded && llm.loaded && !submitting && canvasUrl.trim() !== "" && canvasKey.trim() !== "" && llmKey.trim() !== "";
 
   async function handleConnect() {
     setSubmitting(true);
     setCanvasError("");
-    setOpenaiError("");
+    llm.setError("");
 
-    const [canvasResult, openaiResult] = await Promise.all([
+    const [canvasResult, llmResult] = await Promise.all([
       validateCredential("canvas", canvasKey),
-      validateCredential("openai", openaiKey),
+      validateCredential(provider, llmKey),
     ]);
 
-    if (!canvasResult.valid || !openaiResult.valid) {
+    if (!canvasResult.valid || !llmResult.valid) {
       if (!canvasResult.valid) setCanvasError(canvasResult.reason);
-      if (!openaiResult.valid) setOpenaiError(openaiResult.reason);
+      if (!llmResult.valid) llm.setError(llmResult.reason);
       setSubmitting(false);
       return;
     }
 
     const [, , savedConfig] = await Promise.all([
       setCredential("canvas-token", canvasKey),
-      setCredential("openai-key", openaiKey),
-      writeConfig({ canvas_base_url: canvasUrl }),
+      setCredential(LLM_PROVIDERS[provider].credential, llmKey),
+      writeConfig({ canvas_base_url: canvasUrl, llm_provider: provider }),
     ]);
     setSubmitting(false);
     onNext(savedConfig.canvas_base_url ?? canvasUrl);
@@ -96,20 +94,7 @@ export default function OnboardingKeys({ onNext }: { onNext: (canvasUrl: string)
             <span className="hint">Your Canvas → Account → Settings → New access token</span>
           )}
         </div>
-        <div className="field">
-          <label htmlFor="key-openai">OpenAI API key</label>
-          <input
-            type="password"
-            id="key-openai"
-            value={openaiKey}
-            onChange={(e) => setOpenaiKey(e.target.value)}
-          />
-          {openaiError ? (
-            <span className="field-error">{openaiError}</span>
-          ) : (
-            <span className="hint">platform.openai.com/api-keys</span>
-          )}
-        </div>
+        <ProviderKeyFields state={llm} />
         <button className="btn-primary" disabled={!canProceed} onClick={handleConnect}>
           {submitting ? "Connecting…" : "Connect →"}
         </button>

@@ -10,6 +10,7 @@ import NewSessionView from "./NewSessionView";
 import SessionDetailView from "./SessionDetailView";
 import ManageCoursesView from "./ManageCoursesView";
 import ManageMemoriesView from "./ManageMemoriesView";
+import ModelProviderView from "./ModelProviderView";
 import OnboardingIndexing from "../onboarding/OnboardingIndexing";
 
 export default function AppShell({
@@ -177,6 +178,9 @@ export default function AppShell({
   function openManageCourses() {
     setView("manageCourses");
   }
+  function openModelProvider() {
+    setView("modelProvider");
+  }
   function openManageMemories() {
     setView("manageMemories");
   }
@@ -222,6 +226,7 @@ export default function AppShell({
           activeSessionId={sessionId}
           onOpenSession={openSession}
           onManageCourses={openManageCourses}
+          onModelProvider={openModelProvider}
         />
         <main className="main">
           <Topbar
@@ -233,9 +238,11 @@ export default function AppShell({
                 ? "Manage courses"
                 : view === "manageMemories"
                   ? "Manage memories"
-                  : view === "indexingCourse"
-                    ? "Manage courses"
-                    : undefined
+                  : view === "modelProvider"
+                    ? "Model provider"
+                    : view === "indexingCourse"
+                      ? "Manage courses"
+                      : undefined
             }
             syncStatus={
               launchSyncing
@@ -286,6 +293,7 @@ export default function AppShell({
                   onCourseAdded={handleCourseAdded}
                 />
               )}
+              {view === "modelProvider" && <ModelProviderView onBack={goHome} />}
               {view === "manageMemories" && (
                 <ManageMemoriesView
                   courseId={courseId}

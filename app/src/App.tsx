@@ -24,7 +24,7 @@ export default function App() {
       const [status, cfg] = await Promise.all([getCredentialsStatus(), getConfig()]);
       const remembered = cfg.selected_courses ?? [];
       setCanvasBaseUrl(cfg.canvas_base_url ?? "");
-      if (status.canvas && status.openai && cfg.onboarding_complete && remembered.length > 0) {
+      if (status.canvas && status.llm && cfg.onboarding_complete && remembered.length > 0) {
         const allCourses = await listCourses();
         const restored = allCourses.map((c) => ({
           id: c.id,

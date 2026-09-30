@@ -3,7 +3,7 @@ First real code for this file; only `main.py`'s startup-skip check and
 onboarding-completion write use it so far.
 
 Credentials themselves are never in here — only whether Keychain has them
-(credentials_status), read the same way canvas.py/generation.py already do.
+(credentials_status), read the same way canvas.py/providers.py already do.
 """
 
 import json
@@ -49,8 +49,10 @@ def normalize_canvas_base_url(raw: str) -> str:
     return value.rstrip("/")
 
 
-def credentials_status() -> dict:
+def credentials_status(llm_credential: str) -> dict:
+    """llm_credential: the Keychain item of the provider the student chose
+    (providers.current().credential)."""
     return {
         "canvas": bool(keyring.get_password(CREDENTIAL_SERVICE, "canvas-token")),
-        "openai": bool(keyring.get_password(CREDENTIAL_SERVICE, "openai-key")),
+        "llm": bool(keyring.get_password(CREDENTIAL_SERVICE, llm_credential)),
     }

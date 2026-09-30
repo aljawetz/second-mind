@@ -24,9 +24,9 @@ from html.parser import HTMLParser
 
 from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.core.prompts import PromptTemplate
-from llama_index.llms.openai import OpenAI
 
 import generation
+import providers
 
 BREAKDOWN_TEMPLATE = PromptTemplate(
     "You are Second Mind, a study assistant. Break the following assignment prompt "
@@ -94,7 +94,7 @@ def extract_code_identifiers(html: str) -> set[str]:
 
 
 def build_breakdown(name: str, description_text: str) -> list[str]:
-    llm = OpenAI(model=generation.DEFAULT_MODEL, api_key=generation._get_llm_key())
+    llm = providers.llama_llm()
     prompt = BREAKDOWN_TEMPLATE.format(name=name, description=description_text)
     response = llm.complete(prompt)
     lines = [line.strip(" \t-•") for line in str(response).splitlines()]

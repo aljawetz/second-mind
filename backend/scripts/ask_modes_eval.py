@@ -29,7 +29,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import openai
 from llama_index.core import Settings
 from llama_index.core.callbacks import CallbackManager, TokenCountingHandler
 from llama_index.core.query_engine import CitationQueryEngine
@@ -39,6 +38,7 @@ import chat
 import generation
 import indexing
 import llm
+import providers
 
 SM_HOME = Path.home() / ".secondmind"
 COURSE_NAMES = {
@@ -47,7 +47,7 @@ COURSE_NAMES = {
     56350: "Advanced AI for Industry & Society",
 }
 DEFAULT_COURSE = 55710
-MODEL = generation.DEFAULT_MODEL
+MODEL = providers.OPENAI.model  # costs and the gpt-4o judge assume OpenAI, whatever the app is set to
 TEMPERATURE = 0.1  # llama_index's OpenAI default, which mode A already uses
 MAX_TOOL_ROUNDS = 4
 
@@ -745,7 +745,7 @@ def run_a(index, question: str, _history: list[dict], _course_name: str) -> dict
     # Token counts only register through the global callback manager.
     counter = TokenCountingHandler()
     Settings.callback_manager = CallbackManager([counter])
-    llm = OpenAI(model=MODEL, api_key=generation._get_llm_key())
+    llm = OpenAI(model=MODEL, api_key=providers.api_key(providers.OPENAI))
     engine = CitationQueryEngine.from_args(
         index,
         llm=llm,
@@ -790,7 +790,7 @@ def run_a(index, question: str, _history: list[dict], _course_name: str) -> dict
 
 
 def run_tool_loop(index, question: str, history: list[dict], system_prompt: str) -> dict:
-    client = openai.OpenAI(api_key=generation._get_llm_key())
+    client = providers.openai_client(providers.OPENAI)
     retriever = generation.HybridRetriever(index)
     messages = [{"role": "system", "content": system_prompt}]
     for turn in history:
@@ -869,7 +869,7 @@ def run_shipped(index, question, history, course_name, cutoff):
         return nodes
 
     start = time.perf_counter()
-    events = list(chat.answer(question, history, course_name, search, llm.OpenAIProvider(temperature=TEMPERATURE)))
+    events = list(chat.answer(question, history, course_name, search, llm.OpenAIProvider(providers.OPENAI, temperature=TEMPERATURE)))
     elapsed = time.perf_counter() - start
     final = next(e for e in events if "citations" in e)
     usage = final.get("usage")  # None unless OpenAIProvider reported it (see llm.py's TurnEnd.usage)
@@ -1020,7 +1020,7 @@ def main():
     args = parser.parse_args()
     modes = args.only.split(",")
     wanted = set(filter(None, args.cases.split(",")))
-    judge_client = None if args.no_judge else openai.OpenAI(api_key=generation._get_llm_key())
+    judge_client = None if args.no_judge else providers.openai_client(providers.OPENAI)
 
     cases = HELDOUT_CASES if args.set == "heldout" else CASES
     indexes = {}

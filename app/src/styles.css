@@ -528,11 +528,12 @@ button{font:inherit;color:inherit}
 .back-mini:hover{color:var(--indigo)}
 .field{display:flex;flex-direction:column;gap:.35rem}
 .field label{font-size:.76rem;font-weight:600;color:var(--ink)}
-.field input{
+.field input,.field select{
   border:1px solid var(--line-strong);border-radius:10px;padding:.55rem .7rem;
   font-family:'IBM Plex Mono',monospace;font-size:.8rem;color:var(--ink);background:var(--paper);
 }
-.field input:focus{outline:none;border-color:var(--indigo)}
+.field select{font-family:inherit}
+.field input:focus,.field select:focus{outline:none;border-color:var(--indigo)}
 .field .hint{font-size:.7rem;color:var(--ink-faint)}
 .field .field-error{font-size:.7rem;color:var(--danger)}
 .course-pick{display:flex;flex-direction:column;gap:.5rem;max-height:260px;overflow-y:auto}
@@ -551,6 +552,20 @@ button{font:inherit;color:inherit}
 .manage-actions .icon-btn-danger{border-color:var(--danger-ink)}
 .manage-confirm{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;min-width:0}
 .manage-memories-intro{margin:.5rem 0 1rem}
+.model-provider-form{display:flex;flex-direction:column;gap:1rem;max-width:30rem}
+.model-provider-form .section-label{margin-bottom:0}
+.model-provider-actions{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.model-provider-actions .btn-primary{width:auto;padding:.6rem 1.4rem}
+.form-ok{font-size:.78rem;color:var(--moss)}
+.field .btn-secondary{padding:.6rem 1rem}
+.link-btn{
+  align-self:flex-start;background:none;border:none;padding:0;cursor:pointer;
+  font-size:.74rem;color:var(--indigo);
+}
+.link-btn:hover{text-decoration:underline}
+.signin-code{display:flex;flex-direction:column;gap:.45rem;border:1px solid var(--line-strong);border-radius:12px;padding:.8rem}
+.signin-user-code{font-family:'IBM Plex Mono',monospace;font-size:1.3rem;font-weight:600;letter-spacing:.12em;color:var(--ink);user-select:all}
+.signin-actions{display:flex;gap:1rem}
 #view-manage-memories .course-pick .course-row{cursor:default}
 #view-manage-memories .course-pick .course-row:hover{border-color:var(--line)}
 .memory-edit-area{

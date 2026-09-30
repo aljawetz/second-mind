@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { fetch } from "@tauri-apps/plugin-http";
+import type { LlmProvider } from "./credentials";
 
 // Routed through the Rust backend via IPC, not the webview's own fetch:
 // WKWebView blocks a plain fetch() to http://127.0.0.1 from this app's
@@ -17,9 +18,9 @@ export function getBackendInstanceToken(): Promise<string> {
   return invoke("backend_instance_token");
 }
 
-export type CredentialKind = "canvas" | "openai";
+export type CredentialKind = "canvas" | LlmProvider;
 
-// Format check only (Step 2) — not a real Canvas/OpenAI call yet. Step 3
+// Format check only (Step 2) — not a real Canvas/model provider call yet. Step 3
 // upgrades main.py's handler for this same endpoint to do that; the
 // frontend's interface here doesn't need to change when it does.
 export async function validateCredential(
@@ -33,13 +34,46 @@ export async function validateCredential(
   return res.json();
 }
 
+// llm: whether the key for the provider config.json names is stored.
 export interface CredentialsStatus {
   canvas: boolean;
-  openai: boolean;
+  llm: boolean;
 }
 
 export async function getCredentialsStatus(): Promise<CredentialsStatus> {
   const res = await fetch("http://127.0.0.1:8756/credentials/status");
+  return res.json();
+}
+
+// Sign in with GitHub for the Copilot provider (backend/github_signin.py,
+// OAuth device flow): start gets a code to show, then poll once every
+// `interval` seconds until it isn't "pending". On "done" the backend has
+// already put the token in the Keychain; it never comes through here.
+export interface GithubDeviceCode {
+  user_code: string;
+  verification_uri: string;
+  interval: number;
+  expires_in: number;
+}
+
+export interface GithubSignInPoll {
+  status: "pending" | "done" | "denied" | "expired" | "error";
+  interval?: number;
+  login?: string | null;
+  message?: string;
+}
+
+export async function startGithubSignIn(): Promise<GithubDeviceCode> {
+  const res = await fetch("http://127.0.0.1:8756/github/device/start", { method: "POST", body: "{}" });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `couldn't start GitHub sign-in (${res.status})`);
+  }
+  return data;
+}
+
+export async function pollGithubSignIn(): Promise<GithubSignInPoll> {
+  const res = await fetch("http://127.0.0.1:8756/github/device/poll", { method: "POST", body: "{}" });
   return res.json();
 }
 
@@ -49,7 +83,7 @@ export async function getCredentialsStatus(): Promise<CredentialsStatus> {
 // disk) instead of always starting fresh.
 export interface SsbConfig {
   selected_courses?: number[];
-  llm_provider?: string;
+  llm_provider?: LlmProvider;
   onboarding_complete?: boolean;
   canvas_base_url?: string;
 }

@@ -42,7 +42,7 @@ def _extraction(text, kind="fact", summary=""):  # no summary memory unless a te
 
 
 class FakeModel:
-    """Stands in for llm.OpenAIProvider: scripted streamed replies for /ask,
+    """Stands in for llm.current_provider(): scripted streamed replies for /ask,
     scripted JSON replies for the memory worker."""
 
     def __init__(self):
@@ -76,7 +76,7 @@ def app(tmp_path, monkeypatch):
     monkeypatch.setattr(indexing, "load_index", no_index)
     monkeypatch.setattr(memory_jobs, "embed", embed)
     model = FakeModel()
-    monkeypatch.setattr(llm, "OpenAIProvider", lambda *args, **kwargs: model)
+    monkeypatch.setattr(llm, "current_provider", lambda *args, **kwargs: model)
 
     server = main.ThreadingHTTPServer(("127.0.0.1", 0), main.Handler)
     threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()

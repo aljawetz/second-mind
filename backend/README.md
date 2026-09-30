@@ -102,8 +102,9 @@ case (a deliberately off-topic query should return zero source nodes, not a hall
 uv run python3 scripts/generation_smoke_test.py
 ```
 
-Makes real, **billed** OpenAI API calls (a handful of cheap `gpt-4o-mini` queries, but real money,
-not simulated). Needs a real OpenAI key in Keychain.
+Makes real, **billed** calls to the model provider chosen at onboarding (a handful of cheap
+`gpt-4o-mini`, `deepseek-flash` or Copilot queries, but real money, not simulated). Needs that provider's
+real key in Keychain.
 
 ## Running the assignment explainer boundary test
 
