@@ -39,6 +39,20 @@ cd app && npx tsc --noEmit                 # frontend
 Both need to pass. If you touched anything under `app/src-tauri/`, also confirm `npm run tauri
 dev` still launches cleanly — there's no automated check for the Rust shell itself yet.
 
+## Automated PR reviews
+
+[CodeRabbit](https://www.coderabbit.ai/oss) is configured in
+[`.coderabbit.yaml`](.coderabbit.yaml) to review PRs targeting any branch, including drafts,
+and review new commits automatically. No PR title, label, or author filters are configured.
+
+Repository admins must first [install the CodeRabbit GitHub App](https://github.com/apps/coderabbitai)
+and grant it access to `aljawetz/second-mind`. The app handles review events directly; no GitHub
+Actions workflow or API secret is needed. Public repositories qualify for free reviews.
+
+For an existing PR, comment `@coderabbitai review` to request a review, or
+`@coderabbitai full review` to review the entire PR again. See the
+[configuration reference](https://docs.coderabbit.ai/reference/configuration) for review controls.
+
 ## How this repo documents itself
 
 Every backend `docs/architecture/*.md` file is kept current with **real findings**, not just
