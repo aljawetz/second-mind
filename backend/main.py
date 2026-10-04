@@ -96,6 +96,13 @@ MEMORY_LIST_PATH = re.compile(r"^/courses/(\d+)/memories$")
 MEMORY_ALL_PATH = re.compile(r"^/courses/(\d+)/memories/all$")
 MEMORY_DETAIL_PATH = re.compile(r"^/courses/(\d+)/memories/([\w-]+)$")
 MEMORY_EDIT_PATH = re.compile(r"^/courses/(\d+)/memories/([\w-]+)/edit$")
+STUDY_LIST_PATH = re.compile(r"^/courses/(\d+)/study$")
+STUDY_SOURCES_PATH = re.compile(r"^/courses/(\d+)/study/sources$")
+STUDY_DETAIL_PATH = re.compile(r"^/courses/(\d+)/study/([\w-]+)$")
+STUDY_PROGRESS_PATH = re.compile(r"^/courses/(\d+)/study/([\w-]+)/progress$")
+STUDY_EXPORT_PATH = re.compile(r"^/courses/(\d+)/study/([\w-]+)/export$")
+# Where "Download as CSV" saves (study.export_csv); tests point it elsewhere.
+DOWNLOADS_DIR = Path.home() / "Downloads"
 # Same shape as the route ids above, for ids that arrive in a request body
 # instead (/ask's conversation_id) and end up in a file path.
 SAFE_ID = re.compile(r"[\w-]+")
@@ -280,6 +287,19 @@ class Handler(BaseHTTPRequestHandler):
             if memory_list_match:
                 include_inactive = _parse_include_inactive(query)
                 self._handle_list_memories(memory_list_match.group(1), include_inactive)
+                return
+            study_list_match = STUDY_LIST_PATH.match(path)
+            if study_list_match:
+                self._handle_list_study(study_list_match.group(1))
+                return
+            # Before STUDY_DETAIL_PATH, which "sources" would also match.
+            study_sources_match = STUDY_SOURCES_PATH.match(path)
+            if study_sources_match:
+                self._handle_study_sources(study_sources_match.group(1))
+                return
+            study_detail_match = STUDY_DETAIL_PATH.match(path)
+            if study_detail_match:
+                self._handle_study_detail(study_detail_match.group(1), study_detail_match.group(2))
                 return
             self._send_json(404, {"error": {"code": "not_found", "message": "no such route"}})
 
@@ -508,6 +528,21 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_memory_update(memory_edit_match.group(1), memory_edit_match.group(2))
             return
 
+        study_list_match = STUDY_LIST_PATH.match(path)
+        if study_list_match:
+            self._handle_study_start(study_list_match.group(1))
+            return
+
+        study_progress_match = STUDY_PROGRESS_PATH.match(path)
+        if study_progress_match:
+            self._handle_study_progress(study_progress_match.group(1), study_progress_match.group(2))
+            return
+
+        study_export_match = STUDY_EXPORT_PATH.match(path)
+        if study_export_match:
+            self._handle_study_export(study_export_match.group(1), study_export_match.group(2))
+            return
+
         self._send_json(404, {"error": {"code": "not_found", "message": "no such route"}})
 
     def do_DELETE(self):
@@ -522,6 +557,10 @@ class Handler(BaseHTTPRequestHandler):
         memory_match = MEMORY_DETAIL_PATH.match(self.path)
         if memory_match:
             self._handle_memory_delete(memory_match.group(1), memory_match.group(2))
+            return
+        study_match = STUDY_DETAIL_PATH.match(self.path)
+        if study_match:
+            self._handle_study_delete(study_match.group(1), study_match.group(2))
             return
         course_match = COURSE_PATH.match(self.path)
         if course_match:
@@ -953,6 +992,136 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         self._send_json(200, {"breakdown": breakdown, "pointers": pointers})
+
+    def _read_json_body(self) -> dict | None:
+        """The request's JSON object, or None after answering 400."""
+        length = int(self.headers.get("Content-Length", 0))
+        try:
+            data = json.loads(self.rfile.read(length) or b"{}")
+        except json.JSONDecodeError:
+            data = None
+        if not isinstance(data, dict):
+            self._send_json(400, {"error": {"code": "bad_request", "message": "invalid JSON"}})
+            return None
+        return data
+
+    def _handle_list_study(self, course_id: str):
+        import study
+
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        self._send_json(200, {"artifacts": study.list_artifacts(SM_HOME, int(course_id))})
+
+    def _handle_study_sources(self, course_id: str):
+        import study
+
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        # Canvas's modules give the grouping students know ("Week 02 - ...").
+        # Without them (offline, token expired) the list still works, by kind.
+        try:
+            structure = canvas.get_course_structure(int(course_id))
+        except (canvas.CanvasError, httpx.HTTPStatusError, httpx.TransportError):
+            structure = None
+        self._send_json(200, {"sources": study.list_sources(SM_HOME / "index.lancedb", int(course_id), structure)})
+
+    def _handle_study_detail(self, course_id: str, artifact_id: str):
+        import study
+
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        artifact = study.get_artifact(SM_HOME, int(course_id), artifact_id)
+        if artifact is None:
+            self._not_found("no such quiz or deck")
+            return
+        self._send_json(200, artifact)
+
+    def _handle_study_start(self, course_id: str):
+        import llm
+        import study
+
+        data = self._read_json_body()
+        if data is None:
+            return
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        kind = data.get("kind")
+        try:
+            options = study.check_options(kind, data)
+        except ValueError as e:
+            self._send_json(400, {"error": {"code": "bad_request", "message": str(e)}})
+            return
+        # Fail now on a missing key or unknown provider, not minutes later
+        # inside the background run.
+        try:
+            model = llm.current_provider()
+        except LLM_ERRORS as e:
+            self._send_json(*self._llm_error(e))
+            return
+
+        def embed(text: str) -> list[float]:
+            from embeddings import OnnxBgeEmbedding
+
+            return OnnxBgeEmbedding().get_query_embedding(text)
+
+        def describe(e: Exception) -> str:
+            if isinstance(e, LLM_ERRORS):
+                return self._llm_error(e)[1]["error"]["message"]
+            traceback.print_exc()
+            return "Something went wrong while writing this. Try again."
+
+        summary = study.start(
+            SM_HOME, SM_HOME / "index.lancedb", int(course_id), kind, options, llm=model, embed=embed, describe_error=describe
+        )
+        self._send_json(202, summary)
+
+    def _handle_study_progress(self, course_id: str, artifact_id: str):
+        import study
+
+        data = self._read_json_body()
+        if data is None:
+            return
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        try:
+            study.save_progress(SM_HOME, int(course_id), artifact_id, data.get("progress") or {})
+        except KeyError:
+            self._not_found("no such quiz or deck")
+            return
+        self._send_json(200, {"status": "saved"})
+
+    def _handle_study_export(self, course_id: str, artifact_id: str):
+        import study
+
+        length = int(self.headers.get("Content-Length", 0))
+        if length:
+            self.rfile.read(length)
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        try:
+            path = study.export_csv(SM_HOME, int(course_id), artifact_id, DOWNLOADS_DIR)
+        except KeyError:
+            self._not_found("no such quiz or deck")
+            return
+        except OSError as e:
+            self._send_json(500, {"error": {"code": "export_failed", "message": f"couldn't save the file: {e.strerror}"}})
+            return
+        self._send_json(200, {"path": str(path)})
+
+    def _handle_study_delete(self, course_id: str, artifact_id: str):
+        import study
+
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        study.delete_artifact(SM_HOME, int(course_id), artifact_id)
+        self._send_json(200, {"status": "deleted"})
 
     def log_message(self, format, *args):
         pass  # keep stdout quiet; this is a sidecar, not a dev console

@@ -70,13 +70,18 @@ class OpenAIProvider:
         self._temperature = temperature
         self._extra = {"extra_body": self._provider.extra_body} if self._provider.extra_body else {}
 
-    def complete_json(self, messages: list[dict]) -> object:
-        """One non-streaming call in JSON mode, at temperature 0 — memory
-        extraction and consolidation (memory/extract.py's JsonLLM). The
+    def complete_json(self, messages: list[dict], temperature: float = 0) -> object:
+        """One non-streaming call in JSON mode — memory extraction and
+        consolidation (memory/extract.py's JsonLLM) at temperature 0, study
+        artifacts (study.py) higher, so asking again gives new questions. The
         reply parsed, or None if it isn't JSON after all: callers treat
         anything unexpected as "nothing to do", never as an error."""
         response = self._client.chat.completions.create(
-            model=self._model, messages=messages, temperature=0, response_format={"type": "json_object"}, **self._extra
+            model=self._model,
+            messages=messages,
+            temperature=temperature,
+            response_format={"type": "json_object"},
+            **self._extra,
         )
         try:
             return json.loads(response.choices[0].message.content or "")

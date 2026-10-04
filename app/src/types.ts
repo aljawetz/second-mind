@@ -6,7 +6,8 @@ export type ViewName =
   | "manageCourses"
   | "manageMemories"
   | "modelProvider"
-  | "indexingCourse";
+  | "indexingCourse"
+  | "study";
 
 export type OnboardStage = "startup" | "keys" | "courses" | "indexing" | "app";
 

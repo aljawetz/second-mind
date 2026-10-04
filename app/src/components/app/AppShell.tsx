@@ -2,14 +2,22 @@ import { useEffect, useState } from "react";
 import type { AvailableCourse, ViewName } from "../../types";
 import {
   deleteConversation,
+  deleteStudy,
   listAssignments,
   listConversations,
   listSessions,
+  listStudy,
+  startStudy,
   syncCourse,
   type CanvasAssignment,
+  type Citation,
   type ConversationSummary,
   type SessionSummary,
+  type StudyKind,
+  type StudyOptions,
+  type StudySummary,
 } from "../../sidecar";
+import { openCitation } from "../../citations";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import HomeView from "./HomeView";
@@ -19,6 +27,9 @@ import SessionDetailView from "./SessionDetailView";
 import ManageCoursesView from "./ManageCoursesView";
 import ManageMemoriesView from "./ManageMemoriesView";
 import ModelProviderView from "./ModelProviderView";
+import StudyPanel from "./StudyPanel";
+import QuizView from "./QuizView";
+import FlashcardsView from "./FlashcardsView";
 import OnboardingIndexing from "../onboarding/OnboardingIndexing";
 
 export default function AppShell({
@@ -47,6 +58,12 @@ export default function AppShell({
   // starts fresh. Not bumped when a new chat gets saved under its id, which
   // would reload it mid-answer.
   const [chatKey, setChatKey] = useState(0);
+  // Quizzes and flashcards (study.py): the list on course home, the one open.
+  const [studyItems, setStudyItems] = useState<StudySummary[]>([]);
+  const [studyError, setStudyError] = useState<string | null>(null);
+  const [studyId, setStudyId] = useState<string | null>(null);
+  // Explain on a quiz question or flashcard: asked in a new chat on course home.
+  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   const [pendingIndexCourse, setPendingIndexCourse] = useState<AvailableCourse | null>(null);
   const [launchSyncing, setLaunchSyncing] = useState(false);
   const [launchSyncErrors, setLaunchSyncErrors] = useState<string[]>([]);
@@ -174,6 +191,50 @@ export default function AppShell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions, courseId]);
 
+  function refreshStudy() {
+    if (!course) return;
+    listStudy(courseId)
+      .then((list) => {
+        setStudyItems(list);
+        setStudyError(null);
+      })
+      .catch((err) => setStudyError(err instanceof Error ? err.message : "Couldn't load quizzes"));
+  }
+
+  useEffect(() => {
+    setStudyItems([]);
+    refreshStudy();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId, !!course]);
+
+  // Generation runs in the background; poll until nothing is generating.
+  useEffect(() => {
+    if (!studyItems.some((s) => s.status === "generating")) return;
+    const id = setInterval(refreshStudy, 3000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studyItems, courseId]);
+
+  async function createStudy(kind: StudyKind, options: StudyOptions) {
+    const started = await startStudy(courseId, kind, options);
+    setStudyItems((prev) => [started, ...prev]);
+  }
+  async function removeStudy(id: string) {
+    await deleteStudy(courseId, id);
+    setStudyItems((prev) => prev.filter((s) => s.id !== id));
+  }
+  function openStudy(id: string) {
+    setStudyId(id);
+    setView("study");
+  }
+  function explainInChat(question: string) {
+    setPendingQuestion(question);
+    openChat(null);
+  }
+  function openCourseCitation(c: Citation) {
+    void openCitation(canvasBaseUrl, courseId, c, openSession);
+  }
+
   function openChat(id: string | null) {
     setConversationId(id);
     setChatKey((k) => k + 1);
@@ -244,6 +305,7 @@ export default function AppShell({
   }
 
   const selectedAssignment = assignments.find((a) => a.id === assignmentId) ?? null;
+  const openStudyItem = studyItems.find((s) => s.id === studyId) ?? null;
 
   // Removing the last course leaves nothing to render here — App.tsx owns
   // the course list and would need to route back to onboarding for that
@@ -308,6 +370,18 @@ export default function AppShell({
                   assignmentsError={assignmentsError}
                   sessions={sessions}
                   conversationId={conversationId}
+                  initialQuestion={pendingQuestion}
+                  onInitialQuestionSent={() => setPendingQuestion(null)}
+                  studyPanel={
+                    <StudyPanel
+                      courseId={courseId}
+                      artifacts={studyItems}
+                      error={studyError}
+                      onCreate={createStudy}
+                      onOpen={openStudy}
+                      onDelete={removeStudy}
+                    />
+                  }
                   onConversationSaved={handleConversationSaved}
                   onOpenAssignment={openAssignment}
                   onOpenSession={openSession}
@@ -320,6 +394,24 @@ export default function AppShell({
                   assignment={selectedAssignment}
                   onBack={goHome}
                   onOpenSession={openSession}
+                />
+              )}
+              {view === "study" && openStudyItem?.kind === "quiz" && (
+                <QuizView
+                  courseId={courseId}
+                  artifactId={openStudyItem.id}
+                  onBack={goHome}
+                  onExplain={explainInChat}
+                  onOpenCitation={openCourseCitation}
+                />
+              )}
+              {view === "study" && openStudyItem?.kind === "flashcards" && (
+                <FlashcardsView
+                  courseId={courseId}
+                  artifactId={openStudyItem.id}
+                  onBack={goHome}
+                  onExplain={explainInChat}
+                  onOpenCitation={openCourseCitation}
                 />
               )}
               {view === "newSession" && (

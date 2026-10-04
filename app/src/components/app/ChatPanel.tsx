@@ -17,6 +17,8 @@ export default function ChatPanel({
   courseName,
   conversationId: initialConversationId,
   suggestions,
+  initialQuestion,
+  onInitialQuestionSent,
   onConversationSaved,
   onOpenCitation,
 }: {
@@ -25,6 +27,9 @@ export default function ChatPanel({
   // A saved chat to open, or null for a new one.
   conversationId: string | null;
   suggestions: string[];
+  // Asked as soon as the panel opens: Explain on a quiz question or flashcard.
+  initialQuestion?: string | null;
+  onInitialQuestionSent?: () => void;
   onConversationSaved: (conversationId: string) => void;
   onOpenCitation: (c: Citation) => void;
 }) {
@@ -48,6 +53,16 @@ export default function ChatPanel({
     return () => {
       mounted.current = false;
     };
+  }, []);
+
+  // Once only, also under StrictMode's double-run of effects.
+  const initialSent = useRef(false);
+  useEffect(() => {
+    if (!initialQuestion || initialSent.current) return;
+    initialSent.current = true;
+    void send(initialQuestion);
+    onInitialQuestionSent?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const lastTurn = turns[turns.length - 1];

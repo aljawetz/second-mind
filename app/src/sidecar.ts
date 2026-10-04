@@ -453,3 +453,133 @@ export async function deleteMemory(courseId: number, memoryId: string): Promise<
     throw new Error(data?.error?.message ?? `failed to delete memory (${res.status})`);
   }
 }
+
+// Study artifacts (backend/study.py, docs/plans/2026-10-03-study-artifacts.md):
+// quizzes and flashcards like NotebookLM's, written from the course's own
+// indexed material. POST returns at once with status "generating"; poll the
+// list or the artifact until it's "done" or "error".
+export type StudyKind = "quiz" | "flashcards";
+export type StudyCount = "fewer" | "standard" | "more";
+export type StudyDifficulty = "easy" | "medium" | "hard";
+
+export interface StudyOptions {
+  count: StudyCount;
+  difficulty: StudyDifficulty;
+  topic: string;
+  // Narrow to these indexed documents; null means the whole course.
+  item_ids: string[] | null;
+}
+
+export const DEFAULT_STUDY_OPTIONS: StudyOptions = { count: "standard", difficulty: "medium", topic: "", item_ids: null };
+
+export interface StudySummary {
+  id: string;
+  kind: StudyKind;
+  title: string;
+  status: "generating" | "done" | "error";
+  error: string | null;
+  created_at: string;
+  options: StudyOptions;
+  count: number;
+}
+
+export interface QuizOption {
+  text: string;
+  correct: boolean;
+  rationale: string;
+}
+
+export interface QuizQuestion {
+  question: string;
+  options: QuizOption[];
+  hint: string;
+  citation: Citation;
+  passage: string;
+}
+
+export interface Flashcard {
+  front: string;
+  back: string;
+  citation: Citation;
+  passage: string;
+}
+
+// The app's own record of where the student is; the backend only stores it.
+export interface QuizProgress {
+  // Question index → chosen option index.
+  answers?: Record<string, number>;
+  position?: number;
+  finished?: boolean;
+}
+
+export interface FlashcardProgress {
+  position?: number;
+  marks?: Record<string, "got" | "missed">;
+  removed?: number[];
+  // Card indexes in the order being practised (shuffle, only-missed).
+  order?: number[];
+}
+
+export interface StudyArtifact extends Omit<StudySummary, "count"> {
+  items: (QuizQuestion | Flashcard)[];
+  stats: { generated: number; unsourced: number; malformed: number; unsupported: number; checked: boolean } | null;
+  progress: QuizProgress & FlashcardProgress;
+}
+
+export interface StudySource {
+  item_id: string;
+  source: string;
+  source_type: Citation["source_type"];
+  chunks: number;
+  // Canvas's heading for it ("Week 02 - Literature Review", or the module's
+  // name), or a kind ("Recorded sessions") for what Canvas doesn't list.
+  group: string;
+}
+
+async function studyJson<T>(res: Response, what: string): Promise<T> {
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error?.message ?? `${what} failed (${res.status})`);
+  return data as T;
+}
+
+export async function listStudy(courseId: number): Promise<StudySummary[]> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/study`);
+  return (await studyJson<{ artifacts: StudySummary[] }>(res, "loading quizzes")).artifacts;
+}
+
+export async function listStudySources(courseId: number): Promise<StudySource[]> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/study/sources`);
+  return (await studyJson<{ sources: StudySource[] }>(res, "loading sources")).sources;
+}
+
+export async function startStudy(courseId: number, kind: StudyKind, options: StudyOptions): Promise<StudySummary> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/study`, {
+    method: "POST",
+    body: JSON.stringify({ kind, ...options }),
+  });
+  return studyJson<StudySummary>(res, "generating");
+}
+
+export async function getStudy(courseId: number, id: string): Promise<StudyArtifact> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/study/${id}`);
+  return studyJson<StudyArtifact>(res, "opening");
+}
+
+export async function saveStudyProgress(courseId: number, id: string, progress: StudyArtifact["progress"]): Promise<void> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/study/${id}/progress`, {
+    method: "POST",
+    body: JSON.stringify({ progress }),
+  });
+  await studyJson(res, "saving progress");
+}
+
+export async function deleteStudy(courseId: number, id: string): Promise<void> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/study/${id}`, { method: "DELETE" });
+  await studyJson(res, "deleting");
+}
+
+// NotebookLM's "Download": the backend writes a CSV to ~/Downloads and says where.
+export async function exportStudyCsv(courseId: number, id: string): Promise<string> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/study/${id}/export`, { method: "POST", body: "{}" });
+  return (await studyJson<{ path: string }>(res, "saving the file")).path;
+}

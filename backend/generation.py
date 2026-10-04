@@ -141,20 +141,31 @@ def build_citations(source_nodes: list[NodeWithScore]) -> list[dict]:
     citations = []
     for node_with_score in source_nodes:
         node = node_with_score.node
-        source = node.metadata.get("source", "")
-        # Every node now always carries all of page/slide/timestamp
-        # (indexing.py's _metadata, Step 12) — only some populated per
-        # node — so these must check the value, not just key presence.
-        if node.metadata.get("page") is not None:
-            label = f"{source} · p.{node.metadata['page']}"
-        elif node.metadata.get("slide") is not None:
-            label = f"{source} · slide {node.metadata['slide']}"
-        elif node.metadata.get("timestamp") is not None:
-            label = f"{source} · {node.metadata['timestamp']}"
-        else:
-            label = source
         source_rel = node.relationships.get(NodeRelationship.SOURCE)
-        item_id = source_rel.node_id if source_rel else ""
-        source_type = node.metadata.get("item_type", "file")
-        citations.append({"source_type": source_type, "label": label, "item_id": item_id})
+        citations.append(citation_for(node.metadata, source_rel.node_id if source_rel else ""))
     return citations
+
+
+def location(metadata: dict) -> str:
+    """Where in its document a chunk sits: "p.3", "slide 4", "14:22", or ""."""
+    # Every node now always carries all of page/slide/timestamp
+    # (indexing.py's _metadata, Step 12) — only some populated per
+    # node — so these must check the value, not just key presence.
+    if metadata.get("page") is not None:
+        return f"p.{metadata['page']}"
+    if metadata.get("slide") is not None:
+        return f"slide {metadata['slide']}"
+    if metadata.get("timestamp") is not None:
+        return metadata["timestamp"]
+    return ""
+
+
+def citation_for(metadata: dict, item_id: str) -> dict:
+    """One chunk's citation: chat answers (above) and study artifacts (study.py)."""
+    source = metadata.get("source") or ""
+    where = location(metadata)
+    return {
+        "source_type": metadata.get("item_type") or "file",
+        "label": f"{source} · {where}" if where else source,
+        "item_id": item_id,
+    }
