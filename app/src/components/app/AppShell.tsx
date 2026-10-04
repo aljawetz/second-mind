@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
-import type { ArtifactType, AvailableCourse, ViewName } from "../../types";
-import { listAssignments, listSessions, syncCourse, type CanvasAssignment, type SessionSummary } from "../../sidecar";
+import type { AvailableCourse, ViewName } from "../../types";
+import {
+  deleteConversation,
+  listAssignments,
+  listConversations,
+  listSessions,
+  syncCourse,
+  type CanvasAssignment,
+  type ConversationSummary,
+  type SessionSummary,
+} from "../../sidecar";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import HomeView from "./HomeView";
-import ArtifactView from "./ArtifactView";
 import AssignmentView from "./AssignmentView";
 import NewSessionView from "./NewSessionView";
 import SessionDetailView from "./SessionDetailView";
@@ -26,13 +34,19 @@ export default function AppShell({
 }) {
   const [courseId, setCourseId] = useState<number>(courses[0].id);
   const [view, setView] = useState<ViewName>("home");
-  const [artifact, setArtifact] = useState<ArtifactType>("mocktest");
   const [assignmentId, setAssignmentId] = useState<number | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
   const [assignments, setAssignments] = useState<CanvasAssignment[]>([]);
   const [assignmentsError, setAssignmentsError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  // The chat open on course home: a saved one, or null for a new chat.
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  // Bumped whenever the student picks a different chat, so the chat panel
+  // starts fresh. Not bumped when a new chat gets saved under its id, which
+  // would reload it mid-answer.
+  const [chatKey, setChatKey] = useState(0);
   const [pendingIndexCourse, setPendingIndexCourse] = useState<AvailableCourse | null>(null);
   const [launchSyncing, setLaunchSyncing] = useState(false);
   const [launchSyncErrors, setLaunchSyncErrors] = useState<string[]>([]);
@@ -100,8 +114,7 @@ export default function AppShell({
   // than crash on course.find(...)! finding nothing.
   useEffect(() => {
     if (!courses.some((c) => c.id === courseId) && courses.length > 0) {
-      setCourseId(courses[0].id);
-      setView("home");
+      changeCourse(courses[0].id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courses]);
@@ -138,6 +151,19 @@ export default function AppShell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId, !!course]);
 
+  function refreshConversations() {
+    if (!course) return;
+    listConversations(courseId)
+      .then(setConversations)
+      .catch(() => {});
+  }
+
+  useEffect(() => {
+    setConversations([]);
+    refreshConversations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId, !!course]);
+
   // A session left "recording"/"processing" keeps polling in the
   // background while the sidebar is visible, so its status dot updates
   // even if the student navigates away from the session's own page.
@@ -148,9 +174,19 @@ export default function AppShell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions, courseId]);
 
-  function openArtifact(type: ArtifactType) {
-    setArtifact(type);
-    setView("artifact");
+  function openChat(id: string | null) {
+    setConversationId(id);
+    setChatKey((k) => k + 1);
+    setView("home");
+  }
+  function handleConversationSaved(id: string) {
+    setConversationId(id);
+    refreshConversations();
+  }
+  async function handleDeleteConversation(id: string) {
+    await deleteConversation(courseId, id);
+    if (id === conversationId) openChat(null);
+    refreshConversations();
   }
   function openAssignment(id: number) {
     setAssignmentId(id);
@@ -161,6 +197,8 @@ export default function AppShell({
   }
   function changeCourse(id: number) {
     setCourseId(id);
+    setConversationId(null);
+    setChatKey((k) => k + 1);
     setView("home");
   }
   function openNewSession() {
@@ -221,10 +259,16 @@ export default function AppShell({
           courses={courses}
           activeCourseId={courseId}
           onCourseChange={changeCourse}
-          onNewSession={openNewSession}
+          conversations={conversations}
+          activeConversationId={view === "home" ? conversationId : null}
+          onNewChat={() => openChat(null)}
+          onOpenConversation={openChat}
+          onDeleteConversation={handleDeleteConversation}
           sessions={sessions}
-          activeSessionId={sessionId}
+          activeSessionId={view === "sessionDetail" ? sessionId : null}
           onOpenSession={openSession}
+          onNewSession={openNewSession}
+          canvasBaseUrl={canvasBaseUrl}
           onManageCourses={openManageCourses}
           onModelProvider={openModelProvider}
         />
@@ -249,26 +293,25 @@ export default function AppShell({
                 ? { label: "Syncing courses…" }
                 : launchSyncErrors.length > 0
                   ? { label: `Sync issue: ${launchSyncErrors.join("; ")}`, detail: launchSyncDetails.join("\n"), error: true }
-                  : undefined
+                  : { label: "Synced with Canvas", ok: true }
             }
           />
-          <div className={"view" + (view === "home" ? " view-fill" : "")}>
-            <div className={"view-inner" + (view === "home" ? " view-inner-fill" : "")}>
+          <div className={"view" + (view === "home" ? " view-home" : "")}>
+            <div className="view-inner">
               {view === "home" && (
                 <HomeView
-                  key={courseId}
+                  key={`${courseId}-${chatKey}`}
                   courseId={courseId}
                   courseName={course.name}
                   canvasBaseUrl={canvasBaseUrl}
                   assignments={assignments}
                   assignmentsError={assignmentsError}
-                  onOpenArtifact={openArtifact}
+                  sessions={sessions}
+                  conversationId={conversationId}
+                  onConversationSaved={handleConversationSaved}
                   onOpenAssignment={openAssignment}
                   onOpenSession={openSession}
                 />
-              )}
-              {view === "artifact" && (
-                <ArtifactView artifact={artifact} onArtifactChange={setArtifact} onBack={goHome} />
               )}
               {view === "assignment" && selectedAssignment && (
                 <AssignmentView

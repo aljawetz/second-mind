@@ -117,6 +117,16 @@ A module-level `threading.Lock` guards the read-modify-write in `append_turn`, s
 
 ### Task 5: lift chat state and add history UI
 
+**Done in the UI redesign (branch `ui/notebook-redesign`), with two changes from this plan:**
+the chat list lives in the sidebar under the active course (the redesign gave the sidebar room
+for it), and deleting a chat uses an inline confirm instead of `window.confirm`. `HomeView` now
+hosts a `ChatPanel`, which is remounted by an `AppShell` key when the student picks a chat, and
+loads the saved chat only on mount.
+
+**Real finding:** the shipped `HomeView` read `conversation_id` from the `done` line, but
+`main.py` sends it on the first line only. So every question started a new saved conversation.
+`ChatPanel` now takes the id from the first line and reuses it for follow-ups.
+
 **Files:** modify `AppShell.tsx`, `HomeView.tsx`, `styles.css`
 
 - [ ] `AppShell` holds `conversationId: string | null` and `conversations: ConversationSummary[]`. Load the list on course change (same effect as `refreshSessions`). Reset `conversationId` to `null` on course change.

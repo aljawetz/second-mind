@@ -37,8 +37,22 @@ export function splitAssignments(assignments: CanvasAssignment[]): {
   return { upcoming, past };
 }
 
+// Calendar days from today to the due date, in local time: 0 is today.
+function daysUntil(dueAt: string): number {
+  const due = new Date(dueAt);
+  due.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((due.getTime() - today.getTime()) / 86_400_000);
+}
+
 export function statusPill(a: CanvasAssignment): { text: string; cls: string } {
   if (a.missing) return { text: "Missing", cls: "pill-red" };
   if (a.submitted) return { text: a.late ? "Submitted late" : "Submitted", cls: "pill-green" };
+  if (!a.due_at) return { text: "No due date", cls: "pill-neutral" };
+  // Work due within a day gets the urgent colour.
+  const days = daysUntil(a.due_at);
+  if (days === 0) return { text: "Due today", cls: "pill-red" };
+  if (days === 1) return { text: "Due tomorrow", cls: "pill-red" };
   return { text: `Due ${formatDue(a.due_at)}`, cls: "pill-ochre" };
 }

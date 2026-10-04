@@ -13,7 +13,7 @@ export default function Topbar({
   overrideTitle?: string;
   // detail: the full per-item failure list, shown on hover — the label
   // stays short enough for the pill.
-  syncStatus?: { label: string; detail?: string; error?: boolean };
+  syncStatus?: { label: string; detail?: string; error?: boolean; ok?: boolean };
   onManageMemories?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -31,10 +31,15 @@ export default function Topbar({
 
   const pill = syncStatus && (
     <span
-      className={"pill ground-pill " + (syncStatus.error ? "pill-red" : "pill-neutral")}
+      className={"sync-pill" + (syncStatus.error ? " error" : syncStatus.ok ? " ok" : "")}
       title={syncStatus.detail || syncStatus.label}
     >
-      {syncStatus.label}
+      {syncStatus.ok && (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      )}
+      <span className="label">{syncStatus.label}</span>
     </span>
   );
 
@@ -91,8 +96,8 @@ export default function Topbar({
 
   return (
     <div className="topbar">
-      <h1>{courseCode}</h1>
-      <span className="code mono">{courseName}</span>
+      <span className="course-code">{courseCode}</span>
+      <h1 title={courseName}>{courseName}</h1>
       {actions}
     </div>
   );
