@@ -557,6 +557,10 @@ details.panel[open] summary{margin-bottom:10px}
 .source-group-head .src{font-weight:600;color:var(--ink)}
 .source-group-head .kind{font-family:var(--f-mono)}
 .source-child{padding-left:28px}
+.source-option.unavailable{cursor:default}
+.source-option.unavailable:hover{background:none}
+.source-option.unavailable .src,.source-option.unavailable .kind{color:var(--ink-3)}
+.source-option .why{display:block;white-space:normal;font-size:var(--t1);color:var(--ink-3)}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px}
 .modal-actions .btn-primary,.modal-actions .btn-secondary{width:auto;padding:9px 20px}
 

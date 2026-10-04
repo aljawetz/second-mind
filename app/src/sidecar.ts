@@ -534,6 +534,8 @@ export interface StudySource {
   // Canvas's heading for it ("Week 02 - Literature Review", or the module's
   // name), or a kind ("Recorded sessions") for what Canvas doesn't list.
   group: string;
+  // Set for a module file with nothing indexed: why it can't be chosen.
+  unavailable: string | null;
 }
 
 async function studyJson<T>(res: Response, what: string): Promise<T> {

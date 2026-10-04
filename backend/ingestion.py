@@ -11,6 +11,10 @@ import re
 from pathlib import Path
 
 from bs4 import BeautifulSoup, Comment
+import docx
+from docx.table import Table
+from docx.text.paragraph import Paragraph
+import openpyxl
 import pdfplumber
 import pytesseract
 from pptx import Presentation
@@ -172,6 +176,95 @@ def extract_pptx(path: Path) -> list[dict]:
             }
         )
     return slides
+
+
+def _sections(blocks: list[tuple[str | None, str]]) -> list[dict]:
+    """(heading or None, line) pairs -> extract_html_sections()'s shape: a
+    new section at each heading, empty ones left out."""
+    sections: list[dict] = []
+    for heading, line in blocks:
+        if heading is not None or not sections:
+            sections.append({"heading": heading, "lines": []})
+        if line:
+            sections[-1]["lines"].append(line)
+    return [
+        {"heading": s["heading"], "text": "\n".join(s["lines"])}
+        for s in sections
+        if s["heading"] or s["lines"]
+    ]
+
+
+def extract_docx(path: Path) -> list[dict]:
+    """A Word document as sections, split at its headings, in document order
+    (paragraphs and tables interleaved). Same shape as extract_html_sections,
+    so it's indexed the same way (indexing.sections_to_nodes)."""
+    document = docx.Document(path)
+    blocks: list[tuple[str | None, str]] = []
+    for block in document.iter_inner_content():
+        if isinstance(block, Paragraph):
+            text = _clean(block.text)
+            style = (block.style.name if block.style is not None else "") or ""
+            if text and (style.startswith("Heading") or style == "Title"):
+                blocks.append((text, ""))
+            elif text:
+                blocks.append((None, text))
+        elif isinstance(block, Table):
+            for row in block.rows:
+                # A merged cell is returned once per column it spans.
+                cells = list(dict.fromkeys(_clean(c.text) for c in row.cells))
+                line = " | ".join(c for c in cells if c)
+                if line:
+                    blocks.append((None, line))
+    return _sections(blocks)
+
+
+# A data sheet can have tens of thousands of rows; course spreadsheets that
+# are worth studying from (a reading list, a schedule) are far smaller.
+MAX_SHEET_ROWS = 2000
+
+
+def _cell_text(value) -> str:
+    # Excel stores every number as a float: 8 comes back as 8.0.
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def extract_xlsx(path: Path) -> list[dict]:
+    """An Excel workbook as one section per non-empty sheet, each row a
+    "a | b | c" line (the same as HTML tables, extract_html_sections)."""
+    book = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    sections = []
+    try:
+        for sheet in book.worksheets:
+            lines, skipped = [], 0
+            for row in sheet.iter_rows(values_only=True):
+                cells = [_clean(_cell_text(v)) for v in row if v is not None and str(v).strip()]
+                if not cells:
+                    continue
+                if len(lines) < MAX_SHEET_ROWS:
+                    lines.append(" | ".join(cells))
+                else:
+                    skipped += 1
+            if skipped:
+                lines.append(f"[{skipped} more rows not read]")
+            if lines:
+                sections.append({"heading": sheet.title, "text": "\n".join(lines)})
+    finally:
+        book.close()
+    return sections
+
+
+def extract_text_file(path: Path) -> list[dict]:
+    """A .txt, .md or .csv file as one section. UTF-8, else Latin-1, which
+    reads any byte sequence."""
+    raw = path.read_bytes()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1")
+    text = text.replace("\r\n", "\n").strip()
+    return [{"heading": None, "text": text}] if text else []
 
 
 # Put between a page's own text and whatever OCR adds from its images, so

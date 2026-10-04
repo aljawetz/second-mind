@@ -175,26 +175,40 @@ export default function StudyCustomize({
               {!sources && !sourcesError && <p className="qa-thinking">Loading sources…</p>}
               {sources?.length === 0 && <p className="qa-empty">Nothing is indexed for this course yet.</p>}
               {groups.map((g) => {
-                const ids = g.sources.map((s) => s.item_id);
+                // Only what can be used: the week's checkbox skips unreadable files.
+                const ids = g.sources.filter((s) => !s.unavailable).map((s) => s.item_id);
                 const picked = ids.filter((id) => chosen.has(id)).length;
                 return (
                   <div className="source-group" key={g.name}>
                     <label className="source-option source-group-head">
                       <input
                         type="checkbox"
-                        checked={picked === ids.length}
+                        disabled={ids.length === 0}
+                        checked={ids.length > 0 && picked === ids.length}
                         ref={(el) => {
                           if (el) el.indeterminate = picked > 0 && picked < ids.length;
                         }}
                         onChange={(e) => toggle(ids, e.target.checked)}
                       />
                       <span className="src">{g.name}</span>
-                      <span className="kind">{ids.length}</span>
+                      <span className="kind">{g.sources.length}</span>
                     </label>
                     {g.sources.map((s) => (
-                      <label className="source-option source-child" key={s.item_id}>
-                        <input type="checkbox" checked={chosen.has(s.item_id)} onChange={(e) => toggle([s.item_id], e.target.checked)} />
-                        <span className="src">{s.source}</span>
+                      <label
+                        className={"source-option source-child" + (s.unavailable ? " unavailable" : "")}
+                        key={s.item_id}
+                        title={s.unavailable ?? undefined}
+                      >
+                        <input
+                          type="checkbox"
+                          disabled={!!s.unavailable}
+                          checked={chosen.has(s.item_id)}
+                          onChange={(e) => toggle([s.item_id], e.target.checked)}
+                        />
+                        <span className="src">
+                          {s.source}
+                          {s.unavailable && <span className="why">{s.unavailable}</span>}
+                        </span>
                         <span className="kind">{SOURCE_KIND[s.source_type] ?? s.source_type}</span>
                       </label>
                     ))}

@@ -117,10 +117,11 @@ def _canvas_item_id(item: dict) -> str | None:
     return None
 
 
-def _canvas_groups(structure: list[dict]) -> dict[str, tuple[int, str]]:
-    """item id → (position in Canvas, group). The group is the nearest
-    SubHeader above the item ("Week 02 - Literature Review"), else its module."""
-    groups: dict[str, tuple[int, str]] = {}
+def _canvas_groups(structure: list[dict]) -> dict[str, tuple[int, str, dict]]:
+    """item id → (position in Canvas, group, the module item). The group is
+    the nearest SubHeader above the item ("Week 02 - Literature Review"),
+    else its module."""
+    groups: dict[str, tuple[int, str, dict]] = {}
     for module in structure:
         heading = module.get("name") or "Module"
         for item in module.get("items") or []:
@@ -129,8 +130,21 @@ def _canvas_groups(structure: list[dict]) -> dict[str, tuple[int, str]]:
                 continue
             item_id = _canvas_item_id(item)
             if item_id and item_id not in groups:
-                groups[item_id] = (len(groups), heading)
+                groups[item_id] = (len(groups), heading, item)
     return groups
+
+
+def _why_not_indexed(name: str) -> str:
+    """Why a module file has nothing in the index."""
+    from course_sync import SUPPORTED_FILE_SUFFIXES
+
+    suffix = Path(name).suffix.lower()
+    if not suffix:
+        return "Second Mind can't read this kind of file"
+    if suffix not in SUPPORTED_FILE_SUFFIXES:
+        return f"Second Mind can't read {suffix} files"
+    # A scanned PDF OCR found nothing in, or a file added since the last sync.
+    return "No readable text found, or not synced yet"
 
 
 def _fallback_group(source_type: str) -> str:
@@ -142,7 +156,8 @@ def _fallback_group(source_type: str) -> str:
 
 
 def list_sources(db_path: Path, course_id: int, structure: list[dict] | None = None) -> list[dict]:
-    """Each indexed document once, for choosing which to study from. With
+    """Each indexed document once, for choosing which to study from, plus the
+    module files that couldn't be indexed (with "unavailable" saying why). With
     Canvas's module structure, grouped and ordered the way Canvas shows them
     (by week, where the course has week headings); what Canvas doesn't list
     (recordings, the syllabus) comes after, grouped by kind."""
@@ -156,9 +171,22 @@ def list_sources(db_path: Path, course_id: int, structure: list[dict] | None = N
                 "source": metadata.get("source") or doc_id,
                 "source_type": metadata.get("item_type") or "file",
                 "chunks": 0,
+                "unavailable": None,
             }
         sources[doc_id]["chunks"] += 1
     canvas_groups = _canvas_groups(structure or [])
+    # Module files with nothing indexed are listed too, greyed out with the
+    # reason, so the list shows everything the course's modules hold.
+    for item_id, (_, _, item) in canvas_groups.items():
+        if item.get("type") == "File" and item_id not in sources:
+            name = item.get("title") or item_id
+            sources[item_id] = {
+                "item_id": item_id,
+                "source": name,
+                "source_type": "file",
+                "chunks": 0,
+                "unavailable": _why_not_indexed(name),
+            }
     fallback_order = ["Course material", "Syllabus and assignments", "Recorded sessions"]
 
     def place(source: dict) -> tuple[int, int]:

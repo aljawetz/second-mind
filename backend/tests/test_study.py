@@ -97,9 +97,9 @@ def test_a_course_with_no_index_has_no_material(tmp_path):
 
 def test_sources_list_each_document_once(db):
     assert study.list_sources(db, COURSE) == [
-        {"item_id": "file:1", "source": "Lecture 3.pdf", "source_type": "file", "chunks": 2, "group": "Course material"},
-        {"item_id": "page:week-1", "source": "Week 1", "source_type": "page", "chunks": 1, "group": "Course material"},
-        {"item_id": "s-1", "source": "Class #2", "source_type": "transcript", "chunks": 1, "group": "Recorded sessions"},
+        {"item_id": "file:1", "source": "Lecture 3.pdf", "source_type": "file", "chunks": 2, "group": "Course material", "unavailable": None},
+        {"item_id": "page:week-1", "source": "Week 1", "source_type": "page", "chunks": 1, "group": "Course material", "unavailable": None},
+        {"item_id": "s-1", "source": "Class #2", "source_type": "transcript", "chunks": 1, "group": "Recorded sessions", "unavailable": None},
     ]
 
 
@@ -127,6 +127,32 @@ def test_sources_are_grouped_and_ordered_by_canvas_weeks(db):
         ("Week 02 - Test doubles", "Lecture 3.pdf"),
         ("Recorded sessions", "Class #2"),  # not in Canvas: after everything that is
     ]
+
+
+def test_module_files_that_are_not_indexed_are_listed_with_the_reason(db):
+    structure = [
+        {
+            "name": "Course Overview",
+            "items": [
+                {"type": "SubHeader", "title": "Week 02 - Test doubles"},
+                {"type": "File", "title": "Lecture 3.pdf", "content_id": 1},
+                {"type": "File", "title": "Lecture 3 recording.mp4", "content_id": 7},
+                {"type": "File", "title": "Scanned handout.pdf", "content_id": 8},
+                {"type": "File", "title": "README", "content_id": 9},
+            ],
+        }
+    ]
+
+    sources = study.list_sources(db, COURSE, structure=structure)
+
+    rows = [(s["source"], s["group"], s["unavailable"]) for s in sources if s["source_type"] == "file"]
+    assert rows == [
+        ("Lecture 3.pdf", "Week 02 - Test doubles", None),
+        ("Lecture 3 recording.mp4", "Week 02 - Test doubles", "Second Mind can't read .mp4 files"),
+        ("Scanned handout.pdf", "Week 02 - Test doubles", "No readable text found, or not synced yet"),
+        ("README", "Week 02 - Test doubles", "Second Mind can't read this kind of file"),
+    ]
+    assert next(s for s in sources if s["source"] == "README")["item_id"] == "file:9"
 
 
 def test_a_module_without_week_headings_is_its_own_group(tmp_path):
