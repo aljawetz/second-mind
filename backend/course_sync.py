@@ -16,7 +16,15 @@ import ingestion
 import indexing
 import sync
 
-SUPPORTED_FILE_SUFFIXES = {".pdf", ".pptx"}
+# File types read as sections (headings and their text), like Canvas pages.
+SECTION_EXTRACTORS = {
+    ".docx": "extract_docx",
+    ".xlsx": "extract_xlsx",
+    ".txt": "extract_text_file",
+    ".md": "extract_text_file",
+    ".csv": "extract_text_file",
+}
+SUPPORTED_FILE_SUFFIXES = {".pdf", ".pptx", *SECTION_EXTRACTORS}
 
 
 def _course_paths(sm_home: Path, course_id: int) -> tuple[Path, Path]:
@@ -52,10 +60,14 @@ def _sync_file(conn, db_path, table_name, file_meta, is_changed):
                     p["text"] = ingestion.merge_ocr_text(p["text"], ingestion.ocr_pdf_page(tmp_path, p["page"]))
             nodes = indexing.pages_to_nodes(pages, display_name, prefixed_id)
             full_text = "".join(p["text"] for p in pages)
-        else:  # .pptx
+        elif suffix == ".pptx":
             slides = ingestion.extract_pptx(tmp_path)
             nodes = indexing.slides_to_nodes(slides, display_name, prefixed_id)
             full_text = "".join(s["text"] for s in slides)
+        else:  # Word, Excel, plain text
+            sections = getattr(ingestion, SECTION_EXTRACTORS[suffix])(tmp_path)
+            nodes = indexing.sections_to_nodes(sections, display_name, prefixed_id, "file")
+            full_text = ingestion.sections_text(sections)
     finally:
         tmp_path.unlink()
 

@@ -270,7 +270,8 @@ class CopilotProvider:
             else:
                 yield item
 
-    def complete_json(self, messages: list[dict]) -> object:
+    def complete_json(self, messages: list[dict], temperature: float = 0) -> object:
+        # The Copilot runtime takes no temperature; accepted to match OpenAIProvider.
         system, prompt = _flatten(messages)
         text = "".join(i for i in _stream(self._token, self._model, system, f"{prompt}\n\n{JSON_ONLY}", []) if isinstance(i, str))
         return _parse_json(text)

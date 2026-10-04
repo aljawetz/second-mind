@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { splitAssignments, statusPill } from "../../assignmentStatus";
 import type { CanvasAssignment, Citation, SessionSummary } from "../../sidecar";
 import { openCitation } from "../../citations";
@@ -28,6 +28,9 @@ export default function HomeView({
   assignmentsError,
   sessions,
   conversationId,
+  initialQuestion,
+  onInitialQuestionSent,
+  studyPanel,
   onConversationSaved,
   onOpenAssignment,
   onOpenSession,
@@ -39,6 +42,9 @@ export default function HomeView({
   assignmentsError: string | null;
   sessions: SessionSummary[];
   conversationId: string | null;
+  initialQuestion: string | null;
+  onInitialQuestionSent: () => void;
+  studyPanel: ReactNode;
   onConversationSaved: (conversationId: string) => void;
   onOpenAssignment: (id: number) => void;
   onOpenSession: (sessionId: string) => void;
@@ -69,40 +75,45 @@ export default function HomeView({
         courseName={courseName}
         conversationId={conversationId}
         suggestions={suggestionsFor(upcoming, sessions)}
+        initialQuestion={initialQuestion}
+        onInitialQuestionSent={onInitialQuestionSent}
         onConversationSaved={onConversationSaved}
         onOpenCitation={(c: Citation) => void openCitation(canvasBaseUrl, courseId, c, onOpenSession)}
       />
 
-      <section className="assign-panel" aria-label="Assignments">
-        <div className="assign-top">
-          <h2>Assignments</h2>
-          {!assignmentsError && assignments.length > 0 && <span>{upcoming.length} upcoming</span>}
-        </div>
-        <div className="assign-body">
-          {assignmentsError && <p className="qa-a-error">{assignmentsError}</p>}
-          {!assignmentsError && assignments.length === 0 && <p className="qa-empty">No assignments found.</p>}
-          {!assignmentsError && assignments.length > 0 && (
-            <>
-              {upcoming.length > 0 ? renderRows(upcoming) : <p className="qa-empty">Nothing upcoming.</p>}
-              {past.length > 0 && (
-                <>
-                  <button
-                    className="assign-toggle"
-                    type="button"
-                    aria-expanded={pastOpen}
-                    onClick={() => setPastOpen((o) => !o)}
-                  >
-                    <Chevron />
-                    Past and completed
-                    <span className="n">{past.length}</span>
-                  </button>
-                  {pastOpen && renderRows(past)}
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </section>
+      <div className="home-side">
+        {studyPanel}
+        <section className="assign-panel" aria-label="Assignments">
+          <div className="assign-top">
+            <h2>Assignments</h2>
+            {!assignmentsError && assignments.length > 0 && <span>{upcoming.length} upcoming</span>}
+          </div>
+          <div className="assign-body">
+            {assignmentsError && <p className="qa-a-error">{assignmentsError}</p>}
+            {!assignmentsError && assignments.length === 0 && <p className="qa-empty">No assignments found.</p>}
+            {!assignmentsError && assignments.length > 0 && (
+              <>
+                {upcoming.length > 0 ? renderRows(upcoming) : <p className="qa-empty">Nothing upcoming.</p>}
+                {past.length > 0 && (
+                  <>
+                    <button
+                      className="assign-toggle"
+                      type="button"
+                      aria-expanded={pastOpen}
+                      onClick={() => setPastOpen((o) => !o)}
+                    >
+                      <Chevron />
+                      Past and completed
+                      <span className="n">{past.length}</span>
+                    </button>
+                    {pastOpen && renderRows(past)}
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+      </div>
     </section>
   );
 }

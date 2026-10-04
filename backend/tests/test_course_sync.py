@@ -280,22 +280,42 @@ def test_get_file_failure_does_not_abort_the_rest(tmp_path, stub_extraction, mon
     assert done_items == {"syllabus.pdf"}
 
 
-def test_unsupported_file_extension_is_skipped_not_synced(tmp_path, stub_extraction, monkeypatch, capsys):
-    def structure_with_docx(course_id):
-        return [{"items": [{"type": "File", "content_id": 333}]}]
-
-    monkeypatch.setattr(course_sync.canvas, "get_course_structure", structure_with_docx)
+def _one_file(monkeypatch, name):
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [{"items": [{"type": "File", "content_id": 333}]}])
     monkeypatch.setattr(
         course_sync.canvas,
         "get_file",
-        lambda file_id: {"id": 333, "display_name": "notes.docx", "updated_at": "2026-01-01", "url": "https://canvas.example/files/333"},
+        lambda file_id: {"id": 333, "display_name": name, "updated_at": "2026-01-01", "url": "https://canvas.example/files/333"},
     )
     monkeypatch.setattr(course_sync.canvas, "list_pages", lambda course_id: [])
+
+
+def test_unsupported_file_extension_is_skipped_not_synced(tmp_path, stub_extraction, monkeypatch, capsys):
+    _one_file(monkeypatch, "lecture.mp4")
 
     events = run(1, tmp_path)
 
     assert events == [{"done": True, "new": 0, "changed": 0, "removed": 0, "failed": 0}]
-    assert "notes.docx" in capsys.readouterr().out
+    assert "lecture.mp4" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("name", "extractor"),
+    [("Fintech App.docx", "extract_docx"), ("Papers.xlsx", "extract_xlsx"), ("notes.md", "extract_text_file"), ("data.csv", "extract_text_file")],
+)
+def test_word_excel_and_text_files_are_indexed_as_sections(tmp_path, stub_extraction, monkeypatch, name, extractor):
+    _one_file(monkeypatch, name)
+    monkeypatch.setattr(course_sync.ingestion, extractor, lambda path: [{"heading": "Requirements", "text": "Track spending."}])
+    added = []
+    monkeypatch.setattr(course_sync.indexing, "add_nodes", lambda nodes, db_path, table_name: added.extend(nodes))
+
+    events = run(1, tmp_path)
+
+    assert events[-1] == {"done": True, "new": 1, "changed": 0, "removed": 0, "failed": 0}
+    [node] = added
+    assert node.text == f"{name} › Requirements\nTrack spending."
+    assert (node.metadata["source"], node.metadata["item_type"]) == (name, "file")
+    assert node.ref_doc_id == "file:333"
 
 
 # --- Pages from Modules / front page / syllabus -----------------------------
