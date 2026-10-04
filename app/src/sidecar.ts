@@ -565,12 +565,28 @@ export async function getStudy(courseId: number, id: string): Promise<StudyArtif
   return studyJson<StudyArtifact>(res, "opening");
 }
 
-export async function saveStudyProgress(courseId: number, id: string, progress: StudyArtifact["progress"]): Promise<void> {
-  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/study/${id}/progress`, {
-    method: "POST",
-    body: JSON.stringify({ progress }),
+// Each save is the whole progress, so the last one sent must be the last
+// one stored. The backend handles requests on parallel threads, so quick
+// clicks could otherwise land out of order and save an older position.
+// Saves for one artifact wait for the previous one to finish (failed or not).
+const progressQueue = new Map<string, Promise<void>>();
+
+export function saveStudyProgress(courseId: number, id: string, progress: StudyArtifact["progress"]): Promise<void> {
+  const key = `${courseId}/${id}`;
+  const send = async () => {
+    const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/study/${id}/progress`, {
+      method: "POST",
+      body: JSON.stringify({ progress }),
+    });
+    await studyJson(res, "saving progress");
+  };
+  const saved = (progressQueue.get(key) ?? Promise.resolve()).then(send, send);
+  const settled = saved.catch(() => {});
+  progressQueue.set(key, settled);
+  void settled.then(() => {
+    if (progressQueue.get(key) === settled) progressQueue.delete(key);
   });
-  await studyJson(res, "saving progress");
+  return saved;
 }
 
 export async function deleteStudy(courseId: number, id: string): Promise<void> {

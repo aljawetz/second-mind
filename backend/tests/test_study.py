@@ -299,6 +299,26 @@ def test_when_the_check_leaves_too_few_a_second_round_asks_for_the_rest(db):
     assert "Already written" in second and "- Stub" in second
 
 
+def test_a_dropped_item_can_come_back_with_the_right_source(db):
+    llm = ScriptedLLM(
+        # Round 1: "Stub" cites a passage that doesn't exist, then again with a
+        # real one; "Mock" is checked and found unsupported.
+        {"title": "T", "cards": [_card("Stub", "c99"), _card("Stub", "c1"), _card("Mock", "c4")]},
+        {"supported": [1]},
+        # Round 2: "Mock" again, now citing its real passage.
+        {"cards": [_card("Mock", "c2")]},
+        {"supported": [1]},
+    )
+
+    result = study.generate("flashcards", _material(db), count=2, difficulty="easy", topic="", llm=llm, rng=random.Random(0))
+
+    assert [(c["front"], c["citation"]["label"]) for c in result["items"]] == [
+        ("Stub", "Lecture 3.pdf · p.1"),
+        ("Mock", "Lecture 3.pdf · p.2"),
+    ]
+    assert result["stats"]["malformed"] == 0
+
+
 def test_no_second_round_when_the_first_gave_nothing_usable(db):
     llm = ScriptedLLM({"title": "T", "cards": [_card("Invented", "c99")]})
 
@@ -510,6 +530,18 @@ def test_bad_options_and_unknown_courses_are_refused(app):
     assert app.call("GET", "/courses/999/study")[0] == 404
     assert app.call("POST", f"/courses/{COURSE}/study/nope/progress", {"progress": {}})[0] == 404
     assert app.model.calls == []
+
+
+def test_progress_that_is_not_an_object_is_refused(app):
+    app.model.replies += [{"title": "T", "cards": [_card("Stub")]}, {"supported": [1]}]
+    _, started = app.call("POST", f"/courses/{COURSE}/study", {"kind": "flashcards"})
+    assert study.wait_idle(10)
+    path = f"/courses/{COURSE}/study/{started['id']}/progress"
+
+    assert app.call("POST", path, {"progress": [1, 2]})[0] == 400
+    assert app.call("POST", path, {"progress": "position 3"})[0] == 400
+    assert app.call("POST", path, {})[0] == 200  # missing: saved as {}
+    assert app.call("GET", f"/courses/{COURSE}/study/{started['id']}")[1]["progress"] == {}
 
 
 def test_a_missing_model_key_fails_before_anything_is_saved(app, monkeypatch):

@@ -74,14 +74,19 @@ export default function StudyCustomize({
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const dialogRef = useRef<HTMLDivElement>(null);
 
+  // The parent re-renders every few seconds while something generates, with
+  // a new onCancel each time: focus once on open, and read onCancel through
+  // a ref, so those re-renders don't pull focus back to the topic box.
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
   useEffect(() => {
     dialogRef.current?.querySelector<HTMLElement>("textarea")?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
+      if (e.key === "Escape") onCancelRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel]);
+  }, []);
 
   useEffect(() => {
     if (!chooseSources || sources) return;

@@ -1088,8 +1088,12 @@ class Handler(BaseHTTPRequestHandler):
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
+        progress = data.get("progress") or {}
+        if not isinstance(progress, dict):
+            self._send_json(400, {"error": {"code": "bad_request", "message": "progress must be an object"}})
+            return
         try:
-            study.save_progress(SM_HOME, int(course_id), artifact_id, data.get("progress") or {})
+            study.save_progress(SM_HOME, int(course_id), artifact_id, progress)
         except KeyError:
             self._not_found("no such quiz or deck")
             return

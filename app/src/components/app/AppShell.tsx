@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AvailableCourse, ViewName } from "../../types";
 import {
   deleteConversation,
@@ -191,18 +191,32 @@ export default function AppShell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions, courseId]);
 
+  // A list reply is out of date if the course changed, or a quiz was added
+  // or deleted, after it was asked for: applying it would show another
+  // course's quizzes, or drop the one just started. Both bump this.
+  const studyVersion = useRef(0);
+  const activeCourse = useRef(courseId);
+  activeCourse.current = courseId;
+
   function refreshStudy() {
     if (!course) return;
+    const version = studyVersion.current;
     listStudy(courseId)
       .then((list) => {
+        if (version !== studyVersion.current) return;
         setStudyItems(list);
         setStudyError(null);
       })
-      .catch((err) => setStudyError(err instanceof Error ? err.message : "Couldn't load quizzes"));
+      .catch((err) => {
+        if (version !== studyVersion.current) return;
+        setStudyError(err instanceof Error ? err.message : "Couldn't load quizzes");
+      });
   }
 
   useEffect(() => {
+    studyVersion.current++;
     setStudyItems([]);
+    setStudyError(null);
     refreshStudy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId, !!course]);
@@ -216,11 +230,17 @@ export default function AppShell({
   }, [studyItems, courseId]);
 
   async function createStudy(kind: StudyKind, options: StudyOptions) {
-    const started = await startStudy(courseId, kind, options);
+    const forCourse = courseId;
+    const started = await startStudy(forCourse, kind, options);
+    if (activeCourse.current !== forCourse) return;
+    studyVersion.current++;
     setStudyItems((prev) => [started, ...prev]);
   }
   async function removeStudy(id: string) {
-    await deleteStudy(courseId, id);
+    const forCourse = courseId;
+    await deleteStudy(forCourse, id);
+    if (activeCourse.current !== forCourse) return;
+    studyVersion.current++;
     setStudyItems((prev) => prev.filter((s) => s.id !== id));
   }
   function openStudy(id: string) {

@@ -526,6 +526,7 @@ details.panel[open] summary{margin-bottom:10px}
 .study-open.failed .meta{color:var(--late)}
 .study-row .side-del{align-self:center}
 .study-confirm span{flex:1 1 100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.study-confirm .study-confirm-error{color:var(--late);font-size:var(--t1);white-space:normal}
 
 .modal-backdrop{position:fixed;inset:0;z-index:50;background:rgba(26,31,30,.35);display:grid;place-items:center;padding:16px}
 .modal{

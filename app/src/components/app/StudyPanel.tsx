@@ -55,6 +55,12 @@ export default function StudyPanel({
   const [createError, setCreateError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  function confirm(id: string | null) {
+    setDeleteError(null);
+    setConfirming(id);
+  }
 
   async function create(kind: StudyKind, options: StudyOptions) {
     setCreateError(null);
@@ -67,11 +73,13 @@ export default function StudyPanel({
 
   async function remove(id: string) {
     setDeleting(true);
+    setDeleteError(null);
     try {
       await onDelete(id);
       setConfirming(null);
-    } catch {
-      // The row stays; the confirm stays open to try again.
+    } catch (err) {
+      // The row stays, and the confirm stays open to try again.
+      setDeleteError(err instanceof Error && err.message ? err.message : "Couldn't delete");
     } finally {
       setDeleting(false);
     }
@@ -110,10 +118,15 @@ export default function StudyPanel({
           confirming === a.id ? (
             <div className="side-confirm study-confirm" key={a.id}>
               <span>Delete “{a.title}”?</span>
+              {deleteError && (
+                <span className="study-confirm-error" role="alert">
+                  {deleteError}
+                </span>
+              )}
               <button type="button" className="btn-danger" disabled={deleting} onClick={() => void remove(a.id)}>
                 Delete
               </button>
-              <button type="button" className="icon-btn" disabled={deleting} onClick={() => setConfirming(null)}>
+              <button type="button" className="icon-btn" disabled={deleting} onClick={() => confirm(null)}>
                 Cancel
               </button>
             </div>
@@ -140,7 +153,7 @@ export default function StudyPanel({
                   className="side-del"
                   aria-label={`Delete ${a.title}`}
                   title="Delete"
-                  onClick={() => setConfirming(a.id)}
+                  onClick={() => confirm(a.id)}
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />

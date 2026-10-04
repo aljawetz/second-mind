@@ -393,7 +393,10 @@ def generate(
     stats = {"generated": 0, "unsourced": 0, "malformed": 0, "unsupported": 0, "checked": True, "rounds": 0}
     items: list[dict] = []
     dropped: list[dict] = []
-    seen: list[frozenset[str]] = []
+    # Only accepted items count as already written: one dropped for citing
+    # the wrong passage may come back with the right one, which is what the
+    # second round is for.
+    accepted: list[frozenset[str]] = []
     title = ""
 
     for _ in range(MAX_ROUNDS):
@@ -413,20 +416,20 @@ def generate(
         title = title or round_title
         stats["generated"] += len(raw_items)
 
-        fresh = []
+        fresh, fresh_words = [], []
         for raw in raw_items:
             item = _clean_question(raw) if kind == "quiz" else _clean_card(raw)
             words = _words(item["question"] if kind == "quiz" else item["front"]) if item else frozenset()
-            if item is None or _is_repeat(words, seen):
+            if item is None or _is_repeat(words, accepted + fresh_words):
                 stats["malformed"] += 1
                 continue
-            seen.append(words)
             chunk = labelled.get(_text(raw.get("source")))
             if chunk is None:
                 stats["unsourced"] += 1
                 dropped.append({"reason": "unsourced", "source": _text(raw.get("source")), **item})
                 continue
             fresh.append({**item, "citation": chunk["citation"], "passage": chunk["text"]})
+            fresh_words.append(words)
 
         if fresh:
             supported = _check(kind, fresh, llm)
@@ -440,8 +443,10 @@ def generate(
                     if n not in keep:
                         stats["unsupported"] += 1
                         dropped.append({"reason": "unsupported", **it})
+                fresh_words = [w for n, w in enumerate(fresh_words, 1) if n in keep]
                 fresh = [it for n, it in enumerate(fresh, 1) if n in keep]
         items += fresh
+        accepted += fresh_words
         # Another round only helps when this one produced something usable.
         if len(items) >= count or not fresh:
             break
