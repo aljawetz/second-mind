@@ -1092,6 +1092,9 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(progress, dict):
             self._send_json(400, {"error": {"code": "bad_request", "message": "progress must be an object"}})
             return
+        if progress.get("removed") is not None and not isinstance(progress["removed"], list):
+            self._send_json(400, {"error": {"code": "bad_request", "message": "progress.removed must be an array"}})
+            return
         try:
             study.save_progress(SM_HOME, int(course_id), artifact_id, progress)
         except KeyError:

@@ -566,6 +566,10 @@ def test_progress_that_is_not_an_object_is_refused(app):
 
     assert app.call("POST", path, {"progress": [1, 2]})[0] == 400
     assert app.call("POST", path, {"progress": "position 3"})[0] == 400
+    # FlashcardsView reads removed as a list of card numbers; anything else
+    # would stop the deck from opening.
+    assert app.call("POST", path, {"progress": {"removed": {}}})[0] == 400
+    assert app.call("POST", path, {"progress": {"removed": None}})[0] == 200
     assert app.call("POST", path, {})[0] == 200  # missing: saved as {}
     assert app.call("GET", f"/courses/{COURSE}/study/{started['id']}")[1]["progress"] == {}
 
