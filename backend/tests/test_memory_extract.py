@@ -122,6 +122,13 @@ def test_entities_are_kept_only_as_non_empty_strings():
         "The student's GPA is 3.8.",
         "The student lost 10 points on Assignment 2.",
         "The student scored 18/20 on Lab 1.",
+        # Seen with the real model (2026-10-06): a summary saying "receiving",
+        # which the verb list didn't cover. The score-on-an-exam shape
+        # catches it whatever the verb.
+        "They also mentioned receiving a 72 on the midterm.",
+        "The student is getting 85% in the course.",
+        "Their result was 64 on the final exam.",
+        "The student has a 3.7 for the quiz average.",
         "The student was graded harshly on the essay.",
         "Assignment 3 is due Friday.",
         "The student's deadline for the project is December 5.",
@@ -145,6 +152,9 @@ def test_grades_scores_and_deadlines_are_never_kept(text):
         "The student got a B-tree question wrong in the quiz.",
         "The student missed Class #5.",
         "The student wants examples in Java 21.",
+        "The student is on team 4 on the project.",
+        "The student spent 3 hours on the assignment.",
+        "The student missed Class #5 on the midterm review day.",
     ],
 )
 def test_ordinary_memories_get_past_the_grades_filter(text):

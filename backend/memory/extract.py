@@ -83,8 +83,19 @@ _GRADES_OR_DEADLINES = [
     # "got a B+", "received an A-". The letter is case-sensitive, so "got a
     # book" isn't a grade, and it must end there: "got a B-tree" isn't either.
     re.compile(r"\b(?i:got|gets?|getting|received|earned|lost)\s+(?:an?\s+)?[A-DF][+-]?(?=[\s.,;:!?)]|$)"),
-    # "got a 72 on the midterm", "lost 10 points", "received 18/20".
-    re.compile(r"\b(got|received|earned|lost)\b[^.]{0,30}?\b\d{1,3}(?:\.\d+)?\b", re.IGNORECASE),
+    # "got a 72 on the midterm", "lost 10 points", "received 18/20",
+    # "receiving a 72" (a real summary, 2026-10-06: the verb list was too short).
+    re.compile(
+        r"\b(got|gets?|getting|receiv(?:e|es|ed|ing)|earn(?:s|ed|ing)?|lost|losing)\b[^.]{0,30}?\b\d{1,3}(?:\.\d+)?\b",
+        re.IGNORECASE,
+    ),
+    # A score on an exam, whatever the verb: "64 on the final exam", "85% in
+    # the course", "3.7 for the quiz". Not "Class #5 on the midterm review".
+    re.compile(
+        r"(?<!#)\b\d{1,3}(?:\.\d+)?\s*(?:%|/\s*\d+)?\s+(?:on|in|for)\s+(?:the\s+|my\s+|their\s+)?(?:final\s+)?"
+        r"(?:midterm|final|exam|quiz|test|lab|assignment|homework|paper|essay|course)s?\b",
+        re.IGNORECASE,
+    ),
     re.compile(r"\b(due|overdue|deadlines?)\b", re.IGNORECASE),
 ]
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
