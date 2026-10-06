@@ -103,10 +103,13 @@ class MemoryService:
             )
         return ObserveResult(extraction.summary, decisions, extraction.dropped)
 
-    def recall(self, query: str, k: int = 5, include_history: bool = False) -> list[Hit]:
+    def recall(
+        self, query: str, k: int = 5, include_history: bool = False, kinds: tuple[str, ...] | None = None
+    ) -> list[Hit]:
+        """kinds: only these memory kinds (default: all)."""
         return recall.recall(
             query, store=self._store, embed=self._embed, now=self._now(), k=k, include_history=include_history,
-            skip_conversation=self._conversation_id,
+            skip_conversation=self._conversation_id, **({"kinds": kinds} if kinds else {}),
         )
 
     def profile_block(self) -> str:

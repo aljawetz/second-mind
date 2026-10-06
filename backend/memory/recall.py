@@ -12,10 +12,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable
 
-from memory.store import Memory, MemoryStore
+import numpy as np
+
+from memory.store import KINDS, Memory, MemoryStore
 
 # Starting values, calibrated in the evaluation (design spec §12).
-MEMORY_SIMILARITY_CUTOFF = 0.5
+# Measured with the real BGE model, 12 questions against 8 memories
+# (2026-10-06): related pairs score 0.58-0.76, unrelated ones up to ~0.61,
+# so the first 0.5 let nearly every memory through on every question.
+# Provisional until the evaluation calibrates them.
+MEMORY_SIMILARITY_CUTOFF = 0.63  # meaning alone
+KEYWORD_MIN_SIMILARITY = 0.5  # a keyword match needs this much meaning too ("team" -> "on team 4": 0.58)
 VECTOR_CANDIDATES = 20
 KEYWORD_CANDIDATES = 5
 RRF_K = 60  # the usual constant: dampens the gap between rank 1 and rank 2
@@ -47,6 +54,7 @@ def recall(
     k: int = 5,
     include_history: bool = False,
     skip_conversation: str | None = None,
+    kinds: tuple[str, ...] = KINDS,
 ) -> list[Hit]:
     """The k memories that bear most on `query`, best first. Only current
     ones, unless include_history ("what was it before?"). Marks what it
@@ -56,13 +64,16 @@ def recall(
     def wanted(m: Memory) -> bool:
         return not (m.kind == "summary" and m.conversation_id == skip_conversation)
 
+    query_vector = embed(query)
     vector = [
         m
-        for m, cosine in store.vector_search(embed(query), k=VECTOR_CANDIDATES, include_history=include_history)
+        for m, cosine in store.vector_search(query_vector, k=VECTOR_CANDIDATES, kinds=kinds, include_history=include_history)
         if cosine >= MEMORY_SIMILARITY_CUTOFF and wanted(m)
     ]
     keyword = [
-        m for m, _ in store.keyword_search(query, k=KEYWORD_CANDIDATES, include_history=include_history) if wanted(m)
+        m
+        for m, _ in store.keyword_search(query, k=KEYWORD_CANDIDATES, kinds=kinds, include_history=include_history)
+        if wanted(m) and _cosine(query_vector, m.embedding) >= KEYWORD_MIN_SIMILARITY
     ]
 
     relevance: dict[str, float] = {}
@@ -136,6 +147,12 @@ def _profile_line(m: Memory) -> str:
 
 def _when(m: Memory) -> datetime:
     return m.event_time or m.created_at
+
+
+def _cosine(a: list[float], b: list[float]) -> float:
+    a, b = np.asarray(a, dtype=np.float32), np.asarray(b, dtype=np.float32)
+    norms = float(np.linalg.norm(a) * np.linalg.norm(b))
+    return float(a @ b) / norms if norms else 0.0
 
 
 def last_use(m: Memory) -> datetime:

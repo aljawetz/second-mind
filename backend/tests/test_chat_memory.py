@@ -124,12 +124,12 @@ def test_an_empty_memory_adds_the_rules_but_no_profile(memory):
 def test_the_question_is_recalled_first_when_anything_matches(memory):
     memory.remember("The student is on team 4 with Priya.")
 
-    _, final, provider = _run("Which team am I on?", [(["Team 4."], [])], memory.service)
+    _, final, provider = _run("Am I on team 4 with Priya?", [(["Team 4."], [])], memory.service)
 
     call = next(m for m in provider.calls[0]["messages"] if m["role"] == "assistant" and m["tool_calls"][0]["id"] == "recall-0")
     assert call["tool_calls"][0]["function"] == {
         "name": "recall_memory",
-        "arguments": json.dumps({"query": "Which team am I on?"}),
+        "arguments": json.dumps({"query": "Am I on team 4 with Priya?"}),
     }
     assert _tool_result(provider, "recall-0") == "[M1] (fact, since 2026-09-21) The student is on team 4 with Priya."
     assert [m["text"] for m in final["memories_used"]] == ["The student is on team 4 with Priya."]
@@ -149,9 +149,9 @@ def test_the_model_can_recall_what_changed_and_labels_carry_on(memory):
     memory.remember("The student's team does the fraud detection project.", {"decision": "UPDATE", "target": 1})
 
     _, final, provider = _run(
-        "Which project do we do?",
+        "Which fraud detection project does the team do?",
         [
-            ([], [ToolCall(id="r1", name="recall_memory", arguments={"query": "team project before", "include_history": True})]),
+            ([], [ToolCall(id="r1", name="recall_memory", arguments={"query": "The student's team does the project", "include_history": True})]),
             (["Fraud detection, before that the recommender."], []),
         ],
         memory.service,
@@ -224,3 +224,24 @@ def test_an_earlier_summary_goes_into_the_system_prompt():
     system = provider.calls[0]["messages"][0]["content"]
     assert "Earlier in this conversation, summarized" in system
     assert "<summary>\nWent over stubs, then fakes.\n</summary>" in system
+
+
+def test_chat_summaries_are_not_recalled_automatically_only_when_asked(memory):
+    # A summary is broad ("asked about mocks, then test doubles"), so it
+    # sits close to almost any course question. It's for "what did we go
+    # over last week?", which the model asks with recall_memory.
+    memory.service._llm.replies.append({"memories": [], "summary": "Asked about mocking the email service in Java."})
+    memory.service.observe([{"role": "user", "content": "mocking"}], conversation_id="c-old", turn_index=0, at=SAID)
+
+    _, final, provider = _run(
+        "Asked about mocking the email service in Java?",
+        [
+            ([], [ToolCall(id="r1", name="recall_memory", arguments={"query": "mocking the email service in Java"})]),
+            (["Last week you asked about mocking it."], []),
+        ],
+        memory.service,
+    )
+
+    assert all(m.get("tool_call_id") != "recall-0" for m in provider.calls[0]["messages"])
+    assert "Asked about mocking the email service in Java." in _tool_result(provider, "r1", call=1)
+    assert [m["text"] for m in final["memories_used"]] == ["Asked about mocking the email service in Java."]
