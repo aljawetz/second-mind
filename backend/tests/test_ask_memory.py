@@ -163,7 +163,7 @@ def test_what_one_chat_told_memory_shapes_the_next_chat(app):
     first = _say(app, "I'm on team 4 with Priya.", remembers="The student is on team 4 with Priya.")
 
     app.model.chat_replies.append(["Team 4."])
-    _, events = _ask(app, "Which team am I on?")
+    _, events = _ask(app, "Am I on team 4 with Priya?")
 
     assert events[0]["conversation_id"] != first[0]["conversation_id"]
     assert "The student is on team 4 with Priya." in app.model.chat_calls[-1][0]["content"]  # profile

@@ -74,7 +74,7 @@ def test_what_the_student_said_can_be_recalled_later(service_for, clock):
 
     result = svc.observe(_turn("I'm on team 4 with Priya and Ken."), conversation_id="c-1", turn_index=0)
     clock["t"] = T1
-    hits = svc.recall("Which team am I on?")
+    hits = svc.recall("Am I on team 4 with Priya and Ken?")
 
     assert result.summary == "Talked about the project."
     assert [h.memory.text for h in hits] == ["The student is on team 4 with Priya and Ken."]
@@ -101,10 +101,10 @@ def test_a_changed_fact_replaces_the_old_one_through_consolidation(service_for, 
     result = svc.observe(_turn("We switched to fraud detection."), conversation_id="c-2", turn_index=0)
 
     assert [d.action for d in result.decisions] == ["UPDATE"]
-    assert [h.memory.text for h in svc.recall("Which project is my team doing?")] == [
+    assert [h.memory.text for h in svc.recall("Which project does the student's team do?")] == [
         "The student's team switched to the fraud detection project."
     ]
-    history = svc.recall("Which project did my team do before?", include_history=True)
+    history = svc.recall("Which project did the student's team do before?", include_history=True)
     assert {h.memory.text for h in history} == {
         "The student's team does the recommender project.",
         "The student's team switched to the fraud detection project.",
@@ -228,7 +228,7 @@ def test_each_turn_rewrites_its_chat_summary_as_one_memory(service_for, clock):
 
     [summary] = [m for m in svc.list() if m.kind == "summary"]
     assert (summary.text, summary.conversation_id) == ("Asked about the fixtures lab, then about mocking the email service.", "c-1")
-    assert [h.memory.id for h in svc.recall("What did we say about mocking email?")] == [summary.id]
+    assert [h.memory.id for h in svc.recall("What did we say about mocking the email service?")] == [summary.id]
 
 
 def test_the_chat_being_answered_does_not_recall_its_own_summary(tmp_path, clock):

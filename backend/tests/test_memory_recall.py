@@ -11,6 +11,9 @@ from memory.store import MemoryStore
 
 NOW = datetime(2026, 9, 28, 12, 0, tzinfo=timezone.utc)
 QUERIES = {"email service": [1.0, 0.0, 0.0], "anything": [1.0, 0.0, 0.0]}
+# Two vectors a hair apart: the first ranks 1st by meaning, the second 2nd,
+# so any change in order below comes from age, use or importance.
+FIRST, SECOND = [1.0, 0.0, 0.0], [0.95, 0.312, 0.0]
 
 
 @pytest.fixture
@@ -39,12 +42,30 @@ def test_a_memory_matched_by_meaning_and_by_keyword_outranks_one_matched_by_mean
     assert _ids(_recall(store, "email service")) == [both, meaning_only]
 
 
-def test_weak_meaning_matches_are_ignored_but_keyword_matches_still_count(store):
-    # cos = 0.3, under the 0.5 cutoff: only the keyword can bring it in.
-    _add(store, "The student likes the Tuesday lecture.", [0.3, 0.954, 0.0])
-    keyword = _add(store, "The student asked about the email lab.", [0.3, 0.954, 0.0])
+def test_a_match_by_meaning_alone_must_be_strong(store):
+    # Real BGE scores unrelated short sentences up to ~0.61 against a
+    # question; related ones from ~0.58. Under the cutoff, meaning alone
+    # doesn't count.
+    _add(store, "The student likes the Tuesday lecture.", [0.6, 0.8, 0.0])
+    strong = _add(store, "The student prefers Java examples.", [0.7, 0.714, 0.0])
 
-    assert _ids(_recall(store, "email service")) == [keyword]
+    assert _ids(_recall(store, "anything")) == [strong]
+
+
+def test_a_keyword_match_still_needs_some_meaning(store):
+    # "team" finds "on team 4" at cos 0.58; a shared word in an unrelated
+    # memory ("AI" in a course about AI) shouldn't be enough on its own.
+    _add(store, "The student asked about the email lab.", [0.3, 0.954, 0.0])
+    related = _add(store, "The student is stuck on the email service.", [0.55, 0.835, 0.0])
+
+    assert _ids(_recall(store, "email service")) == [related]
+
+
+def test_recall_can_be_limited_to_some_kinds(store):
+    fact = _add(store, "The student is stuck on the email service.", FIRST)
+    _add(store, "Asked about mocking the email service.", FIRST, kind="summary")
+
+    assert _ids(_recall(store, "email service", kinds=("fact", "event", "task"))) == [fact]
 
 
 def test_at_most_k_results(store):
@@ -67,9 +88,6 @@ def test_replaced_memories_come_back_only_when_history_is_asked_for(store):
     assert set(_ids(_recall(store, "anything", include_history=True))) == {old, new}
 
 
-# Two vectors a hair apart: the first ranks 1st by meaning, the second 2nd,
-# so any change in order below comes from age, use or importance.
-FIRST, SECOND = [1.0, 0.0, 0.0], [0.95, 0.312, 0.0]
 
 
 def test_older_events_rank_below_recent_ones(store):

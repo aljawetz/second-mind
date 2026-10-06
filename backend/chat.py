@@ -326,8 +326,11 @@ def answer(
     # Memory too, for the same reason: left to the model, it would often not
     # look. Only added when something matched, so an unrelated question
     # costs nothing extra.
+    # Chat summaries are left out here: they're broad, so they sit close to
+    # almost any course question and showed up on every answer. They stay
+    # reachable through recall_memory ("what did we go over last week?").
     if memory is not None:
-        hits = memory.recall(question)
+        hits = memory.recall(question, kinds=("fact", "event", "task"))
         if hits:
             messages.append({"role": "assistant", "content": None, "tool_calls": [_call("recall-0", "recall_memory", {"query": question})]})
             messages.append({"role": "tool", "tool_call_id": "recall-0", "content": show(hits)})
