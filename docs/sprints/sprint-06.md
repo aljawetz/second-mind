@@ -27,4 +27,24 @@ wired to a real backend instead of the mockup's hardcoded data.
 
 ## What we did
 
-TBD — fill in once this sprint is underway.
+**Integration.** Every major part now runs together on a real course: Canvas sync, cited chat,
+the assignment explainer, session capture, agent memory, and the new study artifacts. On 2026-10-04
+we ran the whole chain on 49797 with real Canvas data and gpt-4o-mini: sync, cited questions, an
+assignment explanation, a recorded lecture that was then searchable in chat, and a quiz built from
+that week's slides plus the recording. All 24 steps worked.
+
+**New this sprint.** Quizzes and flashcards modelled on NotebookLM's, each item cited to its
+passage and checked (design spec §8, [PR #19](https://github.com/aljawetz/second-mind/pull/19)).
+Sync now also reads Word, Excel and text files, which were missing from chat and study before.
+
+**Testing.** 423 backend tests, plus a normal, edge and failure case per Must Have in the dry run.
+FR4, FR6 and FR7 pass. FR1, FR3 and FR8 work with gaps. FR5 is partial: recording starts by hand,
+not at class time, and a real classroom recording is still untested.
+
+**What we found.** In one hand-graded quiz, 6 of 10 questions were supported by the passage they
+cite. The check meant to catch the rest missed them, and fixing it is Sprint 7's first task.
+Onboarding also checks only a key's format, the explainer gave no source pointers for one
+assignment, and silent or broken recordings don't say what went wrong.
+
+Report: [docs/evaluations/sprint-6-deliverable.md](../evaluations/sprint-6-deliverable.md).
+Rerun the dry run: `backend/scripts/e2e_dry_run.py`.

@@ -1,0 +1,1575 @@
+{
+ "steps": [
+  {
+   "step": "ping",
+   "ok": true,
+   "seconds": 0.0,
+   "result": {
+    "status": "ok",
+    "source": "sm-backend",
+    "instance": ""
+   }
+  },
+  {
+   "step": "list Canvas courses (FR1: token works)",
+   "ok": true,
+   "seconds": 0.5,
+   "result": {
+    "status": 200,
+    "n": 11,
+    "has_49797": true
+   }
+  },
+  {
+   "step": "credential format check: bad OpenAI key (FR1 failure)",
+   "ok": true,
+   "seconds": 0.0,
+   "result": {
+    "valid": false,
+    "reason": "OpenAI keys start with 'sk-'"
+   }
+  },
+  {
+   "step": "credential format check: well-formed but fake OpenAI key",
+   "ok": true,
+   "seconds": 0.0,
+   "result": {
+    "valid": true,
+    "reason": ""
+   }
+  },
+  {
+   "step": "sync course from Canvas (FR2)",
+   "ok": false,
+   "seconds": 7.9,
+   "result": {
+    "exception": "AttributeError(\"'str' object has no attribute 'get'\")"
+   }
+  },
+  {
+   "step": "indexed sources after sync",
+   "ok": true,
+   "seconds": 0.6,
+   "result": [
+    [
+     "Week 01 - Course Overview",
+     "CatherineFang_Bio.pdf",
+     null
+    ],
+    [
+     "Week 01 - Course Overview",
+     "Citation & Bibliography  with Zotero.pdf",
+     null
+    ],
+    [
+     "Week 01 - Course Overview",
+     "49797-Project Proposal.pdf",
+     null
+    ],
+    [
+     "Week 02 - Literature Review",
+     "Nvidia: Building RAG Agents with LLMs",
+     null
+    ],
+    [
+     "Week 02 - Literature Review",
+     "(Optional) ACM/IEEE Competition",
+     null
+    ],
+    [
+     "Week 02 - Literature Review",
+     "Research Study.pdf",
+     null
+    ],
+    [
+     "Week 02 - Literature Review",
+     "Sample Literature Review Paper with Good Structure.pdf",
+     null
+    ],
+    [
+     "Week 02 - Literature Review",
+     "Sample Table of Selected Papers.xlsx",
+     null
+    ],
+    [
+     "Week 03 - AI Research Assistance",
+     "AI Research Assistance.pptx",
+     null
+    ],
+    [
+     "Week 03 - AI Research Assistance",
+     "AI Research Assistance Explained",
+     null
+    ],
+    [
+     "Product Context & Requirements",
+     "Fintech App.docx",
+     null
+    ],
+    [
+     "Project Context & Requirements",
+     "BrainEEG Research Project",
+     null
+    ],
+    [
+     "Weekly Project Deliverables",
+     "Sprint 1 Deliverable - Individual",
+     null
+    ],
+    [
+     "Weekly Project Deliverables",
+     "Team Placement - Individual",
+     null
+    ],
+    [
+     "Weekly Project Deliverables",
+     "Sprint 2 Deliverable - Problem Validation, Requirements, and MVP Scope",
+     null
+    ],
+    [
+     "Weekly Project Deliverables",
+     "Sprint 3 Deliverable - Technical Feasibility and Baseline",
+     null
+    ],
+    [
+     "Weekly Project Deliverables",
+     "Sprint 4 Deliverable - System Architecture and Implementation Plan",
+     null
+    ],
+    [
+     "Weekly Project Deliverables",
+     "Sprint 5 Deliverable - Core AI/Technology Prototype",
+     null
+    ],
+    [
+     "Weekly Project Deliverables",
+     "Sprint 6 Deliverable - End-to-End Alpha System",
+     null
+    ],
+    [
+     "Weekly Project Deliverables",
+     "Sprint 7 Deliverable - User/Stakeholder and Impact Validation",
+     null
+    ],
+    [
+     "Weekly Project Deliverables",
+     "Sprint 8 Deliverable - Robustness, Responsible AI, and System Improvement",
+     null
+    ],
+    [
+     "Weekly Project Deliverables",
+     "LLM Certificate Completion",
+     null
+    ],
+    [
+     "Weekly Project Deliverables",
+     "Sprint 9 Deliverable - Beta Release and Independent Testing",
+     null
+    ],
+    [
+     "Weekly Project Deliverables",
+     "Final Product, Impact, and Project Defense",
+     null
+    ],
+    [
+     "Syllabus and assignments",
+     "Syllabus",
+     null
+    ],
+    [
+     "Syllabus and assignments",
+     "AI for Society and Industry: Project Peer Review",
+     null
+    ],
+    [
+     "Syllabus and assignments",
+     "Off-Campus Stakeholder Interview: Time Slot & Interviewee Details",
+     null
+    ]
+   ]
+  },
+  {
+   "step": "ask: covered question (FR3)",
+   "ok": true,
+   "seconds": 4.7,
+   "result": {
+    "status": 200,
+    "answer": "The course materials suggest that when choosing papers for a literature review, you should:\n\n1. **Select Relevant Literature**: Focus on studies that are pertinent to your research question and objectives. This involves analyzing and evaluating the selected studies to situate your work within the broader scholarly community.\n\n2. **Identify Trends and Themes**: Group research into trends or themes rather than discussing individual studies separately. This helps to illustrate consensus or disagreement in the field, showing how different approaches have evolved over time.\n\n3. **Screen for Quality**: Use systematic methods to screen for quality, such as eliminating duplicates and excluding irrelevant types of publications (e.g., reviews, letters, abstracts).\n\n4. **Establish Inclusion Criteria**: Define clear criteria for inclusion based on the relevance and quality of the studies, ensuring that they contribute meaningfully to your review [1][2][3].\n\nGeneral knowledge (not from your course materials): A good literature review not only summarizes existing research but also identifies gaps in the literature, highlights the significance of your research, and provides a foundation for your own study.",
+    "grounded": true,
+    "citations": [
+     {
+      "source_type": "file",
+      "label": "Research Study.pdf \u00b7 p.7",
+      "item_id": "file:14690036"
+     },
+     {
+      "source_type": "file",
+      "label": "Sample Literature Review Paper with Good Structure.pdf \u00b7 p.4",
+      "item_id": "file:14690035"
+     },
+     {
+      "source_type": "file",
+      "label": "Research Study.pdf \u00b7 p.6",
+      "item_id": "file:14690036"
+     }
+    ],
+    "errors": []
+   }
+  },
+  {
+   "step": "ask: question from the Word file now indexed (FR2/FR3)",
+   "ok": true,
+   "seconds": 2.4,
+   "result": {
+    "status": 200,
+    "answer": "The course materials do not specify possible names for the fintech app idea. However, the target audience includes:\n\n1. **Freelancers and gig workers** (e.g., Uber drivers, virtual assistants) who have variable income.\n2. **Young entrepreneurs** who value advanced financial tools and need help with financial planning.\n3. **College students**, who are a massive underserved market with low financial literacy and need budgeting tools.\n4. **Recent graduates and immigrants** navigating U.S. financial systems with non-traditional income flows.\n\nThe demographics primarily include individuals aged 20\u201345, with incomes ranging from $25k to $100k/year, who are tech-comfortable but not financially savvy, and often live in urban or suburban areas [1][2].",
+    "grounded": true,
+    "citations": [
+     {
+      "source_type": "file",
+      "label": "Fintech App.docx",
+      "item_id": "file:14690038"
+     },
+     {
+      "source_type": "file",
+      "label": "Fintech App.docx",
+      "item_id": "file:14690038"
+     }
+    ],
+    "errors": []
+   }
+  },
+  {
+   "step": "ask: not covered (FR4)",
+   "ok": true,
+   "seconds": 3.8,
+   "result": {
+    "status": 200,
+    "answer": "The course materials do not mention quantum error correction specifically. \n\nIf you need more information or examples about quantum error correction in general, feel free to ask!",
+    "grounded": false,
+    "citations": [],
+    "errors": []
+   }
+  },
+  {
+   "step": "ask: grades are not stored (FR7)",
+   "ok": true,
+   "seconds": 1.2,
+   "result": {
+    "status": 200,
+    "answer": "I couldn't find your grade for the Sprint 2 deliverable in the course materials. You might want to check your course platform or ask your instructor for that information.",
+    "grounded": false,
+    "citations": [],
+    "errors": []
+   }
+  },
+  {
+   "step": "list assignments, live from Canvas (FR7)",
+   "ok": true,
+   "seconds": 0.9,
+   "result": {
+    "status": 200,
+    "n": 16,
+    "sample": [
+     {
+      "id": 1020612,
+      "name": "Sprint 1 Deliverable - Individual",
+      "due_at": "2026-09-01T17:00:00Z",
+      "points_possible": 100.0,
+      "description": "Individual Assignment: Problem Discovery and Solution Proposal\nPurpose & Scope\nThe purpose of this individual assignment is to identify a real-world problem that could be addressed through an end-to-end software solution. You will investigate the problem, understand how it is addressed today, identify gaps in existing approaches, and propose a solution that could realistically be developed by a team during the semester. Your proposal may focus on either industry impact or social impact.\nSelected ideas from the individual assignments may become the basis for semester team projects. Therefore, choose a problem that is important enough to matter but sufficiently scoped for a team of 4\u20136 students to prototype within one semester.\nBy the end of the semester, the team must deliver a functioning end-to-end solution, not merely a proposal, presentation, UI mockup, or isolated algorithm.\nMust Have: Capabilities necessary to demonstrate the core value proposition.\nBe deliberate about scope. A smaller system that works end-to-end is preferable to an ambitious system that remains incomplete.\n1. Problem and Current Landscape\nDefine the problem you want to address.\nProblem Definition\nClearly describe:\nWhat is the problem?\nWho experiences the problem?\nIn what context does it occur?\nWhy is it important to solve?\nPrevalence and Significance\nProvide evidence that the problem is meaningful and sufficiently prevalent.\nDepending on your topic, relevant evidence might include:\nNumber or percentage of people or organizations affected\nSize of the relevant industry or market\nFinancial costs\nTime or productivity losses\nSocial consequences\nCurrent trends indicating that the problem is growing or changing\nSupport important claims with credible sources.\nTarget Users and Stakeholders\nIdentify the primary target users of your proposed solution.\nAlso consider other stakeholders who may influence adoption or be affected by the solution. These may include customers, employers, administrators, regulators, healthcare providers, educators, community organizations, or other groups.\nDistinguish, where appropriate, among:\nUser: Who interacts with the solution?\nCustomer: Who pays for or purchases it?\nBeneficiary: Who ultimately receives the value?\nThese may or may not be the same person.\nHow the Problem Is Addressed Today\nInvestigate the current landscape.\nDescribe how people or organizations currently solve or manage the problem. Consider:\nExisting software products\nCommercial competitors\nManual workflows\nInstitutional processes\nOpen-source solutions\nWorkarounds\nCases in which users simply tolerate the problem\nIdentify at least 2\u20133 existing approaches or alternatives.\n2. Proposed Solution\nPropose an end-to-end software solution that addresses the unmet need identified above.\nYour proposal should explain:\nWhat the solution does\nWho will use it\nWhat information or inputs it requires\nWhat processing, software, or intelligence occurs\nWhat output or action it produces\nHow the user receives value\nWhy someone would choose it over the current alternatives\nDescribe the proposed workflow from beginning to end.\nValue Proposition\nComplete this sentence: For [target user], who struggles with [problem], our proposed solution provides [key benefit] by [how it works], unlike [current alternative(s)], which [important limitation].\nMeasuring Impact\nDefine how you would determine whether the project succeeds.\nIdentify 3-5 measurable success criteria. Examples include:\nReduction in task completion time\nImprovement in accuracy\nReduction in cost\nIncrease in user engagement\nUser satisfaction\nReduction in errors\nSystem reliability\nAdoption or retention\nAccessibility improvements\nMeasurable social outcomes\nAt least one metric should evaluate technical performance, and at least one should evaluate user, business, or social impact.\nDeliverable\nSubmit a 2\u00a0page proposal, excluding references and optional appendices.\nProblem significance (20%)\nIs the problem real, important, and supported by evidence?\nUnderstanding of users and current solutions (20%)\nDoes the proposal demonstrate a strong understanding of stakeholders, existing approaches, and the unmet need?\nSolution quality and differentiation (20%)\nDoes the proposed solution logically address the identified problem, and is its value proposition compelling?\nFeasibility and scope (20%)\nCould a team of 4\u20136 graduate students realistically implement an end-to-end MVP during the semester?\nImpact and measurability (10%)\nAre the expected industry or social benefits meaningful and measurable?\nClarity and professionalism (10%)\nIs the proposal well researched, logically organized, concise, and professionally presented?\nImportant Principle\nDo not optimize your proposal for technological novelty alone.\nMeaningful Problem \u00d7 User Need \u00d7 Technical Feasibility \u00d7 Effective Execution \u00d7 Measurable Impact",
+      "submitted": true,
+      "late": false,
+      "missing": false
+     },
+     {
+      "id": 1028161,
+      "name": "Team Placement - Individual",
+      "due_at": "2026-09-03T17:00:00Z",
+      "points_possible": 100.0,
+      "description": "Make sure you sign up your name to one of the projects in the following spreadsheet. If the project you'll work on is not on the spreadsheet, please create one row for the project.\nEach team will have 2 to 6 students. For the bigger size, please split into two teams.\nhttps://docs.google.com/spreadsheets/d/1HpkNu6omsNv1YxQCnjXxuS5rTIxT5NDUdu4Afz79mog/edit?gid=0#gid=0\nThe grade will be given to those students whose names are on the spreadsheet by the due time. If your name is missing, 0 grade will be given.",
+      "submitted": false,
+      "late": false,
+      "missing": false
+     }
+    ]
+   }
+  },
+  {
+   "step": "explain Sprint 6 assignment (FR8)",
+   "ok": true,
+   "seconds": 2.3,
+   "result": {
+    "breakdown": [
+     "Demonstrate end-to-end integration of the project's major components.",
+     "Ensure a realistic input produces a meaningful user-facing output or action.",
+     "All major components must operate together seamlessly.",
+     "Implement the Must Have requirements at an alpha level.",
+     "Test normal scenarios, edge cases, and failure scenarios.",
+     "Identify integration failures within the system.",
+     "Identify bottlenecks in the system's performance.",
+     "Identify technical debt present in the system.",
+     "Identify usability problems encountered during testing.",
+     "Determine the highest-priority improvements for the next iteration.",
+     "Provide a live end-to-end alpha demonstration.",
+     "Submit a short integration/testing report."
+    ],
+    "pointers": []
+   }
+  },
+  {
+   "step": "record a 2-minute lecture (synthetic speech) and transcribe (FR5)",
+   "ok": true,
+   "seconds": 12.4,
+   "result": {
+    "session_id": "2026-10-04-class-1",
+    "stop_status": 200,
+    "processing_seconds": 12.1,
+    "status": "done",
+    "error": null,
+    "transcript": "Good afternoon, everyone. Today, we continue with literature reviews. Last week, we talked about search criteria. And today, I want to focus on how to report your selection process. When you search the databases, you will find hundreds of papers. You remove duplicates first, then you screen titles and abstract, and finally, you read the full text of the papers that remain. The Prisma Diagram is a flow chart that shows how many papers you found, how many you removed at each step, and how many you included in the end. Every systematic review should include a Prisma Diagram, because it makes your selection process transparent and repeatable. When you write the inclusion criteria, use the PICO model, Population, Intervention, Comparison, and Outcome. For example, if your population is children with autism, your intervention is virtual reality training, and your outcome is social skills, then a paper about adults with depression does not meet your criteria. Group the papers you include by themes, not one paper at a time. One more thing for your projects. The team check-in for this sprint moves from Tuesday to Thursday at 3 pm in the same room. Please bring your table of selected papers to the check-in, with at least 10 papers in it. That is, all for today.",
+    "summary": "# Literature Reviews\n\n## Reporting Selection Process\n- Begin with a search in databases, resulting in hundreds of papers.\n- Steps in the selection process:\n  1. Remove duplicates.\n  2. Screen titles and abstracts.\n  3. Read the full text of remaining papers.\n  \n## Prisma Diagram\n- A flow chart that illustrates:\n  - Number of papers found.\n  - Number of papers removed at each step.\n  - Number of papers included in the final review.\n- Essential for systematic reviews to ensure transparency and repeatability.\n\n## Inclusion Criteria\n- Use the PICO model:\n  - **P**opulation\n  - **I**ntervention\n  -"
+   }
+  },
+  {
+   "step": "ask about what was said in the recording (FR5 to FR3)",
+   "ok": true,
+   "seconds": 1.3,
+   "result": {
+    "status": 200,
+    "answer": "The professor mentioned that the team check-in moves from Tuesday to Thursday at 3 pm in the same room. The PRISMA diagram is a flow chart that illustrates the selection process for systematic reviews, showing how many papers were found, how many were removed at each step, and how many were included in the final analysis. It is essential for making the selection process transparent and repeatable [1].",
+    "grounded": true,
+    "citations": [
+     {
+      "source_type": "transcript",
+      "label": "Class #1 \u00b7 0:00",
+      "item_id": "2026-10-04-class-1"
+     }
+    ],
+    "errors": []
+   }
+  },
+  {
+   "step": "record silence (FR5 edge)",
+   "ok": true,
+   "seconds": 12.0,
+   "result": {
+    "session_id": "2026-10-04-class-2",
+    "stop_status": 200,
+    "processing_seconds": 12.0,
+    "status": "done",
+    "error": null,
+    "transcript": "",
+    "summary": ""
+   }
+  },
+  {
+   "step": "upload audio that isn't audio (FR5 failure)",
+   "ok": true,
+   "seconds": 2.0,
+   "result": {
+    "stop_status": 200,
+    "body": {
+     "session_id": "2026-10-04-class-3",
+     "status": "processing"
+    },
+    "final": {
+     "session_id": "2026-10-04-class-3",
+     "title": "Class #3",
+     "status": "error",
+     "class_num": 3,
+     "error": "[Errno 1094995529] Invalid data found when processing input: '<test copy of ~/.secondmind>/courses/56350/sessions/2026-10-04-class-3/audio.m4a'"
+    }
+   }
+  },
+  {
+   "step": "quiz from Week 02 files + the recording, topic, medium (FR9)",
+   "ok": true,
+   "seconds": 58.3,
+   "result": {
+    "id": "quiz-0e41b1e794dd",
+    "status": "done",
+    "error": null,
+    "seconds": 58.2,
+    "title": "Literature Reviews and PRISMA",
+    "stats": {
+     "generated": 15,
+     "unsourced": 0,
+     "malformed": 0,
+     "unsupported": 4,
+     "checked": true,
+     "rounds": 2
+    },
+    "items": [
+     {
+      "question": "What is the primary aim of a literature review?",
+      "options": [
+       {
+        "text": "To summarize the personal opinions of the author.",
+        "correct": false,
+        "rationale": "A literature review is based on objective analysis of previous studies, not personal opinions."
+       },
+       {
+        "text": "To evaluate past literature and illustrate gaps in research.",
+        "correct": true,
+        "rationale": "A literature review selects relevant past literature, analyzes, and evaluates these studies to illustrate gaps in previous research."
+       },
+       {
+        "text": "To present a single author's research findings.",
+        "correct": false,
+        "rationale": "A literature review aims to connect multiple studies rather than focus on individual research findings."
+       },
+       {
+        "text": "To create a database of all published works.",
+        "correct": false,
+        "rationale": "While literature reviews reference many works, they do not aim to catalog all published works."
+       }
+      ],
+      "hint": "Think about the purpose of connecting research and showing gaps.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.6",
+       "item_id": "file:14690036"
+      },
+      "passage": "#print(len(t))\nstudies_to_consider = []\nrd = csv.reader(t)\nKEYWORD_INDEX = 16\nPDF_INDEX = 15\nABSTRACT_INDEX = 10\nfor item in rd:\nkeywords = [keyword.lower() for keyword in\nitem[KEYWORD_INDEX].split(\";\")]\nif (\n\"autism\" in keywords or\n\"asd\" in keywords or\n\"aspergers\" in keywords\n):\n#print(\"First test passed :D\")\nif (\n\"vr\" in keywords or\n\"virtual reality\" in keywords or\n\"facial emotion recognition\" in keywords\n):\nprint(\"Second test passed! :D\")\nstudies_to_consider.append(item)\n#raise\nprint(f\"Now I have {len(studies_to_consider)} studies to consider!!!\")\nfor study in studies_to_consider:\nprint(study[PDF_INDEX])\nprint(study[ABSTRACT_INDEX])\nprint(studies_to_consider)\nLiterature Review Paper\nA literature review selects relevant past literature, analyzes and evaluates these studies.\nPurposes: situates your work within the broader scholarly community - connects your work to\nthe broader field and shows that your work has grown organically from current trends.\nIllustrates a gap in this previous research."
+     },
+     {
+      "question": "Which of the following is a key step in the PRISMA selection process?",
+      "options": [
+       {
+        "text": "Including all found papers.",
+        "correct": false,
+        "rationale": "The process involves excluding papers that do not meet the criteria, not including all found papers."
+       },
+       {
+        "text": "Screening titles and abstracts.",
+        "correct": true,
+        "rationale": "Screening titles and abstracts is a critical step to narrow down the literature for a systematic review."
+       },
+       {
+        "text": "Writing a summary of each paper.",
+        "correct": false,
+        "rationale": "The PRISMA process focuses on documenting the selection process, not summarizing each paper."
+       },
+       {
+        "text": "Citing all references listed in the databases.",
+        "correct": false,
+        "rationale": "PRISMA does not require citing all references; it focuses on the selection and reporting process."
+       }
+      ],
+      "hint": "Think about what processes are necessary to filter down the initial search results.",
+      "citation": {
+       "source_type": "transcript",
+       "label": "Class #1 \u00b7 0:00",
+       "item_id": "2026-10-04-class-1"
+      },
+      "passage": "Good afternoon, everyone.  Today, we continue with literature reviews.  Last week, we talked about search criteria.  And today, I want to focus on how to report your selection process.  When you search the databases, you will find hundreds of papers.  You remove duplicates first, then you screen titles and abstract,  and finally, you read the full text of the papers that remain.  The Prisma Diagram is a flow chart that shows how many papers you found,  how many you removed at each step, and how many you included in the end.  Every systematic review should include a Prisma Diagram,  because it makes your selection process transparent and repeatable.  When you write the inclusion criteria, use the PICO model,  Population, Intervention, Comparison, and Outcome.  For example, if your population is children with autism,  your intervention is virtual reality training,  and your outcome is social skills,  then a paper about adults with depression does not meet your criteria.  Group the papers you include by themes, not one paper at a time.  One more thing for your projects.  The team check-in for this sprint moves from Tuesday to Thursday at 3 pm in the same room.  Please bring your table of selected papers to the check-in,  with at least 10 papers in it.  That is, all for today."
+     },
+     {
+      "question": "Why is it important to avoid predatory journals in literature searches?",
+      "options": [
+       {
+        "text": "They do not conduct proper peer review.",
+        "correct": true,
+        "rationale": "Predatory journals often lack genuine peer review, leading to the publication of low-quality research."
+       },
+       {
+        "text": "They only publish articles in local languages.",
+        "correct": false,
+        "rationale": "Predatory journals may publish in various languages, but this is not their defining characteristic."
+       },
+       {
+        "text": "They are not indexed in major databases.",
+        "correct": false,
+        "rationale": "Some predatory journals may still be indexed; the key issue is the lack of valid peer review."
+       },
+       {
+        "text": "They charge excessive fees for publication.",
+        "correct": false,
+        "rationale": "While many predatory journals do charge fees, the main concern is their lack of rigorous peer review."
+       }
+      ],
+      "hint": "Consider the implications of peer review in academic publishing.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.4",
+       "item_id": "file:14690036"
+      },
+      "passage": "Elsevier is a Netherlands-based information and analytics company specializing in scientific, technical, and\nmedical content.\nScopus\nScopus is Elsevier\u2019s abstract and citation database launched in 2004. Scopus covers nearly 36,377 titles from\napproximately 11,678 publishers, of which 34,346 are peer-reviewed journals in top-level subject fields: life\nsciences, social sciences, physical sciences and health sciences. Scopus traces citations and impact\nfactors of articles in peer-reviewed journals in all subjects.\nPubMed\nPubMed is a free search engine accessing primarily the MEDLINE database of references and abstracts on life\nsciences and biomedical topics. The United States National Library of Medicine at the National Institutes of\nHealth maintain the database as part of the Entrez system of information retrieval.\nResearch Gate:\nResearchGate is a European commercial social networking site for scientists and researchers to share papers,\nask and answer questions, and find collaborators.\nDOAJ\nhttps://doaj.org/\nDOAJ is a community-curated online directory that indexes and provides access to high quality,\nopen access, peer-reviewed journals. All DOAJ services are free of charge including being\nindexed. All data is freely available. It is maintained by Infrastructure Services for Open Access.\nAvoid predator journals\nPotential predatory scholarly open\u2011access publishers\nhttps://beallslist.net/\nBeall's List was a prominent list of predatory open-access publishers that was maintained by University of\nColorado librarian Jeffrey Beall on his blog Scholarly Open Access. The list aimed to document open-access\npublishers who did not perform real peer review, effectively publishing any article as long as the authors pay\nthe open access fee. Originally started as a personal endeavor in 2008, Beall's List became a widely followed\npiece of work by the mid-2010s. Its influence led some publishers on the list to threaten defamation lawsuits\nagainst Beall, as well as to lodge official complaints against Beall's work to the University of Colorado. As a\nresult, Beall deactivated his blog and the list in January 2017.\nSearch Criteria\nPublication Year"
+     },
+     {
+      "question": "What does PRISMA stand for?",
+      "options": [
+       {
+        "text": "Primary Research Information System for Medical Analysis.",
+        "correct": false,
+        "rationale": "This is not the correct definition of PRISMA; it specifically relates to systematic reviews and meta-analyses."
+       },
+       {
+        "text": "Preferred Reporting Items for Systematic Reviews and Meta-Analyses.",
+        "correct": true,
+        "rationale": "PRISMA stands for Preferred Reporting Items for Systematic Reviews and Meta-Analyses, which guides the reporting of systematic reviews."
+       },
+       {
+        "text": "Peer Review Index of Scientific Manuscripts and Articles.",
+        "correct": false,
+        "rationale": "This does not represent PRISMA's focus on systematic reviews."
+       },
+       {
+        "text": "Publication Review for International Scientific Manuscripts and Articles.",
+        "correct": false,
+        "rationale": "This does not accurately describe what PRISMA stands for or its purpose."
+       }
+      ],
+      "hint": "Think about what kind of reviews PRISMA is designed to report.",
+      "citation": {
+       "source_type": "transcript",
+       "label": "Class #1 \u00b7 0:00",
+       "item_id": "2026-10-04-class-1"
+      },
+      "passage": "Good afternoon, everyone.  Today, we continue with literature reviews.  Last week, we talked about search criteria.  And today, I want to focus on how to report your selection process.  When you search the databases, you will find hundreds of papers.  You remove duplicates first, then you screen titles and abstract,  and finally, you read the full text of the papers that remain.  The Prisma Diagram is a flow chart that shows how many papers you found,  how many you removed at each step, and how many you included in the end.  Every systematic review should include a Prisma Diagram,  because it makes your selection process transparent and repeatable.  When you write the inclusion criteria, use the PICO model,  Population, Intervention, Comparison, and Outcome.  For example, if your population is children with autism,  your intervention is virtual reality training,  and your outcome is social skills,  then a paper about adults with depression does not meet your criteria.  Group the papers you include by themes, not one paper at a time.  One more thing for your projects.  The team check-in for this sprint moves from Tuesday to Thursday at 3 pm in the same room.  Please bring your table of selected papers to the check-in,  with at least 10 papers in it.  That is, all for today."
+     },
+     {
+      "question": "What is a systematic review?",
+      "options": [
+       {
+        "text": "A review that systematically collects and synthesizes research studies.",
+        "correct": true,
+        "rationale": "A systematic review is designed to comprehensively gather and analyze studies on a specific research question."
+       },
+       {
+        "text": "A summary of a single research study.",
+        "correct": false,
+        "rationale": "A systematic review synthesizes multiple studies, not just summarizing a single one."
+       },
+       {
+        "text": "A random selection of articles on a topic.",
+        "correct": false,
+        "rationale": "A systematic review is not random; it follows a structured and transparent methodology."
+       },
+       {
+        "text": "An opinion-based article on a research topic.",
+        "correct": false,
+        "rationale": "Systematic reviews are based on evidence and analysis, not personal opinions."
+       }
+      ],
+      "hint": "Think about the process of gathering multiple studies for analysis.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.6",
+       "item_id": "file:14690036"
+      },
+      "passage": "#print(len(t))\nstudies_to_consider = []\nrd = csv.reader(t)\nKEYWORD_INDEX = 16\nPDF_INDEX = 15\nABSTRACT_INDEX = 10\nfor item in rd:\nkeywords = [keyword.lower() for keyword in\nitem[KEYWORD_INDEX].split(\";\")]\nif (\n\"autism\" in keywords or\n\"asd\" in keywords or\n\"aspergers\" in keywords\n):\n#print(\"First test passed :D\")\nif (\n\"vr\" in keywords or\n\"virtual reality\" in keywords or\n\"facial emotion recognition\" in keywords\n):\nprint(\"Second test passed! :D\")\nstudies_to_consider.append(item)\n#raise\nprint(f\"Now I have {len(studies_to_consider)} studies to consider!!!\")\nfor study in studies_to_consider:\nprint(study[PDF_INDEX])\nprint(study[ABSTRACT_INDEX])\nprint(studies_to_consider)\nLiterature Review Paper\nA literature review selects relevant past literature, analyzes and evaluates these studies.\nPurposes: situates your work within the broader scholarly community - connects your work to\nthe broader field and shows that your work has grown organically from current trends.\nIllustrates a gap in this previous research."
+     },
+     {
+      "question": "Which of the following is a critical component of a systematic review?",
+      "options": [
+       {
+        "text": "An opinion piece about the topic.",
+        "correct": false,
+        "rationale": "Systematic reviews are evidence-based and should not include opinion pieces."
+       },
+       {
+        "text": "A focus on a single author's perspective.",
+        "correct": false,
+        "rationale": "Systematic reviews synthesize multiple studies and perspectives, not just one author's viewpoint."
+       },
+       {
+        "text": "Clear selection criteria for including studies.",
+        "correct": true,
+        "rationale": "Establishing clear selection criteria is essential to determine which studies are included in the review."
+       },
+       {
+        "text": "A detailed summary of every article found.",
+        "correct": false,
+        "rationale": "While summaries are important, a systematic review focuses on synthesizing findings, not detailing every article."
+       }
+      ],
+      "hint": "Think about what makes systematic reviews systematic and rigorous.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.6",
+       "item_id": "file:14690036"
+      },
+      "passage": "#print(len(t))\nstudies_to_consider = []\nrd = csv.reader(t)\nKEYWORD_INDEX = 16\nPDF_INDEX = 15\nABSTRACT_INDEX = 10\nfor item in rd:\nkeywords = [keyword.lower() for keyword in\nitem[KEYWORD_INDEX].split(\";\")]\nif (\n\"autism\" in keywords or\n\"asd\" in keywords or\n\"aspergers\" in keywords\n):\n#print(\"First test passed :D\")\nif (\n\"vr\" in keywords or\n\"virtual reality\" in keywords or\n\"facial emotion recognition\" in keywords\n):\nprint(\"Second test passed! :D\")\nstudies_to_consider.append(item)\n#raise\nprint(f\"Now I have {len(studies_to_consider)} studies to consider!!!\")\nfor study in studies_to_consider:\nprint(study[PDF_INDEX])\nprint(study[ABSTRACT_INDEX])\nprint(studies_to_consider)\nLiterature Review Paper\nA literature review selects relevant past literature, analyzes and evaluates these studies.\nPurposes: situates your work within the broader scholarly community - connects your work to\nthe broader field and shows that your work has grown organically from current trends.\nIllustrates a gap in this previous research."
+     },
+     {
+      "question": "In a literature review, why should research be grouped into trends or themes?",
+      "options": [
+       {
+        "text": "To provide a coherent narrative of the research landscape.",
+        "correct": true,
+        "rationale": "Grouping research into themes helps articulate the broader trends and consensus in the research area."
+       },
+       {
+        "text": "To list individual studies one by one.",
+        "correct": false,
+        "rationale": "Grouping by themes is more effective than listing studies individually for clarity and coherence."
+       },
+       {
+        "text": "To avoid discussing disagreements in the research.",
+        "correct": false,
+        "rationale": "Discussing both agreement and disagreement is crucial for a comprehensive literature review."
+       },
+       {
+        "text": "To highlight only the most recent studies.",
+        "correct": false,
+        "rationale": "While recent studies may be included, the focus is on trends, not just recency."
+       }
+      ],
+      "hint": "Think about how themes enhance the understanding of research.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.7",
+       "item_id": "file:14690036"
+      },
+      "passage": "1. Introduction: explain the relevant background information\n\u25cf Define key terms\n\u25cf Describe phenomena\n\u25cf Prevalence of the issue\n\u25cf Current limitations\n\u25cf Aim of this paper, uniqueness\n2. Group research into trends/themes/coherence rather than mentioning individual researches\nseparately\n\u25cf Layout an overall terrain that you're working by dissecting the field\n\u25cf Show consensus/agreement in the field, and disagreement if any\n\u25cb Agreement\n\u25a0 \u201cOne trend in the research is....\u201d\n\u25a0 \u201cResearch seems to agree that....\u201d\n\u25a0 \u201cNumerous authors support the claim that....\u201d\n\u25a0 \u201cThere is strong convergent evidence for....\u201d\n\u25cb Disagreement\n\u25a0 \u201cThe evidence on X is mixed for....\u201d\n\u25a0 \u201cThere is overall debate regarding....\u201d\n\u25a0 \u201cA lack of consensus exists on the point of...\u201d \u2022 \u201cThere are two conflicting\ncamps on the issue of....\u201d\n\u25cf Show different approaches or field evolution (e.g. one trend focuses on, several studies\nemphasize...)\n\u25cf Each paragraph should discuss one specific trend, not author"
+     },
+     {
+      "question": "What type of information does a PRISMA flow diagram typically present?",
+      "options": [
+       {
+        "text": "The opinions of the researchers on the included studies.",
+        "correct": false,
+        "rationale": "PRISMA diagrams focus on the selection process rather than subjective opinions of researchers."
+       },
+       {
+        "text": "A summary of each included paper.",
+        "correct": false,
+        "rationale": "The flow diagram does not summarize individual papers; it outlines the selection process."
+       },
+       {
+        "text": "The number of papers found, screened, and included.",
+        "correct": true,
+        "rationale": "The PRISMA diagram visually represents the flow of papers through each stage of the review process."
+       },
+       {
+        "text": "The methodologies used in each study.",
+        "correct": false,
+        "rationale": "The PRISMA flow diagram does not detail methodologies; it summarizes the selection process."
+       }
+      ],
+      "hint": "Think about how a visual representation can clarify the review process.",
+      "citation": {
+       "source_type": "transcript",
+       "label": "Class #1 \u00b7 0:00",
+       "item_id": "2026-10-04-class-1"
+      },
+      "passage": "Good afternoon, everyone.  Today, we continue with literature reviews.  Last week, we talked about search criteria.  And today, I want to focus on how to report your selection process.  When you search the databases, you will find hundreds of papers.  You remove duplicates first, then you screen titles and abstract,  and finally, you read the full text of the papers that remain.  The Prisma Diagram is a flow chart that shows how many papers you found,  how many you removed at each step, and how many you included in the end.  Every systematic review should include a Prisma Diagram,  because it makes your selection process transparent and repeatable.  When you write the inclusion criteria, use the PICO model,  Population, Intervention, Comparison, and Outcome.  For example, if your population is children with autism,  your intervention is virtual reality training,  and your outcome is social skills,  then a paper about adults with depression does not meet your criteria.  Group the papers you include by themes, not one paper at a time.  One more thing for your projects.  The team check-in for this sprint moves from Tuesday to Thursday at 3 pm in the same room.  Please bring your table of selected papers to the check-in,  with at least 10 papers in it.  That is, all for today."
+     },
+     {
+      "question": "Why is it advised to summarize trends of the identified research area in a literature review?",
+      "options": [
+       {
+        "text": "To focus solely on recent studies.",
+        "correct": false,
+        "rationale": "Summarizing trends is about the overall landscape, not just recent research."
+       },
+       {
+        "text": "To present a list of all studies in the area.",
+        "correct": false,
+        "rationale": "A literature review should synthesize information, not just list studies."
+       },
+       {
+        "text": "To showcase the evolution and consensus in the field.",
+        "correct": true,
+        "rationale": "Summarizing trends allows for understanding how the research area has developed and where it stands."
+       },
+       {
+        "text": "To avoid mentioning conflicting studies.",
+        "correct": false,
+        "rationale": "It is essential to discuss both trends and conflicts to provide a balanced view of the research."
+       }
+      ],
+      "hint": "Consider the benefits of understanding research patterns in a field.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.7",
+       "item_id": "file:14690036"
+      },
+      "passage": "1. Introduction: explain the relevant background information\n\u25cf Define key terms\n\u25cf Describe phenomena\n\u25cf Prevalence of the issue\n\u25cf Current limitations\n\u25cf Aim of this paper, uniqueness\n2. Group research into trends/themes/coherence rather than mentioning individual researches\nseparately\n\u25cf Layout an overall terrain that you're working by dissecting the field\n\u25cf Show consensus/agreement in the field, and disagreement if any\n\u25cb Agreement\n\u25a0 \u201cOne trend in the research is....\u201d\n\u25a0 \u201cResearch seems to agree that....\u201d\n\u25a0 \u201cNumerous authors support the claim that....\u201d\n\u25a0 \u201cThere is strong convergent evidence for....\u201d\n\u25cb Disagreement\n\u25a0 \u201cThe evidence on X is mixed for....\u201d\n\u25a0 \u201cThere is overall debate regarding....\u201d\n\u25a0 \u201cA lack of consensus exists on the point of...\u201d \u2022 \u201cThere are two conflicting\ncamps on the issue of....\u201d\n\u25cf Show different approaches or field evolution (e.g. one trend focuses on, several studies\nemphasize...)\n\u25cf Each paragraph should discuss one specific trend, not author"
+     },
+     {
+      "question": "What is a critical aspect of the PRISMA selection process in systematic reviews?",
+      "options": [
+       {
+        "text": "Including only recent studies published in English",
+        "correct": false,
+        "rationale": "While recent studies are often a focus, the PICO model specifically guides how to define the studies to include, not just their publication date or language."
+       },
+       {
+        "text": "Only selecting studies that agree with the research hypothesis",
+        "correct": false,
+        "rationale": "The selection process should be unbiased and based on established criteria, not pre-determined hypotheses."
+       },
+       {
+        "text": "Documenting every article read during the review",
+        "correct": false,
+        "rationale": "While documenting is important, the key aspect of PRISMA is about the flowchart that visualizes the selection process, not just any article read."
+       },
+       {
+        "text": "Using the PICO model for inclusion criteria",
+        "correct": true,
+        "rationale": "The PICO model (Population, Intervention, Comparison, Outcome) is essential for clearly defining the inclusion criteria during the selection process."
+       }
+      ],
+      "hint": "Think about the framework that guides the selection criteria.",
+      "citation": {
+       "source_type": "transcript",
+       "label": "Class #1 \u00b7 0:00",
+       "item_id": "2026-10-04-class-1"
+      },
+      "passage": "Good afternoon, everyone.  Today, we continue with literature reviews.  Last week, we talked about search criteria.  And today, I want to focus on how to report your selection process.  When you search the databases, you will find hundreds of papers.  You remove duplicates first, then you screen titles and abstract,  and finally, you read the full text of the papers that remain.  The Prisma Diagram is a flow chart that shows how many papers you found,  how many you removed at each step, and how many you included in the end.  Every systematic review should include a Prisma Diagram,  because it makes your selection process transparent and repeatable.  When you write the inclusion criteria, use the PICO model,  Population, Intervention, Comparison, and Outcome.  For example, if your population is children with autism,  your intervention is virtual reality training,  and your outcome is social skills,  then a paper about adults with depression does not meet your criteria.  Group the papers you include by themes, not one paper at a time.  One more thing for your projects.  The team check-in for this sprint moves from Tuesday to Thursday at 3 pm in the same room.  Please bring your table of selected papers to the check-in,  with at least 10 papers in it.  That is, all for today."
+     }
+    ],
+    "dropped": [
+     {
+      "reason": "unsupported",
+      "question": "What is the PICO model used for in the selection criteria?",
+      "options": [
+       {
+        "text": "To define the key components of a clinical question.",
+        "correct": true,
+        "rationale": "PICO stands for Population, Intervention, Comparison, and Outcome, and is used to frame clinical research questions."
+       },
+       {
+        "text": "To categorize papers based on publication year.",
+        "correct": false,
+        "rationale": "The PICO model focuses on framing clinical questions rather than categorizing by publication year."
+       },
+       {
+        "text": "To summarize findings from individual studies.",
+        "correct": false,
+        "rationale": "PICO does not summarize findings; it helps in formulating research questions."
+       },
+       {
+        "text": "To establish the validity of a single study.",
+        "correct": false,
+        "rationale": "PICO is about framing questions for systematic reviews, not validating individual studies."
+       }
+      ],
+      "hint": "Consider how PICO helps in defining research parameters.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.8",
+       "item_id": "file:14690036"
+      },
+      "passage": "3. Materials and Methods\n3.1 Search strategy\nThe first step in eliminating a large number of articles was using the search terms and\npublication date. Secondly, we sorted by number of citations, removing any duplicates.\n3.2 Selection Criteria\n3.3 Selection Process\n3.4 Data Extraction\n4. Results\n4.1 Study Selection\n\n[Text read from images on this page]\nand Hyland note that students who receive positive feedback p nt more positive outlooks of their\nwriting, while students who receive mostly negative feedback exhibit diminishing motivation. Students\nin a high school writing center, for example, felt motivated to work harder after receiving positive\nfeedback on their writing (Brimner). In studies of freshmen composition classes, \u201cpraiseworthy grading\u201d\nhas been found to support students\u2019 confidence and encourage them to take risks (Dragga; Zak). [...]\nResearch on more advanced students have echoed those findings; Straub\u2019s study of students\u2019 Situates\n\u201creactions to teacher feedback in\u2018a freshmen composition classroom found that students react individual\nmore favorably to positive or praise comments; students also prefer specific praise over generic authors\ncomments such as, \u201cgood,\u201d which is considered too vague and even disingenuous. [...] These within trend\nresults align with Dragga\u2019s findings, which found that students are unsure of how to improve their\nwriting when they only receive praise. [...]"
+     },
+     {
+      "reason": "unsupported",
+      "question": "What is the significance of documenting the search keywords and boolean expressions in research?",
+      "options": [
+       {
+        "text": "It ensures reproducibility of the research process.",
+        "correct": true,
+        "rationale": "Documenting search keywords and boolean expressions allows others to replicate the search process."
+       },
+       {
+        "text": "It allows for the publication of the research.",
+        "correct": false,
+        "rationale": "While documentation is important, it does not directly relate to the publication process."
+       },
+       {
+        "text": "It provides a summary of research findings.",
+        "correct": false,
+        "rationale": "Documenting keywords is not about summarizing findings but about transparency in the research process."
+       },
+       {
+        "text": "It is only necessary for qualitative studies.",
+        "correct": false,
+        "rationale": "Documenting search strategies is important for all types of studies, not just qualitative ones."
+       }
+      ],
+      "hint": "Consider why transparency is critical in research.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.5",
+       "item_id": "file:14690036"
+      },
+      "passage": "\u25cf 2022 - Present, earlier research papers may contain outdated information that will not\nadd significant value to our research.\nResearch Focus Areas\n\u25cf\n\u25cf\nTechnologies\n\u25cf\nRequirements\n1. Meet the defined search criteria\n2. Please clearly document the search keywords and boolean expression\nFor example (not limited to): (ASD OR Autism OR Autism Spectrum Disorder OR\nAsperger) AND (face OR facial OR emotion)\n3. Please clearly summarize the trends of the research area you identified\nPlease refer to study material:\n\u25cf https://www.cmu.edu/student-success/other-resources/resource-descriptions/rela\nted-work.html\n\u25cf https://www.youtube.com/watch?v=Hfty1dGfZcw\n4. Summarization of the identified research papers\nTitle/Author Aim Methodologies Model/Datasets Result Limitations Year\n5. (Bonus) Creative Process\nimport csv\nt = \"\"\nwith open(\"myresearch.csv\") as file:\nt = file.readlines()"
+     },
+     {
+      "reason": "unsupported",
+      "question": "What are some common databases used for literature searches?",
+      "options": [
+       {
+        "text": "Google Scholar, PubMed, Scopus.",
+        "correct": true,
+        "rationale": "These databases are commonly used to access scholarly literature across various disciplines."
+       },
+       {
+        "text": "Facebook, Instagram, Twitter.",
+        "correct": false,
+        "rationale": "While these platforms are popular, they are not academic databases for scholarly literature."
+       },
+       {
+        "text": "Wikipedia, Quora, Reddit.",
+        "correct": false,
+        "rationale": "These are not reliable sources for academic research compared to databases like PubMed or Scopus."
+       },
+       {
+        "text": "LinkedIn, eBay, Amazon.",
+        "correct": false,
+        "rationale": "These platforms do not serve as databases for academic literature searches."
+       }
+      ],
+      "hint": "Consider where researchers typically access peer-reviewed articles.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.5",
+       "item_id": "file:14690036"
+      },
+      "passage": "\u25cf 2022 - Present, earlier research papers may contain outdated information that will not\nadd significant value to our research.\nResearch Focus Areas\n\u25cf\n\u25cf\nTechnologies\n\u25cf\nRequirements\n1. Meet the defined search criteria\n2. Please clearly document the search keywords and boolean expression\nFor example (not limited to): (ASD OR Autism OR Autism Spectrum Disorder OR\nAsperger) AND (face OR facial OR emotion)\n3. Please clearly summarize the trends of the research area you identified\nPlease refer to study material:\n\u25cf https://www.cmu.edu/student-success/other-resources/resource-descriptions/rela\nted-work.html\n\u25cf https://www.youtube.com/watch?v=Hfty1dGfZcw\n4. Summarization of the identified research papers\nTitle/Author Aim Methodologies Model/Datasets Result Limitations Year\n5. (Bonus) Creative Process\nimport csv\nt = \"\"\nwith open(\"myresearch.csv\") as file:\nt = file.readlines()"
+     },
+     {
+      "reason": "unsupported",
+      "question": "Why is it important to group research into themes during a literature review?",
+      "options": [
+       {
+        "text": "To highlight individual studies separately",
+        "correct": false,
+        "rationale": "Highlighting individual studies does not provide a comprehensive view; grouping by themes helps to show broader trends."
+       },
+       {
+        "text": "To illustrate gaps in the existing research",
+        "correct": true,
+        "rationale": "Grouping research into themes helps to identify gaps and consensus in the existing literature, clarifying where further research is needed."
+       },
+       {
+        "text": "To simplify the writing process",
+        "correct": false,
+        "rationale": "Grouping by themes is not primarily about simplification; it serves to enhance understanding of trends and coherence in the field."
+       },
+       {
+        "text": "To ensure all studies are included in the review",
+        "correct": false,
+        "rationale": "While grouping helps with organization, the goal is to provide a thematic overview, not to guarantee all studies are mentioned."
+       }
+      ],
+      "hint": "Consider the benefits of a broader perspective on research findings.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.7",
+       "item_id": "file:14690036"
+      },
+      "passage": "1. Introduction: explain the relevant background information\n\u25cf Define key terms\n\u25cf Describe phenomena\n\u25cf Prevalence of the issue\n\u25cf Current limitations\n\u25cf Aim of this paper, uniqueness\n2. Group research into trends/themes/coherence rather than mentioning individual researches\nseparately\n\u25cf Layout an overall terrain that you're working by dissecting the field\n\u25cf Show consensus/agreement in the field, and disagreement if any\n\u25cb Agreement\n\u25a0 \u201cOne trend in the research is....\u201d\n\u25a0 \u201cResearch seems to agree that....\u201d\n\u25a0 \u201cNumerous authors support the claim that....\u201d\n\u25a0 \u201cThere is strong convergent evidence for....\u201d\n\u25cb Disagreement\n\u25a0 \u201cThe evidence on X is mixed for....\u201d\n\u25a0 \u201cThere is overall debate regarding....\u201d\n\u25a0 \u201cA lack of consensus exists on the point of...\u201d \u2022 \u201cThere are two conflicting\ncamps on the issue of....\u201d\n\u25cf Show different approaches or field evolution (e.g. one trend focuses on, several studies\nemphasize...)\n\u25cf Each paragraph should discuss one specific trend, not author"
+     }
+    ],
+    "cited_sources": [
+     "Class #1",
+     "Research Study.pdf"
+    ]
+   }
+  },
+  {
+   "step": "flashcards, whole course, defaults (FR9)",
+   "ok": true,
+   "seconds": 46.2,
+   "result": {
+    "id": "cards-bf038746392c",
+    "status": "done",
+    "error": null,
+    "seconds": 46.2,
+    "title": "Key Concepts in AI and Education",
+    "stats": {
+     "generated": 48,
+     "unsourced": 0,
+     "malformed": 2,
+     "unsupported": 31,
+     "checked": true,
+     "rounds": 2
+    },
+    "items": [
+     {
+      "front": "What is the AI Home Energy Copilot?",
+      "back": "It is an AI-powered system designed to help solar-powered households optimize their energy consumption and renewable energy utilization through personalized recommendations and forecasts.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.1",
+       "item_id": "file:14709849"
+      },
+      "passage": "Project Title\nAI Home Energy Copilot for Solar-Powered Households Using Multi-Agent Forecasting\nProject Abstract\nIssue Statement\nResidential solar adoption continues to grow, yet many homeowners struggle to understand\nand optimize their energy usage. Even homes equipped with solar panels often rely on static\ndashboards that show historical consumption and generation data but provide little guidance\nabout future energy availability, battery utilization, grid dependence, or cost-saving\nopportunities. As electricity prices rise and grids become increasingly stressed, helping\nhouseholds make intelligent energy decisions can reduce costs, improve renewable energy\nutilization, and contribute to broader sustainability goals. The challenge impacts millions of\nhouseholds transitioning toward clean energy systems.\nExisting Solutions\nCurrent platforms from solar providers and utility companies primarily focus on monitoring past\nenergy consumption and solar generation. Some systems provide simple forecasts based on\nweather data, but they rarely offer personalized recommendations or account for household\nbehavior patterns, appliance usage, battery storage, dynamic electricity pricing, and grid\nconditions simultaneously. Most solutions operate as standalone forecasting tools rather than\nintelligent decision-support systems.\nMy Aim\nThis project proposes an AI-powered Home Energy Copilot that combines large language\nmodels, multi-agent systems, and time-series forecasting models to help homeowners optimize\nenergy consumption and renewable energy utilization. Specialized agents would collaboratively\npredict solar generation, forecast household demand, estimate electricity costs, monitor\nbattery health, and recommend energy-efficient actions. Responsible AI principles would be\nincorporated through explainable recommendations, transparent uncertainty estimates,\nprivacy-preserving data handling, and fairness across different household types.\nExamples of recommendations include:\n\u2022 Best times to run energy-intensive appliances\n\u2022 When to charge or discharge home batteries\n\u2022 Anticipated grid electricity usage\n\u2022 Potential monthly cost savings\n\u2022 Carbon footprint reduction opportunities"
+     },
+     {
+      "front": "What ethical metrics are important for the AI Home Energy Copilot?",
+      "back": "Ethical metrics include the explainability and transparency of recommendations, user trust and satisfaction scores, and privacy-preserving handling of household energy data.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.2",
+       "item_id": "file:14709849"
+      },
+      "passage": "Measure of Success\nTechnical Metrics\n\u2022 Forecasting accuracy for energy consumption and solar generation (MAPE/RMSE)\n\u2022 Recommendation acceptance rate\n\u2022 Reduction in forecasting error compared to baseline models\nEthical Metrics\n\u2022 Explainability and transparency of recommendations\n\u2022 User trust and satisfaction scores\n\u2022 Privacy-preserving handling of household energy data\nReal-World Metrics\n\u2022 Reduction in electricity costs\n\u2022 Increase in solar self-consumption rate\n\u2022 Reduction in grid energy dependence\n\u2022 Estimated reduction in household carbon emissions"
+     },
+     {
+      "front": "What is the significance of ethical metrics in AI projects?",
+      "back": "Ethical metrics ensure that AI systems operate transparently, fairly, and with respect for user privacy, fostering trust and acceptance among users.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.2",
+       "item_id": "file:14709849"
+      },
+      "passage": "Measure of Success\nTechnical Metrics\n\u2022 Forecasting accuracy for energy consumption and solar generation (MAPE/RMSE)\n\u2022 Recommendation acceptance rate\n\u2022 Reduction in forecasting error compared to baseline models\nEthical Metrics\n\u2022 Explainability and transparency of recommendations\n\u2022 User trust and satisfaction scores\n\u2022 Privacy-preserving handling of household energy data\nReal-World Metrics\n\u2022 Reduction in electricity costs\n\u2022 Increase in solar self-consumption rate\n\u2022 Reduction in grid energy dependence\n\u2022 Estimated reduction in household carbon emissions"
+     },
+     {
+      "front": "What does 'responsible AI principles' entail?",
+      "back": "Responsible AI principles encompass ethical considerations such as explainability, fairness, and privacy in the development and deployment of AI systems.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.1",
+       "item_id": "file:14709849"
+      },
+      "passage": "Project Title\nAI Home Energy Copilot for Solar-Powered Households Using Multi-Agent Forecasting\nProject Abstract\nIssue Statement\nResidential solar adoption continues to grow, yet many homeowners struggle to understand\nand optimize their energy usage. Even homes equipped with solar panels often rely on static\ndashboards that show historical consumption and generation data but provide little guidance\nabout future energy availability, battery utilization, grid dependence, or cost-saving\nopportunities. As electricity prices rise and grids become increasingly stressed, helping\nhouseholds make intelligent energy decisions can reduce costs, improve renewable energy\nutilization, and contribute to broader sustainability goals. The challenge impacts millions of\nhouseholds transitioning toward clean energy systems.\nExisting Solutions\nCurrent platforms from solar providers and utility companies primarily focus on monitoring past\nenergy consumption and solar generation. Some systems provide simple forecasts based on\nweather data, but they rarely offer personalized recommendations or account for household\nbehavior patterns, appliance usage, battery storage, dynamic electricity pricing, and grid\nconditions simultaneously. Most solutions operate as standalone forecasting tools rather than\nintelligent decision-support systems.\nMy Aim\nThis project proposes an AI-powered Home Energy Copilot that combines large language\nmodels, multi-agent systems, and time-series forecasting models to help homeowners optimize\nenergy consumption and renewable energy utilization. Specialized agents would collaboratively\npredict solar generation, forecast household demand, estimate electricity costs, monitor\nbattery health, and recommend energy-efficient actions. Responsible AI principles would be\nincorporated through explainable recommendations, transparent uncertainty estimates,\nprivacy-preserving data handling, and fairness across different household types.\nExamples of recommendations include:\n\u2022 Best times to run energy-intensive appliances\n\u2022 When to charge or discharge home batteries\n\u2022 Anticipated grid electricity usage\n\u2022 Potential monthly cost savings\n\u2022 Carbon footprint reduction opportunities"
+     },
+     {
+      "front": "What does the term 'multi-agent systems' refer to?",
+      "back": "Multi-agent systems involve multiple intelligent agents working collaboratively to solve problems or perform tasks, often seen in AI applications like the Home Energy Copilot.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.1",
+       "item_id": "file:14709849"
+      },
+      "passage": "Project Title\nAI Home Energy Copilot for Solar-Powered Households Using Multi-Agent Forecasting\nProject Abstract\nIssue Statement\nResidential solar adoption continues to grow, yet many homeowners struggle to understand\nand optimize their energy usage. Even homes equipped with solar panels often rely on static\ndashboards that show historical consumption and generation data but provide little guidance\nabout future energy availability, battery utilization, grid dependence, or cost-saving\nopportunities. As electricity prices rise and grids become increasingly stressed, helping\nhouseholds make intelligent energy decisions can reduce costs, improve renewable energy\nutilization, and contribute to broader sustainability goals. The challenge impacts millions of\nhouseholds transitioning toward clean energy systems.\nExisting Solutions\nCurrent platforms from solar providers and utility companies primarily focus on monitoring past\nenergy consumption and solar generation. Some systems provide simple forecasts based on\nweather data, but they rarely offer personalized recommendations or account for household\nbehavior patterns, appliance usage, battery storage, dynamic electricity pricing, and grid\nconditions simultaneously. Most solutions operate as standalone forecasting tools rather than\nintelligent decision-support systems.\nMy Aim\nThis project proposes an AI-powered Home Energy Copilot that combines large language\nmodels, multi-agent systems, and time-series forecasting models to help homeowners optimize\nenergy consumption and renewable energy utilization. Specialized agents would collaboratively\npredict solar generation, forecast household demand, estimate electricity costs, monitor\nbattery health, and recommend energy-efficient actions. Responsible AI principles would be\nincorporated through explainable recommendations, transparent uncertainty estimates,\nprivacy-preserving data handling, and fairness across different household types.\nExamples of recommendations include:\n\u2022 Best times to run energy-intensive appliances\n\u2022 When to charge or discharge home batteries\n\u2022 Anticipated grid electricity usage\n\u2022 Potential monthly cost savings\n\u2022 Carbon footprint reduction opportunities"
+     },
+     {
+      "front": "What is the significance of forecasting accuracy?",
+      "back": "Forecasting accuracy is crucial for assessing the performance of AI models in predicting energy consumption and solar generation, as indicated by metrics like MAPE and RMSE. High accuracy is essential for user trust and effective decision-making.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.2",
+       "item_id": "file:14709849"
+      },
+      "passage": "Measure of Success\nTechnical Metrics\n\u2022 Forecasting accuracy for energy consumption and solar generation (MAPE/RMSE)\n\u2022 Recommendation acceptance rate\n\u2022 Reduction in forecasting error compared to baseline models\nEthical Metrics\n\u2022 Explainability and transparency of recommendations\n\u2022 User trust and satisfaction scores\n\u2022 Privacy-preserving handling of household energy data\nReal-World Metrics\n\u2022 Reduction in electricity costs\n\u2022 Increase in solar self-consumption rate\n\u2022 Reduction in grid energy dependence\n\u2022 Estimated reduction in household carbon emissions"
+     },
+     {
+      "front": "What does 'explainability' in AI refer to?",
+      "back": "Explainability in AI refers to the clarity with which the model's decisions can be understood by users, which is important for building trust and ensuring ethical use of AI technologies. It allows users to comprehend how recommendations are made.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.2",
+       "item_id": "file:14709849"
+      },
+      "passage": "Measure of Success\nTechnical Metrics\n\u2022 Forecasting accuracy for energy consumption and solar generation (MAPE/RMSE)\n\u2022 Recommendation acceptance rate\n\u2022 Reduction in forecasting error compared to baseline models\nEthical Metrics\n\u2022 Explainability and transparency of recommendations\n\u2022 User trust and satisfaction scores\n\u2022 Privacy-preserving handling of household energy data\nReal-World Metrics\n\u2022 Reduction in electricity costs\n\u2022 Increase in solar self-consumption rate\n\u2022 Reduction in grid energy dependence\n\u2022 Estimated reduction in household carbon emissions"
+     },
+     {
+      "front": "What are 'multi-agent systems' used for in AI?",
+      "back": "Multi-agent systems are employed in AI to facilitate collaborative problem-solving among specialized agents, each with distinct functions, such as predicting solar generation and optimizing energy consumption. This enhances the overall efficiency of decision-support systems.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.1",
+       "item_id": "file:14709849"
+      },
+      "passage": "Project Title\nAI Home Energy Copilot for Solar-Powered Households Using Multi-Agent Forecasting\nProject Abstract\nIssue Statement\nResidential solar adoption continues to grow, yet many homeowners struggle to understand\nand optimize their energy usage. Even homes equipped with solar panels often rely on static\ndashboards that show historical consumption and generation data but provide little guidance\nabout future energy availability, battery utilization, grid dependence, or cost-saving\nopportunities. As electricity prices rise and grids become increasingly stressed, helping\nhouseholds make intelligent energy decisions can reduce costs, improve renewable energy\nutilization, and contribute to broader sustainability goals. The challenge impacts millions of\nhouseholds transitioning toward clean energy systems.\nExisting Solutions\nCurrent platforms from solar providers and utility companies primarily focus on monitoring past\nenergy consumption and solar generation. Some systems provide simple forecasts based on\nweather data, but they rarely offer personalized recommendations or account for household\nbehavior patterns, appliance usage, battery storage, dynamic electricity pricing, and grid\nconditions simultaneously. Most solutions operate as standalone forecasting tools rather than\nintelligent decision-support systems.\nMy Aim\nThis project proposes an AI-powered Home Energy Copilot that combines large language\nmodels, multi-agent systems, and time-series forecasting models to help homeowners optimize\nenergy consumption and renewable energy utilization. Specialized agents would collaboratively\npredict solar generation, forecast household demand, estimate electricity costs, monitor\nbattery health, and recommend energy-efficient actions. Responsible AI principles would be\nincorporated through explainable recommendations, transparent uncertainty estimates,\nprivacy-preserving data handling, and fairness across different household types.\nExamples of recommendations include:\n\u2022 Best times to run energy-intensive appliances\n\u2022 When to charge or discharge home batteries\n\u2022 Anticipated grid electricity usage\n\u2022 Potential monthly cost savings\n\u2022 Carbon footprint reduction opportunities"
+     },
+     {
+      "front": "What role does the scientific method play in AI?",
+      "back": "The scientific method is essential in the AI product lifecycle, as it helps in the systematic development and evaluation of AI models. It ensures that AI products are tested and validated through rigorous methodologies.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.1",
+       "item_id": "file:14690036"
+      },
+      "passage": "Research Study\nScience Research 1\nScience Method 1\nThe AI/ML Conferences 2\nTop AI/ML Journals 3\nLiterature Search 3\nSearch Criteria 4\nRequirements 5\nScience Research\nThe AI product lifecycle is tightly coupled with the scientific research process. The essential component\nof such software products and services is the AI models and signal feedback loop. Therefore, foremost we\nneed to understand the scientific method.\nScience Method"
+     },
+     {
+      "front": "What is the purpose of literature reviews in AI research?",
+      "back": "Literature reviews situate research within the broader scholarly community by analyzing existing studies, identifying gaps, and establishing a foundation for new investigations. They help clarify the current state of knowledge and inform future research directions.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.7",
+       "item_id": "file:14690036"
+      },
+      "passage": "1. Introduction: explain the relevant background information\n\u25cf Define key terms\n\u25cf Describe phenomena\n\u25cf Prevalence of the issue\n\u25cf Current limitations\n\u25cf Aim of this paper, uniqueness\n2. Group research into trends/themes/coherence rather than mentioning individual researches\nseparately\n\u25cf Layout an overall terrain that you're working by dissecting the field\n\u25cf Show consensus/agreement in the field, and disagreement if any\n\u25cb Agreement\n\u25a0 \u201cOne trend in the research is....\u201d\n\u25a0 \u201cResearch seems to agree that....\u201d\n\u25a0 \u201cNumerous authors support the claim that....\u201d\n\u25a0 \u201cThere is strong convergent evidence for....\u201d\n\u25cb Disagreement\n\u25a0 \u201cThe evidence on X is mixed for....\u201d\n\u25a0 \u201cThere is overall debate regarding....\u201d\n\u25a0 \u201cA lack of consensus exists on the point of...\u201d \u2022 \u201cThere are two conflicting\ncamps on the issue of....\u201d\n\u25cf Show different approaches or field evolution (e.g. one trend focuses on, several studies\nemphasize...)\n\u25cf Each paragraph should discuss one specific trend, not author"
+     },
+     {
+      "front": "What is the significance of user trust in AI systems?",
+      "back": "User trust is essential for the adoption and success of AI systems, as it influences user engagement and acceptance. High levels of trust often lead to better user satisfaction and adherence to AI recommendations.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.2",
+       "item_id": "file:14709849"
+      },
+      "passage": "Measure of Success\nTechnical Metrics\n\u2022 Forecasting accuracy for energy consumption and solar generation (MAPE/RMSE)\n\u2022 Recommendation acceptance rate\n\u2022 Reduction in forecasting error compared to baseline models\nEthical Metrics\n\u2022 Explainability and transparency of recommendations\n\u2022 User trust and satisfaction scores\n\u2022 Privacy-preserving handling of household energy data\nReal-World Metrics\n\u2022 Reduction in electricity costs\n\u2022 Increase in solar self-consumption rate\n\u2022 Reduction in grid energy dependence\n\u2022 Estimated reduction in household carbon emissions"
+     },
+     {
+      "front": "What is the impact of AI on sustainability goals?",
+      "back": "AI can significantly contribute to sustainability goals by optimizing resource usage, reducing waste, and enabling more effective management of renewable energy sources. This supports the transition to cleaner energy systems.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.1",
+       "item_id": "file:14709849"
+      },
+      "passage": "Project Title\nAI Home Energy Copilot for Solar-Powered Households Using Multi-Agent Forecasting\nProject Abstract\nIssue Statement\nResidential solar adoption continues to grow, yet many homeowners struggle to understand\nand optimize their energy usage. Even homes equipped with solar panels often rely on static\ndashboards that show historical consumption and generation data but provide little guidance\nabout future energy availability, battery utilization, grid dependence, or cost-saving\nopportunities. As electricity prices rise and grids become increasingly stressed, helping\nhouseholds make intelligent energy decisions can reduce costs, improve renewable energy\nutilization, and contribute to broader sustainability goals. The challenge impacts millions of\nhouseholds transitioning toward clean energy systems.\nExisting Solutions\nCurrent platforms from solar providers and utility companies primarily focus on monitoring past\nenergy consumption and solar generation. Some systems provide simple forecasts based on\nweather data, but they rarely offer personalized recommendations or account for household\nbehavior patterns, appliance usage, battery storage, dynamic electricity pricing, and grid\nconditions simultaneously. Most solutions operate as standalone forecasting tools rather than\nintelligent decision-support systems.\nMy Aim\nThis project proposes an AI-powered Home Energy Copilot that combines large language\nmodels, multi-agent systems, and time-series forecasting models to help homeowners optimize\nenergy consumption and renewable energy utilization. Specialized agents would collaboratively\npredict solar generation, forecast household demand, estimate electricity costs, monitor\nbattery health, and recommend energy-efficient actions. Responsible AI principles would be\nincorporated through explainable recommendations, transparent uncertainty estimates,\nprivacy-preserving data handling, and fairness across different household types.\nExamples of recommendations include:\n\u2022 Best times to run energy-intensive appliances\n\u2022 When to charge or discharge home batteries\n\u2022 Anticipated grid electricity usage\n\u2022 Potential monthly cost savings\n\u2022 Carbon footprint reduction opportunities"
+     },
+     {
+      "front": "What is the significance of privacy-preserving data handling in AI?",
+      "back": "Privacy-preserving data handling is crucial in AI to protect user information and maintain compliance with regulations, thereby fostering trust and ensuring ethical use of sensitive data in AI applications.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.2",
+       "item_id": "file:14709849"
+      },
+      "passage": "Measure of Success\nTechnical Metrics\n\u2022 Forecasting accuracy for energy consumption and solar generation (MAPE/RMSE)\n\u2022 Recommendation acceptance rate\n\u2022 Reduction in forecasting error compared to baseline models\nEthical Metrics\n\u2022 Explainability and transparency of recommendations\n\u2022 User trust and satisfaction scores\n\u2022 Privacy-preserving handling of household energy data\nReal-World Metrics\n\u2022 Reduction in electricity costs\n\u2022 Increase in solar self-consumption rate\n\u2022 Reduction in grid energy dependence\n\u2022 Estimated reduction in household carbon emissions"
+     },
+     {
+      "front": "What role do specialized agents play in the AI Home Energy Copilot?",
+      "back": "Specialized agents in the AI Home Energy Copilot collaboratively predict solar generation, estimate electricity costs, and recommend energy-efficient actions, enhancing overall energy management for users.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.1",
+       "item_id": "file:14709849"
+      },
+      "passage": "Project Title\nAI Home Energy Copilot for Solar-Powered Households Using Multi-Agent Forecasting\nProject Abstract\nIssue Statement\nResidential solar adoption continues to grow, yet many homeowners struggle to understand\nand optimize their energy usage. Even homes equipped with solar panels often rely on static\ndashboards that show historical consumption and generation data but provide little guidance\nabout future energy availability, battery utilization, grid dependence, or cost-saving\nopportunities. As electricity prices rise and grids become increasingly stressed, helping\nhouseholds make intelligent energy decisions can reduce costs, improve renewable energy\nutilization, and contribute to broader sustainability goals. The challenge impacts millions of\nhouseholds transitioning toward clean energy systems.\nExisting Solutions\nCurrent platforms from solar providers and utility companies primarily focus on monitoring past\nenergy consumption and solar generation. Some systems provide simple forecasts based on\nweather data, but they rarely offer personalized recommendations or account for household\nbehavior patterns, appliance usage, battery storage, dynamic electricity pricing, and grid\nconditions simultaneously. Most solutions operate as standalone forecasting tools rather than\nintelligent decision-support systems.\nMy Aim\nThis project proposes an AI-powered Home Energy Copilot that combines large language\nmodels, multi-agent systems, and time-series forecasting models to help homeowners optimize\nenergy consumption and renewable energy utilization. Specialized agents would collaboratively\npredict solar generation, forecast household demand, estimate electricity costs, monitor\nbattery health, and recommend energy-efficient actions. Responsible AI principles would be\nincorporated through explainable recommendations, transparent uncertainty estimates,\nprivacy-preserving data handling, and fairness across different household types.\nExamples of recommendations include:\n\u2022 Best times to run energy-intensive appliances\n\u2022 When to charge or discharge home batteries\n\u2022 Anticipated grid electricity usage\n\u2022 Potential monthly cost savings\n\u2022 Carbon footprint reduction opportunities"
+     },
+     {
+      "front": "What are the benefits of using AI in personal finance management?",
+      "back": "AI in personal finance management offers benefits such as personalized budgeting insights, automated expense tracking, and proactive alerts, helping users optimize their financial health and decision-making.",
+      "citation": {
+       "source_type": "file",
+       "label": "Fintech App.docx",
+       "item_id": "file:14690038"
+      },
+      "passage": "Fintech App.docx\nJuly 13\nPossible Names:\nBenchWise: Smart Money for the Hustle Economy\nCashLoom AI\nEarnest / EarnestAI\netc.\nExecutive Summary\nIn the rapidly growing gig and creator economy, freelancers, side hustlers, and independent earners face an overlooked challenge: unstable income, unclear financial benchmarks, and overlooked waste. BenchWise is an AI-powered personal finance platform that helps users not only forecast their cashflow but also take control of spending, eliminate financial leaks, and redirect micro-savings into wealth-building ventures. From Uber drivers to violin teachers, BenchWise brings personalized accounting intelligence to the people who need it most\u2014without requiring them to be financial experts."
+     }
+    ],
+    "dropped": [
+     {
+      "reason": "unsupported",
+      "front": "What are the Big Four AI/ML conferences?",
+      "back": "The Big Four AI/ML conferences are NeurIPS, ICML, ICLR, and AAAI, which are known for cutting-edge research in various areas of artificial intelligence and machine learning.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.2",
+       "item_id": "file:14690036"
+      },
+      "passage": "The AI/ML Conferences\nThe \"Big Four\" in AI/ML scientific publishing typically refers to the top-tier conference.\nConferences are the primary venue for cutting-edge research in the AI/ML field. Here are the\nBig 4:\n1. NeurIPS\nFull Name: Conference on Neural Information Processing Systems\nFocus: Machine learning, deep learning, neuroscience, statistics, and societal impact\nKnown for: Large scale, interdisciplinary work, strong theoretical and applied research\nWebsite: https://nips.cc"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What is the purpose of using Zotero?",
+      "back": "Zotero is used for managing bibliographic data and related research materials, allowing users to easily organize, cite, and create bibliographies for their research.",
+      "citation": {
+       "source_type": "file",
+       "label": "Citation & Bibliography  with Zotero.pdf \u00b7 p.2",
+       "item_id": "file:14690032"
+      },
+      "passage": "Zotero"
+     },
+     {
+      "reason": "unsupported",
+      "front": "How can citations be auto-generated in Google Docs using Zotero?",
+      "back": "To auto-generate citations in Google Docs, one can use the Zotero menu to add/edit citations and select the desired citation style, such as IEEE, for formatting.",
+      "citation": {
+       "source_type": "file",
+       "label": "Citation & Bibliography  with Zotero.pdf \u00b7 p.7",
+       "item_id": "file:14690032"
+      },
+      "passage": "Auto Generate Citation\nMake sure that you use chrome browser. It has the Google doc Zotero menu item.\nOpen a Google doc. Click at the place where you want to add citation. Select Zotero menu item -> Add/edit\ncitation.\n7\n\n[Text read from images on this page]\nmat Tools Add-ons Zotero Help\nJormal text + Arial Add/edit citat Ctriesec (| cD =\nL _ Add/edit bibliography : 4\nDocument preferences...\nRefresh\nSwitch word processors...\nZoterc Unlink citations...\nThis is a demonstration on how to use Zotero. |"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What is the focus of the AI product lifecycle?",
+      "back": "The AI product lifecycle is closely tied to the scientific research process, emphasizing the integration of AI models and the signal feedback loop in product development.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.1",
+       "item_id": "file:14690036"
+      },
+      "passage": "Research Study\nScience Research 1\nScience Method 1\nThe AI/ML Conferences 2\nTop AI/ML Journals 3\nLiterature Search 3\nSearch Criteria 4\nRequirements 5\nScience Research\nThe AI product lifecycle is tightly coupled with the scientific research process. The essential component\nof such software products and services is the AI models and signal feedback loop. Therefore, foremost we\nneed to understand the scientific method.\nScience Method"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What does a systematic literature review involve?",
+      "back": "A systematic literature review involves selecting relevant past literature, analyzing and evaluating these studies to situate new work within the broader scholarly community.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.7",
+       "item_id": "file:14690036"
+      },
+      "passage": "1. Introduction: explain the relevant background information\n\u25cf Define key terms\n\u25cf Describe phenomena\n\u25cf Prevalence of the issue\n\u25cf Current limitations\n\u25cf Aim of this paper, uniqueness\n2. Group research into trends/themes/coherence rather than mentioning individual researches\nseparately\n\u25cf Layout an overall terrain that you're working by dissecting the field\n\u25cf Show consensus/agreement in the field, and disagreement if any\n\u25cb Agreement\n\u25a0 \u201cOne trend in the research is....\u201d\n\u25a0 \u201cResearch seems to agree that....\u201d\n\u25a0 \u201cNumerous authors support the claim that....\u201d\n\u25a0 \u201cThere is strong convergent evidence for....\u201d\n\u25cb Disagreement\n\u25a0 \u201cThe evidence on X is mixed for....\u201d\n\u25a0 \u201cThere is overall debate regarding....\u201d\n\u25a0 \u201cA lack of consensus exists on the point of...\u201d \u2022 \u201cThere are two conflicting\ncamps on the issue of....\u201d\n\u25cf Show different approaches or field evolution (e.g. one trend focuses on, several studies\nemphasize...)\n\u25cf Each paragraph should discuss one specific trend, not author"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What are the main areas of intervention in VR for Autism Spectrum Disorder?",
+      "back": "The main areas of intervention include social skills, emotional skills, daily living skills, communication abilities, and attention training.",
+      "citation": {
+       "source_type": "file",
+       "label": "Sample Literature Review Paper with Good Structure.pdf \u00b7 p.10",
+       "item_id": "file:14690035"
+      },
+      "passage": "The features of this type of intervention are especially interesting for ASD\ntherapy. Fromthestudiesreviewed,basedontheexposureofsubjectstosocialsituationsinvirtual\nscenarios[26,28,29,32,34,35,37,38,42,43,46,47,50,51],themainresultsindicateimportantchangestobe\nconsidered. Instudiesbasedontheuseofsecondlifegames,improvementsinemotionalregulation,\nsocialattribution, andanalogicalreasoningwereobserved[28,29]. InthecaseofcollaborativeVR\nscenarios, results have indicated that the use of technology facilitates the training of flexibility,\nidentity, the construction of social norms, and emotional recognition [32,35]. In addition, these\nstrategiescontributetothedevelopmentofimportantaspectsrelatedtosocialskills: Initiationofplay,\nsocialresponse,andconversationalskills. Avatarsandvirtualelementscontributetothetrainingin\nrecognitionoffacialexpressionsandbodygestures[37,42,46]. Moreover,virtualenvironmentspermit\ntherecreationofspecificsituations,suchasschool[47]orbullying[51].\nThearticlesthatfocusontheinterventiononemotions[21,22,27,29,30,39,48,51]aremainlybased\nontheuseofavatarsorgamesfortrainingandlearningaspectssuchastheidentificationofbasic\nemotions[27,33],theregulationofemotionalexpression,andsocialemotionalreciprocity[21,22,29].\nSomestudiesthatfocusonthisinterventionareahaveshowninterestingresultsthroughvirtualscenes"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What is the significance of the PICO model in research?",
+      "back": "The PICO model helps in formulating research questions by identifying the population, intervention, comparison, and outcomes, ensuring clarity and focus in the literature selection process.",
+      "citation": {
+       "source_type": "file",
+       "label": "Sample Literature Review Paper with Good Structure.pdf \u00b7 p.3",
+       "item_id": "file:14690035"
+      },
+      "passage": "\u2022 O\u2014Mainoutcomesobtained,nosignificantimprovementisneeded.\nBecauseofthenatureofresearchandtechnologicallimitations,VRsystemsarenotyetwidely\nusedasclinicalinterventions. Mostofthestudiesareshort-time-exposurepilotstudies,alimitation\nthatisespeciallyrelevantinsocialinteractionbehavioralintervention. Sincesignificantoutcomesin\nliteraturearenotexpected,weusedthePICOmodelbutrelaxedtheemphasisonoutcome(O).\n2.3. SelectionProcess\nFirst,asearchwiththeterms(autismORASDORAsperger)AND(VirtualORVRORMixedOR\nAugmented)wasdoneineachindex(WoS,SJR,andPubMed). InthePubMedsearch,onlystudiesthat\nfocusedonhumanswereselected. Second,documentsbelongingtothecategoriesofreviews,letters,\nabstracts,editorials,andnoteswerediscardedfromtheresultsobtainedineachindex. Third,fromthe\nrestoftheresults,wecarriedoutaselectionofthecontributionsbasedontitlesandabstractsineach\nindex;thentheresultsoftheselectioninthethreeindexeswerecomparedtoeliminateduplicates.\nLast, the full text of each article was examined, and the contribution was finally selected if:\n(1) The study included participants with ASD under 18 years old; (2) the intervention employed\nVR-basedtreatments;(3)baselineorintergroupcomparisonsweredone;and(4)outcomesonpatients\nwerereported. Weresolvedanydisagreementsintheselectionofthearticlesamongtheauthorsof\nthiswork.\n2.4."
+     },
+     {
+      "reason": "unsupported",
+      "front": "What are the benefits of using VR in interventions for children with ASD?",
+      "back": "VR allows for safe and controlled training environments that can simulate real-life situations, facilitating skill development in areas such as social interaction and emotional regulation.",
+      "citation": {
+       "source_type": "file",
+       "label": "Sample Literature Review Paper with Good Structure.pdf \u00b7 p.11",
+       "item_id": "file:14690035"
+      },
+      "passage": "Sensors2018,18,2486 11of15\nthatallowtraininginemotionalrecognition,affectiveexpression,emotionalcompetencies,andpositive\nemotions[29,30,39,48].\nChildrenwithASDusuallyhavedifficultywithcommunicationskills.Inthestudiesanalyzed,the\nuseofVRasaninterventionincommunicationskills,socialcommunicationstrategies,andnon-verbal\ncommunicationhasbeenobserved[23,44,45].\nOtherstudieshavebeenbasedonareasrelatedtotraininginactivitiesofdailylivingorcognitive\nskills. In the intervention on cognitive abilities, positive results have been obtained from the use\nofVRinattention[22,39], executivefunctions[47], contextualprocessingofobjects, andcognitive\nflexibility[49]. Thislatterstudy[49]isespeciallyinterestingbecauseoneofthecharacteristicsofsome\nofthesubjectssufferingfromASDiscognitiverigidity. Ontheotherhand,theuseofintervention\nstrategiesbasedonVRorARallowsthetrainingofthesubjectinvirtualsituationsthataresafeand\ncontrolled environments. An example of this is the use of VR to teach driving skills [31] or how\ntodealwithadailysituationsuchasshoppinginasupermarket[24,25]. VRhasalsobeenusedin\ncombinationwithtraditionaltherapies,suchascognitivebehavioraltherapy,toimprovesymptoms\nrelatedtospecificphobiasorfears[41]andtomotivatechildrenwithASDtoimprovetheirlifestyle\nhabitsbyincreasingphysicalactivity[40]."
+     },
+     {
+      "reason": "unsupported",
+      "front": "What are 'zombie expenses' according to financial management strategies?",
+      "back": "'Zombie expenses' refer to low-frequency but recurring payments, such as forgotten subscriptions, that can drain financial resources without providing value.",
+      "citation": {
+       "source_type": "file",
+       "label": "Fintech App.docx",
+       "item_id": "file:14690038"
+      },
+      "passage": "Fintech App.docx \u203a 3. Waste Prevention Alerts\nDetects trials about to expire, unused memberships, and likely fraud or mischarges\nFlags \"zombie expenses\" (low-frequency but recurring payments)"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What is the role of positive feedback in student writing?",
+      "back": "Positive feedback enhances students' confidence and motivation, leading them to engage more deeply in their writing tasks and improve their skills.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.8",
+       "item_id": "file:14690036"
+      },
+      "passage": "3. Materials and Methods\n3.1 Search strategy\nThe first step in eliminating a large number of articles was using the search terms and\npublication date. Secondly, we sorted by number of citations, removing any duplicates.\n3.2 Selection Criteria\n3.3 Selection Process\n3.4 Data Extraction\n4. Results\n4.1 Study Selection\n\n[Text read from images on this page]\nand Hyland note that students who receive positive feedback p nt more positive outlooks of their\nwriting, while students who receive mostly negative feedback exhibit diminishing motivation. Students\nin a high school writing center, for example, felt motivated to work harder after receiving positive\nfeedback on their writing (Brimner). In studies of freshmen composition classes, \u201cpraiseworthy grading\u201d\nhas been found to support students\u2019 confidence and encourage them to take risks (Dragga; Zak). [...]\nResearch on more advanced students have echoed those findings; Straub\u2019s study of students\u2019 Situates\n\u201creactions to teacher feedback in\u2018a freshmen composition classroom found that students react individual\nmore favorably to positive or praise comments; students also prefer specific praise over generic authors\ncomments such as, \u201cgood,\u201d which is considered too vague and even disingenuous. [...] These within trend\nresults align with Dragga\u2019s findings, which found that students are unsure of how to improve their\nwriting when they only receive praise. [...]"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What are the main technologies used in VR interventions for ASD?",
+      "back": "Main technologies include virtual reality scenarios, augmented reality, and mobile devices, which facilitate engagement and interaction in therapeutic contexts.",
+      "citation": {
+       "source_type": "file",
+       "label": "Sample Literature Review Paper with Good Structure.pdf \u00b7 p.11",
+       "item_id": "file:14690035"
+      },
+      "passage": "Withregardtotechnology,mostoftheVR-basedtreatmentincludedVRscenarios,whereassome\nof them only included objects and/or avatars that were not in a VR scenario. Augmented reality\nhasrecentlybeenconsideredinthetreatment,andfourstudies(allfrom2015)usedthistechnology.\nInaddition,fivestudiesusedmobiledevicesintheintervention. Fromourpointofview,thesedevices\nrepresentastepforwardinthetreatmentofpatientswithASDbecausetheyallowanapproachthatis\nubiquitoustobeusedforautisticdisorders. Themainresultsappeartoshowpositiveoutcomesfrom\nexposuretoVR-basedinterventioninchildrenwithASD.However,itisimportanttoconsiderthatthe\nmainresultsobtainedinvolvedsmallsamples. Also,inmostcases,therewasnocomparisonwitha\ncontrolgroupcomposedofhealthyvolunteersorpatientsreceivingtraditionalinterventions.\nWithregardtothesymptomatologyofASD,VR-basedtreatmentsmayhavesomeadvantages\novermoretraditionalinterventions. OneofthemainadvantagesisthatVRallowstheemulationof\neveryday life situations so that scheduled training can be conducted in a therapist-controlled and\nsafeenvironment. Thisissueisespeciallyinterestingwhenthetreatmentshouldbefocusedonthe\ntrainingandimprovementofsocialskills,socialinteraction,communication,emotionalresponse,or\nexecutivefunctions. Inaddition,thistypeofinterventioncanbedevelopedfurthertoobtaindifferent\nmeasures of the performance of the subjects."
+     },
+     {
+      "reason": "unsupported",
+      "front": "What is the aim of the AI Research Assistant project?",
+      "back": "The AI Research Assistant project aims to build a retrieval-augmented agent that can provide accurate and real-time insights from enterprise data to support research activities.",
+      "citation": {
+       "source_type": "page",
+       "label": "AI Research Assistance Explained",
+       "item_id": "page:ai-research-assistance-explained"
+      },
+      "passage": "AI Research Assistance Explained\nGoal of this notebook: building a retrieval-augmented agent using:\n- LangGraph for multi-step dialog agents\n- LangChain for chaining LLMs + tools\n- NVIDIA NIM to run high-performance models (e.g., LLaMA 3.1)\n- Rerankers + Search to simulate deeper reasoning like ReAct (Reasoning and Acting)\nReAct:\nIntroduced in the 2022 paper \u201cReAct: Synergizing Reasoning and Acting in Language Models\u201d (Yao et al., arXiv:2210.03629 ), ReAct teaches LLMs to:\n- Reason \u2014 break down problems into intermediate steps.\n- Act \u2014 use tools (like search engines, APIs, calculators) to get more information.\n- Reflect \u2014 revise and improve based on the outcome.\nThis happens in a loop, where each step includes both:\n- a Thought (reasoning step),\n- and an Action (tool use or lookup).\nExample:\nQuestion: Who is the president of the country where the 2020 Olympics were held?\nThought 1: The 2020 Olympics were held in Tokyo, Japan. Action 1: Search(\"President of Japan\")\nObservation 1: Fumio Kishida is the Prime Minister of Japan.\nThought 2: The leader of Japan is the Prime Minister, not President. Answer: Fumio Kishida\nCode snippet:\nfrom langchain.agents import initialize_agent, Tool from langchain.tools import DuckDuckGoSearchRun from langchain.llms import OpenAI\ntools = [DuckDuckGoSearchRun(name=\"Search\")]\nagent = initialize_agent( tools, OpenAI(temperature=0), agent=\"react-description\", verbose=True )\nagent.run(\"What is the capital of the country where the Eiffel Tower is located?\")\nFramework | Reasoning | Tool Use | Reflection\nChain-of-Thought | Yes | No | No\nTool-Using Agent | No | Yes | No\nReAct | Yes | Yes | Yes\nNotebook explained:\nThe notebook creates a retrieval-augmented agent that mimics ReAct by doing three things:"
+     },
+     {
+      "reason": "unsupported",
+      "front": "How does the AI Home Energy Copilot help users?",
+      "back": "It provides personalized recommendations for energy-efficient actions, forecasts energy availability, monitors battery health, and estimates electricity costs.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.1",
+       "item_id": "file:14709849"
+      },
+      "passage": "Project Title\nAI Home Energy Copilot for Solar-Powered Households Using Multi-Agent Forecasting\nProject Abstract\nIssue Statement\nResidential solar adoption continues to grow, yet many homeowners struggle to understand\nand optimize their energy usage. Even homes equipped with solar panels often rely on static\ndashboards that show historical consumption and generation data but provide little guidance\nabout future energy availability, battery utilization, grid dependence, or cost-saving\nopportunities. As electricity prices rise and grids become increasingly stressed, helping\nhouseholds make intelligent energy decisions can reduce costs, improve renewable energy\nutilization, and contribute to broader sustainability goals. The challenge impacts millions of\nhouseholds transitioning toward clean energy systems.\nExisting Solutions\nCurrent platforms from solar providers and utility companies primarily focus on monitoring past\nenergy consumption and solar generation. Some systems provide simple forecasts based on\nweather data, but they rarely offer personalized recommendations or account for household\nbehavior patterns, appliance usage, battery storage, dynamic electricity pricing, and grid\nconditions simultaneously. Most solutions operate as standalone forecasting tools rather than\nintelligent decision-support systems.\nMy Aim\nThis project proposes an AI-powered Home Energy Copilot that combines large language\nmodels, multi-agent systems, and time-series forecasting models to help homeowners optimize\nenergy consumption and renewable energy utilization. Specialized agents would collaboratively\npredict solar generation, forecast household demand, estimate electricity costs, monitor\nbattery health, and recommend energy-efficient actions. Responsible AI principles would be\nincorporated through explainable recommendations, transparent uncertainty estimates,\nprivacy-preserving data handling, and fairness across different household types.\nExamples of recommendations include:\n\u2022 Best times to run energy-intensive appliances\n\u2022 When to charge or discharge home batteries\n\u2022 Anticipated grid electricity usage\n\u2022 Potential monthly cost savings\n\u2022 Carbon footprint reduction opportunities"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What is the importance of literature search in scientific research?",
+      "back": "A literature search enables researchers to identify existing studies, gaps in knowledge, and trends in their field, informing their own research design and focus.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.3",
+       "item_id": "file:14690036"
+      },
+      "passage": "2. ICML\nFull Name: International Conference on Machine Learning\nFocus: Core machine learning, theory, algorithms, and empirical studies\nKnown for: Methodological innovation and algorithm development\nWebsite: https://icml.cc\n3. ICLR\nFull Name: International Conference on Learning Representations\nFocus: Deep learning, representation learning, and applications\nKnown for: Open review process and cutting-edge deep learning work\nWebsite: https://iclr.cc\n4. AAAI\nFull Name: Association for the Advancement of Artificial Intelligence Conference\nFocus: Broad AI, including planning, NLP, robotics, reasoning, and ethics\nKnown for: Foundational AI beyond just machine learning\nWebsite: https://aaai.org\nTop AI/ML Journals\n\u25cf Journal of Machine Learning Research (JMLR)\n\u25cf IEEE Transactions on Pattern Analysis and Machine Intelligence (TPAMI)\n\u25cf Machine Learning Journal (Springer)\n\u25cf Artificial Intelligence (Elsevier)\nLiterature Search\nThe search for literature can be conducted via Google Scholar, IEEE, ScienceDirect, PubMed,\netc.\nGoogle Scholar\nhttps://scholar.google.com\nGoogle Scholar is a freely accessible web search engine that indexes the full text or metadata of scholarly\nliterature across an array of publishing formats and disciplines.\nhttps://www.sciencedirect.com:\nScienceDirect is a website which provides access to a large bibliographic database of scientific and medical\npublications of the British publisher Elsevier. It hosts over 18 million pieces of content from more than 4,000\nacademic journals and 30,000 e-books of this publisher\nhttps://ieeexplore.ieee.org/Xplore/home.jsp\nIEEE\nThe Institute of Electrical and Electronics Engineers is a professional association for electronic engineering\nand electrical engineering"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What are the limitations of current VR-based interventions for ASD?",
+      "back": "Current VR-based interventions often involve small sample sizes and lack robust control groups, making it difficult to generalize findings across broader populations.",
+      "citation": {
+       "source_type": "file",
+       "label": "Sample Literature Review Paper with Good Structure.pdf \u00b7 p.11",
+       "item_id": "file:14690035"
+      },
+      "passage": "It is important to consider, based on the main results obtained in this systematic review and\nthemainresultsobtainedinpreviousresearch,thelimitationsintheuseofnewtechnologiesinthe\ntreatmentofautism. TheevidenceofefficacyofVR-basedtreatmentislimited. Manyofthestudies"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What features does the BenchWise fintech app offer?",
+      "back": "BenchWise offers cashflow forecasting, waste prevention alerts, financial education nudges, and tools tailored for the gig economy to help users manage their finances effectively.",
+      "citation": {
+       "source_type": "file",
+       "label": "Fintech App.docx",
+       "item_id": "file:14690038"
+      },
+      "passage": "Fintech App.docx\nJuly 13\nPossible Names:\nBenchWise: Smart Money for the Hustle Economy\nCashLoom AI\nEarnest / EarnestAI\netc.\nExecutive Summary\nIn the rapidly growing gig and creator economy, freelancers, side hustlers, and independent earners face an overlooked challenge: unstable income, unclear financial benchmarks, and overlooked waste. BenchWise is an AI-powered personal finance platform that helps users not only forecast their cashflow but also take control of spending, eliminate financial leaks, and redirect micro-savings into wealth-building ventures. From Uber drivers to violin teachers, BenchWise brings personalized accounting intelligence to the people who need it most\u2014without requiring them to be financial experts."
+     },
+     {
+      "reason": "unsupported",
+      "front": "What is the goal of the PRISMA flow diagram in systematic reviews?",
+      "back": "The PRISMA flow diagram visually represents the process of selecting and screening studies in systematic reviews, ensuring transparency and reproducibility.",
+      "citation": {
+       "source_type": "notes",
+       "label": "Class #1",
+       "item_id": "2026-10-04-class-1"
+      },
+      "passage": "My notes: PRISMA flow, check-in moved to Thursday."
+     },
+     {
+      "reason": "unsupported",
+      "front": "How does the AI product lifecycle relate to scientific research?",
+      "back": "The AI product lifecycle incorporates ongoing research processes, ensuring that AI models are continuously refined and validated through empirical data and experimentation.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.1",
+       "item_id": "file:14690036"
+      },
+      "passage": "Research Study\nScience Research 1\nScience Method 1\nThe AI/ML Conferences 2\nTop AI/ML Journals 3\nLiterature Search 3\nSearch Criteria 4\nRequirements 5\nScience Research\nThe AI product lifecycle is tightly coupled with the scientific research process. The essential component\nof such software products and services is the AI models and signal feedback loop. Therefore, foremost we\nneed to understand the scientific method.\nScience Method"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What role does user trust play in AI applications?",
+      "back": "User trust is crucial for the successful adoption and use of AI applications, influencing user engagement and the perceived effectiveness of the technology.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.2",
+       "item_id": "file:14709849"
+      },
+      "passage": "Measure of Success\nTechnical Metrics\n\u2022 Forecasting accuracy for energy consumption and solar generation (MAPE/RMSE)\n\u2022 Recommendation acceptance rate\n\u2022 Reduction in forecasting error compared to baseline models\nEthical Metrics\n\u2022 Explainability and transparency of recommendations\n\u2022 User trust and satisfaction scores\n\u2022 Privacy-preserving handling of household energy data\nReal-World Metrics\n\u2022 Reduction in electricity costs\n\u2022 Increase in solar self-consumption rate\n\u2022 Reduction in grid energy dependence\n\u2022 Estimated reduction in household carbon emissions"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What is the impact of virtual reality on social skills training for ASD?",
+      "back": "Virtual reality provides immersive experiences that allow children with ASD to practice social interactions in a safe environment, leading to improved social skills.",
+      "citation": {
+       "source_type": "file",
+       "label": "Sample Literature Review Paper with Good Structure.pdf \u00b7 p.10",
+       "item_id": "file:14690035"
+      },
+      "passage": "The features of this type of intervention are especially interesting for ASD\ntherapy. Fromthestudiesreviewed,basedontheexposureofsubjectstosocialsituationsinvirtual\nscenarios[26,28,29,32,34,35,37,38,42,43,46,47,50,51],themainresultsindicateimportantchangestobe\nconsidered. Instudiesbasedontheuseofsecondlifegames,improvementsinemotionalregulation,\nsocialattribution, andanalogicalreasoningwereobserved[28,29]. InthecaseofcollaborativeVR\nscenarios, results have indicated that the use of technology facilitates the training of flexibility,\nidentity, the construction of social norms, and emotional recognition [32,35]. In addition, these\nstrategiescontributetothedevelopmentofimportantaspectsrelatedtosocialskills: Initiationofplay,\nsocialresponse,andconversationalskills. Avatarsandvirtualelementscontributetothetrainingin\nrecognitionoffacialexpressionsandbodygestures[37,42,46]. Moreover,virtualenvironmentspermit\ntherecreationofspecificsituations,suchasschool[47]orbullying[51].\nThearticlesthatfocusontheinterventiononemotions[21,22,27,29,30,39,48,51]aremainlybased\nontheuseofavatarsorgamesfortrainingandlearningaspectssuchastheidentificationofbasic\nemotions[27,33],theregulationofemotionalexpression,andsocialemotionalreciprocity[21,22,29].\nSomestudiesthatfocusonthisinterventionareahaveshowninterestingresultsthroughvirtualscenes"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What are the challenges faced by freelancers regarding personal finance?",
+      "back": "Freelancers face challenges like inconsistent cash flow, lack of tailored financial tools, and difficulties in optimizing small savings, which traditional finance apps often overlook.",
+      "citation": {
+       "source_type": "file",
+       "label": "Fintech App.docx",
+       "item_id": "file:14690038"
+      },
+      "passage": "Fintech App.docx \u203a Issue Statement\nIn 2025, over 65 million Americans work as freelancers or gig workers. Unlike salaried workers, they:\nStruggle with inconsistent cashflow and unpredictable expenses\nLack access to traditional financial planning tools tailored to variable income\nLose money on forgotten subscriptions, mischarges, or expired trials\nFail to optimize small savings from deals or discounts\nRarely receive financial education customized to their specific spending behaviors\nThese users are underserved by mainstream personal finance tools like Mint or YNAB, which assume steady paychecks and lack proactive, personalized alerts and guidance."
+     },
+     {
+      "reason": "unsupported",
+      "front": "How is virtual reality used in autism treatment?",
+      "back": "Virtual reality (VR) is utilized in autism treatment to create immersive environments where children can practice social skills, emotional recognition, and daily living tasks in a controlled, safe setting. This method enhances engagement and learning outcomes.",
+      "citation": {
+       "source_type": "file",
+       "label": "Sample Literature Review Paper with Good Structure.pdf \u00b7 p.1",
+       "item_id": "file:14690035"
+      },
+      "passage": "sensors\nReview\nEffectiveness of Virtual Reality for Children and\nAdolescents with Autism Spectrum Disorder:\nAn Evidence-Based Systematic Review\nPatriciaMesa-Gresa1,HermenegildoGil-G\u00f3mez2,Jos\u00e9-AntonioLozano-Quilis2and\nJos\u00e9-AntonioGil-G\u00f3mez2,* ID\n1 DepartamentodePsicobiolog\u00eda,FacultaddePsicolog\u00eda,UniversitatdeVal\u00e8ncia,BlascoIb\u00e1\u00f1ez21,\n46010Valencia,Spain;patricia.mesa@uv.es\n2 InstitutoUniversitariodeAutom\u00e1ticaeInform\u00e1ticaIndustrial,UniversitatPolit\u00e8cnicadeVal\u00e8ncia,Camino\ndeVeras/n,46022Valencia,Spain;hgil@ai2.upv.es(H.G.-G.);jlozano@upv.es(J.-A.L.-Q.)\n* Correspondence:jgil@upv.es;Tel.:+34-96-387-9550(ext.83515)\n(cid:1)(cid:2)(cid:3)(cid:1)(cid:4)(cid:5)(cid:6)(cid:7)(cid:8)(cid:1)\n(cid:1)(cid:2)(cid:3)(cid:4)(cid:5)(cid:6)(cid:7)\nReceived:25May2018;Accepted:27July2018;Published:1August2018\nAbstract: Autism Spectrum Disorder (ASD) is a neurodevelopmental disease that is specially\ncharacterizedbyimpairmentsinsocialcommunicationandsocialskills. ASDhasahighprevalence\nin children, affecting 1 in 160 subjects. Virtual reality (VR) has emerged as an effective tool for\nintervention in the health field."
+     },
+     {
+      "reason": "unsupported",
+      "front": "What are the 'Big Four' AI/ML conferences?",
+      "back": "The 'Big Four' AI/ML conferences are NeurIPS, ICML, ICLR, and AAAI, each focusing on different aspects of machine learning and artificial intelligence, including theoretical advancements and societal impacts.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.2",
+       "item_id": "file:14690036"
+      },
+      "passage": "The AI/ML Conferences\nThe \"Big Four\" in AI/ML scientific publishing typically refers to the top-tier conference.\nConferences are the primary venue for cutting-edge research in the AI/ML field. Here are the\nBig 4:\n1. NeurIPS\nFull Name: Conference on Neural Information Processing Systems\nFocus: Machine learning, deep learning, neuroscience, statistics, and societal impact\nKnown for: Large scale, interdisciplinary work, strong theoretical and applied research\nWebsite: https://nips.cc"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What is the role of time-series forecasting in energy management?",
+      "back": "Time-series forecasting plays a crucial role in energy management by predicting future energy demand and generation based on historical data, enabling more efficient allocation and usage of energy resources.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.1",
+       "item_id": "file:14709849"
+      },
+      "passage": "Project Title\nAI Home Energy Copilot for Solar-Powered Households Using Multi-Agent Forecasting\nProject Abstract\nIssue Statement\nResidential solar adoption continues to grow, yet many homeowners struggle to understand\nand optimize their energy usage. Even homes equipped with solar panels often rely on static\ndashboards that show historical consumption and generation data but provide little guidance\nabout future energy availability, battery utilization, grid dependence, or cost-saving\nopportunities. As electricity prices rise and grids become increasingly stressed, helping\nhouseholds make intelligent energy decisions can reduce costs, improve renewable energy\nutilization, and contribute to broader sustainability goals. The challenge impacts millions of\nhouseholds transitioning toward clean energy systems.\nExisting Solutions\nCurrent platforms from solar providers and utility companies primarily focus on monitoring past\nenergy consumption and solar generation. Some systems provide simple forecasts based on\nweather data, but they rarely offer personalized recommendations or account for household\nbehavior patterns, appliance usage, battery storage, dynamic electricity pricing, and grid\nconditions simultaneously. Most solutions operate as standalone forecasting tools rather than\nintelligent decision-support systems.\nMy Aim\nThis project proposes an AI-powered Home Energy Copilot that combines large language\nmodels, multi-agent systems, and time-series forecasting models to help homeowners optimize\nenergy consumption and renewable energy utilization. Specialized agents would collaboratively\npredict solar generation, forecast household demand, estimate electricity costs, monitor\nbattery health, and recommend energy-efficient actions. Responsible AI principles would be\nincorporated through explainable recommendations, transparent uncertainty estimates,\nprivacy-preserving data handling, and fairness across different household types.\nExamples of recommendations include:\n\u2022 Best times to run energy-intensive appliances\n\u2022 When to charge or discharge home batteries\n\u2022 Anticipated grid electricity usage\n\u2022 Potential monthly cost savings\n\u2022 Carbon footprint reduction opportunities"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What does 'responsible AI' mean?",
+      "back": "Responsible AI refers to the practice of developing AI systems that are ethical, transparent, and accountable, ensuring that they serve the public interest and mitigate potential harms.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.1",
+       "item_id": "file:14709849"
+      },
+      "passage": "Project Title\nAI Home Energy Copilot for Solar-Powered Households Using Multi-Agent Forecasting\nProject Abstract\nIssue Statement\nResidential solar adoption continues to grow, yet many homeowners struggle to understand\nand optimize their energy usage. Even homes equipped with solar panels often rely on static\ndashboards that show historical consumption and generation data but provide little guidance\nabout future energy availability, battery utilization, grid dependence, or cost-saving\nopportunities. As electricity prices rise and grids become increasingly stressed, helping\nhouseholds make intelligent energy decisions can reduce costs, improve renewable energy\nutilization, and contribute to broader sustainability goals. The challenge impacts millions of\nhouseholds transitioning toward clean energy systems.\nExisting Solutions\nCurrent platforms from solar providers and utility companies primarily focus on monitoring past\nenergy consumption and solar generation. Some systems provide simple forecasts based on\nweather data, but they rarely offer personalized recommendations or account for household\nbehavior patterns, appliance usage, battery storage, dynamic electricity pricing, and grid\nconditions simultaneously. Most solutions operate as standalone forecasting tools rather than\nintelligent decision-support systems.\nMy Aim\nThis project proposes an AI-powered Home Energy Copilot that combines large language\nmodels, multi-agent systems, and time-series forecasting models to help homeowners optimize\nenergy consumption and renewable energy utilization. Specialized agents would collaboratively\npredict solar generation, forecast household demand, estimate electricity costs, monitor\nbattery health, and recommend energy-efficient actions. Responsible AI principles would be\nincorporated through explainable recommendations, transparent uncertainty estimates,\nprivacy-preserving data handling, and fairness across different household types.\nExamples of recommendations include:\n\u2022 Best times to run energy-intensive appliances\n\u2022 When to charge or discharge home batteries\n\u2022 Anticipated grid electricity usage\n\u2022 Potential monthly cost savings\n\u2022 Carbon footprint reduction opportunities"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What are the core components of a systematic review?",
+      "back": "Core components of a systematic review include a clear research question, defined search criteria, data extraction, and synthesis of findings from relevant studies. This structured approach enhances the reliability and validity of the review.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.8",
+       "item_id": "file:14690036"
+      },
+      "passage": "3. Materials and Methods\n3.1 Search strategy\nThe first step in eliminating a large number of articles was using the search terms and\npublication date. Secondly, we sorted by number of citations, removing any duplicates.\n3.2 Selection Criteria\n3.3 Selection Process\n3.4 Data Extraction\n4. Results\n4.1 Study Selection\n\n[Text read from images on this page]\nand Hyland note that students who receive positive feedback p nt more positive outlooks of their\nwriting, while students who receive mostly negative feedback exhibit diminishing motivation. Students\nin a high school writing center, for example, felt motivated to work harder after receiving positive\nfeedback on their writing (Brimner). In studies of freshmen composition classes, \u201cpraiseworthy grading\u201d\nhas been found to support students\u2019 confidence and encourage them to take risks (Dragga; Zak). [...]\nResearch on more advanced students have echoed those findings; Straub\u2019s study of students\u2019 Situates\n\u201creactions to teacher feedback in\u2018a freshmen composition classroom found that students react individual\nmore favorably to positive or praise comments; students also prefer specific praise over generic authors\ncomments such as, \u201cgood,\u201d which is considered too vague and even disingenuous. [...] These within trend\nresults align with Dragga\u2019s findings, which found that students are unsure of how to improve their\nwriting when they only receive praise. [...]"
+     },
+     {
+      "reason": "unsupported",
+      "front": "How does augmented reality differ from virtual reality?",
+      "back": "Augmented reality (AR) enhances the real-world environment by overlaying digital information, while virtual reality (VR) creates an entirely immersive digital environment. Both technologies have unique applications in fields like education and therapy.",
+      "citation": {
+       "source_type": "file",
+       "label": "Sample Literature Review Paper with Good Structure.pdf \u00b7 p.1",
+       "item_id": "file:14690035"
+      },
+      "passage": "sensors\nReview\nEffectiveness of Virtual Reality for Children and\nAdolescents with Autism Spectrum Disorder:\nAn Evidence-Based Systematic Review\nPatriciaMesa-Gresa1,HermenegildoGil-G\u00f3mez2,Jos\u00e9-AntonioLozano-Quilis2and\nJos\u00e9-AntonioGil-G\u00f3mez2,* ID\n1 DepartamentodePsicobiolog\u00eda,FacultaddePsicolog\u00eda,UniversitatdeVal\u00e8ncia,BlascoIb\u00e1\u00f1ez21,\n46010Valencia,Spain;patricia.mesa@uv.es\n2 InstitutoUniversitariodeAutom\u00e1ticaeInform\u00e1ticaIndustrial,UniversitatPolit\u00e8cnicadeVal\u00e8ncia,Camino\ndeVeras/n,46022Valencia,Spain;hgil@ai2.upv.es(H.G.-G.);jlozano@upv.es(J.-A.L.-Q.)\n* Correspondence:jgil@upv.es;Tel.:+34-96-387-9550(ext.83515)\n(cid:1)(cid:2)(cid:3)(cid:1)(cid:4)(cid:5)(cid:6)(cid:7)(cid:8)(cid:1)\n(cid:1)(cid:2)(cid:3)(cid:4)(cid:5)(cid:6)(cid:7)\nReceived:25May2018;Accepted:27July2018;Published:1August2018\nAbstract: Autism Spectrum Disorder (ASD) is a neurodevelopmental disease that is specially\ncharacterizedbyimpairmentsinsocialcommunicationandsocialskills. ASDhasahighprevalence\nin children, affecting 1 in 160 subjects. Virtual reality (VR) has emerged as an effective tool for\nintervention in the health field."
+     },
+     {
+      "reason": "unsupported",
+      "front": "What are the challenges of integrating AI in healthcare?",
+      "back": "Integrating AI in healthcare poses challenges such as ensuring data privacy, achieving regulatory compliance, and addressing biases in algorithms. These factors can impact the effectiveness and acceptance of AI solutions.",
+      "citation": {
+       "source_type": "file",
+       "label": "49797-Project Proposal.pdf \u00b7 p.1",
+       "item_id": "file:14709849"
+      },
+      "passage": "Project Title\nAI Home Energy Copilot for Solar-Powered Households Using Multi-Agent Forecasting\nProject Abstract\nIssue Statement\nResidential solar adoption continues to grow, yet many homeowners struggle to understand\nand optimize their energy usage. Even homes equipped with solar panels often rely on static\ndashboards that show historical consumption and generation data but provide little guidance\nabout future energy availability, battery utilization, grid dependence, or cost-saving\nopportunities. As electricity prices rise and grids become increasingly stressed, helping\nhouseholds make intelligent energy decisions can reduce costs, improve renewable energy\nutilization, and contribute to broader sustainability goals. The challenge impacts millions of\nhouseholds transitioning toward clean energy systems.\nExisting Solutions\nCurrent platforms from solar providers and utility companies primarily focus on monitoring past\nenergy consumption and solar generation. Some systems provide simple forecasts based on\nweather data, but they rarely offer personalized recommendations or account for household\nbehavior patterns, appliance usage, battery storage, dynamic electricity pricing, and grid\nconditions simultaneously. Most solutions operate as standalone forecasting tools rather than\nintelligent decision-support systems.\nMy Aim\nThis project proposes an AI-powered Home Energy Copilot that combines large language\nmodels, multi-agent systems, and time-series forecasting models to help homeowners optimize\nenergy consumption and renewable energy utilization. Specialized agents would collaboratively\npredict solar generation, forecast household demand, estimate electricity costs, monitor\nbattery health, and recommend energy-efficient actions. Responsible AI principles would be\nincorporated through explainable recommendations, transparent uncertainty estimates,\nprivacy-preserving data handling, and fairness across different household types.\nExamples of recommendations include:\n\u2022 Best times to run energy-intensive appliances\n\u2022 When to charge or discharge home batteries\n\u2022 Anticipated grid electricity usage\n\u2022 Potential monthly cost savings\n\u2022 Carbon footprint reduction opportunities"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What is the function of the PICO model in research?",
+      "back": "The PICO model helps formulate clinical research questions by identifying the population, intervention, comparison, and outcomes, ensuring that studies address relevant clinical issues effectively.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.5",
+       "item_id": "file:14690036"
+      },
+      "passage": "\u25cf 2022 - Present, earlier research papers may contain outdated information that will not\nadd significant value to our research.\nResearch Focus Areas\n\u25cf\n\u25cf\nTechnologies\n\u25cf\nRequirements\n1. Meet the defined search criteria\n2. Please clearly document the search keywords and boolean expression\nFor example (not limited to): (ASD OR Autism OR Autism Spectrum Disorder OR\nAsperger) AND (face OR facial OR emotion)\n3. Please clearly summarize the trends of the research area you identified\nPlease refer to study material:\n\u25cf https://www.cmu.edu/student-success/other-resources/resource-descriptions/rela\nted-work.html\n\u25cf https://www.youtube.com/watch?v=Hfty1dGfZcw\n4. Summarization of the identified research papers\nTitle/Author Aim Methodologies Model/Datasets Result Limitations Year\n5. (Bonus) Creative Process\nimport csv\nt = \"\"\nwith open(\"myresearch.csv\") as file:\nt = file.readlines()"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What methodologies are commonly used in AI research?",
+      "back": "Common methodologies in AI research include empirical studies, algorithm development, comparative analyses, and user-centered design approaches, which help evaluate AI systems' effectiveness and usability.",
+      "citation": {
+       "source_type": "file",
+       "label": "Research Study.pdf \u00b7 p.1",
+       "item_id": "file:14690036"
+      },
+      "passage": "Research Study\nScience Research 1\nScience Method 1\nThe AI/ML Conferences 2\nTop AI/ML Journals 3\nLiterature Search 3\nSearch Criteria 4\nRequirements 5\nScience Research\nThe AI product lifecycle is tightly coupled with the scientific research process. The essential component\nof such software products and services is the AI models and signal feedback loop. Therefore, foremost we\nneed to understand the scientific method.\nScience Method"
+     },
+     {
+      "reason": "unsupported",
+      "front": "What is the purpose of auto-generating citations in research?",
+      "back": "Auto-generating citations streamlines the research process by ensuring accuracy and consistency in referencing, which is crucial for academic integrity and proper acknowledgment of sources.",
+      "citation": {
+       "source_type": "file",
+       "label": "Citation & Bibliography  with Zotero.pdf \u00b7 p.7",
+       "item_id": "file:14690032"
+      },
+      "passage": "Auto Generate Citation\nMake sure that you use chrome browser. It has the Google doc Zotero menu item.\nOpen a Google doc. Click at the place where you want to add citation. Select Zotero menu item -> Add/edit\ncitation.\n7\n\n[Text read from images on this page]\nmat Tools Add-ons Zotero Help\nJormal text + Arial Add/edit citat Ctriesec (| cD =\nL _ Add/edit bibliography : 4\nDocument preferences...\nRefresh\nSwitch word processors...\nZoterc Unlink citations...\nThis is a demonstration on how to use Zotero. |"
+     }
+    ],
+    "cited_sources": [
+     "49797-Project Proposal.pdf",
+     "Fintech App.docx",
+     "Research Study.pdf"
+    ]
+   }
+  },
+  {
+   "step": "flashcards from the Word file only, easy (FR9)",
+   "ok": true,
+   "seconds": 12.6,
+   "result": {
+    "id": "cards-c56ae5125add",
+    "status": "done",
+    "error": null,
+    "seconds": 12.1,
+    "title": "Fintech App Concepts",
+    "stats": {
+     "generated": 15,
+     "unsourced": 0,
+     "malformed": 0,
+     "unsupported": 1,
+     "checked": true,
+     "rounds": 1
+    },
+    "items": [
+     {
+      "front": "What is BenchWise?",
+      "back": "BenchWise is an AI-powered personal finance platform designed for freelancers and gig workers to manage their unstable income, optimize spending, and redirect savings into wealth-building ventures.",
+      "citation": {
+       "source_type": "file",
+       "label": "Fintech App.docx",
+       "item_id": "file:14690038"
+      },
+      "passage": "Fintech App.docx\nJuly 13\nPossible Names:\nBenchWise: Smart Money for the Hustle Economy\nCashLoom AI\nEarnest / EarnestAI\netc.\nExecutive Summary\nIn the rapidly growing gig and creator economy, freelancers, side hustlers, and independent earners face an overlooked challenge: unstable income, unclear financial benchmarks, and overlooked waste. BenchWise is an AI-powered personal finance platform that helps users not only forecast their cashflow but also take control of spending, eliminate financial leaks, and redirect micro-savings into wealth-building ventures. From Uber drivers to violin teachers, BenchWise brings personalized accounting intelligence to the people who need it most\u2014without requiring them to be financial experts."
+     },
+     {
+      "front": "Who is the primary target audience for BenchWise?",
+      "back": "The primary target audience includes freelancers and gig workers, such as Uber drivers and virtual assistants, alongside recent graduates and immigrants with non-traditional income flows.",
+      "citation": {
+       "source_type": "file",
+       "label": "Fintech App.docx",
+       "item_id": "file:14690038"
+      },
+      "passage": "Fintech App.docx \u203a Target Audience: Gig & Freelance Economy in 2025, variable income earners\nPrimary:\nFreelancers & gig workers (Uber drivers, violin teachers, hair stylists, virtual assistants, Etsy sellers, Airbnb hosts)\nPeople with side hustles who mix W2 + 1099 income\nRecent grads and immigrants navigating U.S. financial systems with non-traditional income flows\nUnderserved financial users who distrust banks or don\u2019t use credit heavily\nDemographics:\nAge: 20\u201345\nIncome: $25k\u2013$100k/year\nTech-comfortable but not financially savvy\nUrban and suburban\nMajority: mobile-first, value self-reliance, often balancing debt and low savings"
+     },
+     {
+      "front": "What challenge do freelancers face compared to salaried workers?",
+      "back": "Freelancers struggle with inconsistent cash flow and unpredictable expenses, lacking access to traditional financial planning tools tailored to their variable income.",
+      "citation": {
+       "source_type": "file",
+       "label": "Fintech App.docx",
+       "item_id": "file:14690038"
+      },
+      "passage": "Fintech App.docx \u203a Issue Statement\nIn 2025, over 65 million Americans work as freelancers or gig workers. Unlike salaried workers, they:\nStruggle with inconsistent cashflow and unpredictable expenses\nLack access to traditional financial planning tools tailored to variable income\nLose money on forgotten subscriptions, mischarges, or expired trials\nFail to optimize small savings from deals or discounts\nRarely receive financial education customized to their specific spending behaviors\nThese users are underserved by mainstream personal finance tools like Mint or YNAB, which assume steady paychecks and lack proactive, personalized alerts and guidance."
+     },
+     {
+      "front": "What is cashflow forecasting?",
+      "back": "Cashflow forecasting predicts income from multiple sources and auto-calculates a break-even point based on fixed and variable costs.",
+      "citation": {
+       "source_type": "file",
+       "label": "Fintech App.docx",
+       "item_id": "file:14690038"
+      },
+      "passage": "Fintech App.docx \u203a 1. Cashflow Forecasting & Break-Even Planning\nPredicts income from multiple sources (Uber, tutoring, freelance gigs)\nAuto-calculates break-even point based on fixed and variable costs\nOffers a \u201c# of gigs/students to break even\u201d calculator with personalized pacing alerts"
+     },
+     {
+      "front": "What does smart expense tracking provide?",
+      "back": "Smart expense tracking creates dynamic, personalized monthly benchmarks by category and sends contextual alerts about spending patterns.",
+      "citation": {
+       "source_type": "file",
+       "label": "Fintech App.docx",
+       "item_id": "file:14690038"
+      },
+      "passage": "Fintech App.docx \u203a 2. Smart Expense Tracking & Category Benchmarks\nCreates dynamic, personalized monthly benchmarks by category (e.g., groceries, gas, supplies)\nSends contextual alerts (e.g., \u201cYou\u2019ve spent 75% of your grocery budget by the 10th\u201d)\nHighlights outliers (too high or low vs typical patterns) and unexpected charges"
+     },
+     {
+      "front": "What are waste prevention alerts?",
+      "back": "Waste prevention alerts detect trials about to expire, unused memberships, and fraudulent charges, helping users avoid unnecessary expenses.",
+      "citation": {
+       "source_type": "file",
+       "label": "Fintech App.docx",
+       "item_id": "file:14690038"
+      },
+      "passage": "Fintech App.docx \u203a 3. Waste Prevention Alerts\nDetects trials about to expire, unused memberships, and likely fraud or mischarges\nFlags \"zombie expenses\" (low-frequency but recurring payments)"
+     },
+     {
+      "front": "How does BenchWise redirect savings from deals?",
+      "back": "BenchWise surfaces personalized deals and routes the savings into investments, emergency savings, or a community fund, promoting financial growth.",
+      "citation": {
+       "source_type": "file",
+       "label": "Fintech App.docx",
+       "item_id": "file:14690038"
+      },
+      "passage": "Fintech App.docx \u203a 4. Deal-to-Wealth Redirection\nSurfaces personalized grocery or service deals\nRoutes deal savings into investments, emergency savings, or a community fund\nOffers users the option to contribute savings to crowd-fund young entrepreneurs through the platform"
+     },
+     {
+      "front": "What type of financial education does BenchWise provide?",
+      "back": "BenchWise sends digestible monthly insights tailored to users' income sources, age, and spending habits, enhancing their financial literacy.",
+      "citation": {
+       "source_type": "file",
+       "label": "Fintech App.docx",
+       "item_id": "file:14690038"
+      },
+      "passage": "Fintech App.docx \u203a 5. Financial Education Nudges\nSends digestible, monthly insights (\u201cWhat\u2019s the difference between checking vs saving?\u201d, \u201cHow to optimize tax for freelance income\u201d)\nPersonalized to income source, age, and spending habits"
+     },
+     {
+      "front": "What features does the itemized dashboard offer?",
+      "back": "The itemized dashboard displays intuitive, categorized financial information and includes a future balance simulator for different financial scenarios.",
+      "citation": {
+       "source_type": "file",
+       "label": "Fintech App.docx",
+       "item_id": "file:14690038"
+      },
+      "passage": "Fintech App.docx \u203a 6. Itemized Dashboard & Visual Forecasts\nDisplays intuitive, categorized dashboards\n\u201cFuture balance simulator\u201d based on forecasted income and expenses\nOffers toggles for best-case, worst-case, and average-case financial scenarios"
+     },
+     {
+      "front": "How does BenchWise differentiate from Rocket Money?",
+      "back": "While Rocket Money focuses on subscription cancellation and budgeting, BenchWise offers detailed income forecasting and itemized benchmarks, which are critical for freelancers.",
+      "citation": {
+       "source_type": "file",
+       "label": "Fintech App.docx",
+       "item_id": "file:14690038"
+      },
+      "passage": "Fintech App.docx \u203a Competitive Analysis (2025)\nProduct | Focus | Weakness (vs BenchWise)\nRocket Money(2025) | Subscription cancellation, budgeting | Strong at spotting subscriptions, but lacks detailed income forecasting or itemized benchmarks\nCopilot Money | Expense tracking with beautiful UI | Targets salaried professionals, limited for multiple fluctuating incomes\nYNAB (You Need A Budget) | Zero-based budgeting | Requires strict manual input and knowledge, not optimized for freelancers or micro-savings reallocation\nIntuit Mint (deprecated 2024) | Was a budgeting tool | Discontinued; market opportunity opened\nMonarch Money | High-net-worth planning | Focuses on wealthy households; lacks gig-focused tools like break-even calculator or deal-to-investment redirection\nEmma, Cleo, Charlie AI | AI finance assistants | More conversational or comedic tone, not precise with tax forecasting or real benchmark planning\nQuickBooks Self-Employed | Tax tracking for freelancers | Strong for IRS Schedule C\u2014but lacks predictive cashflow simulation or personal benchmark nudges"
+     }
+    ],
+    "dropped": [
+     {
+      "reason": "unsupported",
+      "front": "What does JobsGPT do?",
+      "back": "JobsGPT matches users with part-time or side gigs based on their schedule and skills, helping them find relevant earning opportunities.",
+      "citation": {
+       "source_type": "file",
+       "label": "Fintech App.docx",
+       "item_id": "file:14690038"
+      },
+      "passage": "Fintech App.docx \u203a Core Features\n1. Quick Cash Access\nGet expedited access to a verified deposit (typically $9\u2013$99), with funds sent to your bank, debit card, or even as gift cards\u2014usually within a few minutes, for a fee of ~$0.99 per advance.\nNo interest, no credit checks, and no fixed repayment dates.\n2. Send & Receive Money\nEasy P2P transfers between friends, roommates, or family\u2014even if they\u2019re not on Blitz, via integrations with Venmo, Cash App, Zelle, Apple Pay, Google Pay, Chime, and more.\n3. AI-Fueled Financial Tools (\"GPTs\")\nJobsGPT: Matches users with part-time or side gigs based on schedule and skills.\nDealsGPT: Finds college-specific discounts, cashback offerings, and retailer deals based on your spending patterns.\nPriceGPT: Compares prices across stores to help you get the best deals before you buy.\nBudgetGPT (also called Budget AI): Offers personalized budgeting insights, tracks spending habits, flags overspending, and automates expense categorization\n4. Top\u2011Up, Withdraw, Request\nEasily fund your Blitz account by linking your bank or debit card. Withdraw at any time via bank transfers or gift cards.\nSend requests for money\u2014no more awkward chasing debtors.\n5. Data Privacy & Security\nCollects basic personal, contact, location, and device info, but encrypts data in transit, offers the ability to request deletion, and engages in standard analytics/fraud prevention practices"
+     }
+    ],
+    "cited_sources": [
+     "Fintech App.docx"
+    ]
+   }
+  },
+  {
+   "step": "Explain on a quiz question opens a cited chat answer",
+   "ok": true,
+   "seconds": 2.3,
+   "result": {
+    "status": 200,
+    "answer": "The primary aim of a literature review is to evaluate past literature and illustrate gaps in research. This involves selecting relevant studies, analyzing their findings, and identifying areas where further research is needed. A literature review situates your work within the broader scholarly community, showing how it connects to existing research and trends, and highlights the limitations or gaps that your own research may address [1].\n\nGeneral knowledge (not from your course materials): A literature review is essential for establishing the context of your research, demonstrating your understanding of the field, and justifying the need for your study. It helps to ensure that your research builds on existing knowledge rather than duplicating efforts.",
+    "grounded": true,
+    "citations": [
+     {
+      "source_type": "file",
+      "label": "Research Study.pdf \u00b7 p.6",
+      "item_id": "file:14690036"
+     }
+    ],
+    "errors": []
+   }
+  },
+  {
+   "step": "export flashcards as CSV",
+   "ok": true,
+   "seconds": 0.0,
+   "result": {
+    "path": "~/Downloads/Key Concepts in AI and Education.csv"
+   }
+  },
+  {
+   "step": "study: invalid options refused",
+   "ok": true,
+   "seconds": 0.0,
+   "result": [
+    400,
+    400,
+    400
+   ]
+  },
+  {
+   "step": "study: course not selected refused",
+   "ok": true,
+   "seconds": 0.0,
+   "result": 404
+  },
+  {
+   "step": "study: bad progress refused",
+   "ok": true,
+   "seconds": 0.0,
+   "result": [
+    400,
+    400
+   ]
+  }
+ ],
+ "wer": 0.023
+}
