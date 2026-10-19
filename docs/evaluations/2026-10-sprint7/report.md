@@ -121,4 +121,4 @@ The shipped chat was good on 17 of 25 questions (68%). The baseline was good on 
 
 ## Supporting files
 
-In `docs/evaluations/2026-10-sprint7/`: `results.md` (technical detail), `results-after-grades.json` (per-question grades) and `benchmark-protocol.md` (designed, not run). Interview notes are kept local. Evaluation code: `backend/scripts/ask_modes_eval.py`. The due-date change is `schedule_line` in `backend/course_sync.py`.
+In `docs/evaluations/2026-10-sprint7/`: `results.md` (technical detail), `results-after-grades.json` (per-question grades), `judge-check-grades.csv` (our 10 hand grades) and `benchmark-protocol.md` (designed, not run). Interview notes are kept local. Evaluation code: `backend/scripts/ask_modes_eval.py`. The due-date change is `schedule_line` in `backend/course_sync.py`.
