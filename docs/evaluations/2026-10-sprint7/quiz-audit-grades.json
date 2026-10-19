@@ -1,0 +1,73 @@
+{
+  "pipeline": [
+    {
+      "course": 55710,
+      "difficulty": "medium",
+      "kept": 10,
+      "generated": 12,
+      "unsourced": 0,
+      "unsupported": 0,
+      "malformed": 0,
+      "checked": true
+    },
+    {
+      "course": 55710,
+      "difficulty": "hard",
+      "kept": 10,
+      "generated": 10,
+      "unsourced": 0,
+      "unsupported": 0,
+      "malformed": 0,
+      "checked": true
+    },
+    {
+      "course": 56350,
+      "difficulty": "medium",
+      "kept": 10,
+      "generated": 15,
+      "unsourced": 0,
+      "unsupported": 3,
+      "malformed": 0,
+      "checked": true
+    },
+    {
+      "course": 56350,
+      "difficulty": "hard",
+      "kept": 10,
+      "generated": 11,
+      "unsourced": 0,
+      "unsupported": 0,
+      "malformed": 0,
+      "checked": true
+    }
+  ],
+  "overall": {
+    "questions": 40,
+    "answerable_from_passage": 0.975,
+    "answered_correctly_without_passage": 0.975,
+    "correct_option_is_longest": 0.6,
+    "chance": 0.25
+  },
+  "by_course_difficulty": {
+    "55710-medium": {
+      "questions": 10,
+      "answerable_from_passage": 0.9,
+      "answered_correctly_without_passage": 0.9
+    },
+    "55710-hard": {
+      "questions": 10,
+      "answerable_from_passage": 1.0,
+      "answered_correctly_without_passage": 1.0
+    },
+    "56350-medium": {
+      "questions": 10,
+      "answerable_from_passage": 1.0,
+      "answered_correctly_without_passage": 1.0
+    },
+    "56350-hard": {
+      "questions": 10,
+      "answerable_from_passage": 1.0,
+      "answered_correctly_without_passage": 1.0
+    }
+  }
+}

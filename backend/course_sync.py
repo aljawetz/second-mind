@@ -7,6 +7,7 @@ responsible for the actual Canvas calls") — this module is that caller.
 """
 
 import tempfile
+from datetime import datetime, tzinfo
 from pathlib import Path
 
 import httpx
@@ -103,6 +104,27 @@ def _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed):
     return title
 
 
+def schedule_line(assignment: dict, tz: tzinfo | None = None) -> str:
+    """"Due Tue, Sep 15, 2026 at 10:00 AM EDT. Worth 100 points." for an
+    assignment, or "" when Canvas gives neither. A due date lives on the
+    assignment record, not in its description, so without this line chat
+    can't answer "when is X due?". tz defaults to the student's own (the
+    backend runs on their machine), so the time reads the way Canvas shows it
+    to them."""
+    parts = []
+    due_at = assignment.get("due_at")
+    if due_at:
+        try:
+            due = datetime.fromisoformat(due_at.replace("Z", "+00:00")).astimezone(tz)
+            parts.append(f"Due {due.strftime('%a, %b')} {due.day}, {due.year} at {due.strftime('%I:%M %p %Z').lstrip('0')}.")
+        except ValueError:
+            pass
+    points = assignment.get("points_possible")
+    if isinstance(points, (int, float)) and points > 0:
+        parts.append(f"Worth {points:g} points.")
+    return " ".join(parts)
+
+
 def _sync_assignment(conn, db_path, table_name, assignment, is_changed):
     prefixed_id = f"assignment:{assignment['id']}"
     name = assignment.get("name") or f"Assignment {assignment['id']}"
@@ -110,6 +132,9 @@ def _sync_assignment(conn, db_path, table_name, assignment, is_changed):
         indexing.delete_ref_doc_nodes(db_path, table_name, prefixed_id)
 
     sections = ingestion.extract_html_sections(assignment.get("description") or "")
+    schedule = schedule_line(assignment)
+    if schedule:
+        sections.insert(0, {"heading": "Due date and points", "text": schedule})
     text = ingestion.sections_text(sections)
     # Own item_type: citations.ts opens /assignments/<id>, and explain.py's
     # pointers exclude these (see build_pointers).
@@ -270,13 +295,14 @@ def sync_course(course_id: int, sm_home: Path):
             syllabus_remote = [{"id": f"syllabus:{course_id}", "updated_at": sync.content_hash(syllabus_html)}]
 
         # Assignment instructions, so chat can answer "what does Task 2 ask
-        # for?" (Explain only ever read one assignment at a time). Ones with
-        # no text are left out; an assignment whose description was cleared
-        # then reads as deleted, which matches what the student can see.
+        # for?" (Explain only ever read one assignment at a time) and "when is it
+        # due?". Ones with neither text nor a due date or points are left out;
+        # an assignment whose description was cleared then reads as deleted,
+        # which matches what the student can see.
         assignments_by_id = {
             str(a["id"]): a
             for a in assignments
-            if a.get("description") and ingestion.extract_html_page(a["description"]).strip()
+            if (a.get("description") and ingestion.extract_html_page(a["description"]).strip()) or schedule_line(a)
         }
         assignment_remote = [
             {"id": f"assignment:{aid}", "updated_at": a.get("updated_at", "")} for aid, a in assignments_by_id.items()

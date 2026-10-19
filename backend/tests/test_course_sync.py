@@ -524,3 +524,31 @@ def test_an_empty_assignment_listing_deletes_nothing(tmp_path, stub_extraction, 
 
     assert events == [{"done": True, "new": 0, "changed": 0, "removed": 0, "failed": 0}]
     assert _manifest_ids(tmp_path) == {"assignment:1"}
+
+
+# --- Due dates and points ----------------------------------------------------
+
+
+def test_schedule_line_reads_the_due_date_and_points_in_the_given_timezone():
+    from datetime import timedelta, timezone
+
+    eastern = timezone(timedelta(hours=-4), "EDT")
+    line = course_sync.schedule_line({"due_at": "2026-09-15T14:00:00Z", "points_possible": 100.0}, eastern)
+
+    assert line == "Due Tue, Sep 15, 2026 at 10:00 AM EDT. Worth 100 points."
+
+
+def test_schedule_line_handles_missing_and_bad_values():
+    assert course_sync.schedule_line({}) == ""
+    assert course_sync.schedule_line({"due_at": None, "points_possible": 0}) == ""
+    assert course_sync.schedule_line({"due_at": "not a date", "points_possible": 2.5}) == "Worth 2.5 points."
+
+
+def test_an_assignment_with_a_due_date_but_no_description_is_indexed(tmp_path, stub_extraction, assignments_only):
+    dated = {**_assignment(1, "Fall Break", None), "due_at": "2026-10-13T14:00:00Z"}
+    assignments_only(dated, _assignment(2, "Quiz 1", None))
+
+    events = run(1, tmp_path)
+
+    assert events[-1] == {"done": True, "new": 1, "changed": 0, "removed": 0, "failed": 0}
+    assert _manifest_ids(tmp_path) == {"assignment:1"}

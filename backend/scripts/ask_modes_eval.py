@@ -13,11 +13,12 @@ docs/evaluations/2026-09-23-ask-modes/report.md for the write-up.
   E  the shipped /ask code (chat.answer): D plus the report's code fixes,
      at the default 0.5 similarity cutoff.
   F  same as E with a 0.4 cutoff, to choose main.CHAT_SIMILARITY_CUTOFF.
+  G  no retrieval: the plain-chatbot baseline for Sprint 7 (same model, no course text).
 
 Not a pytest test: makes real, billed OpenAI calls against the real local
 index (~/.secondmind/index.lancedb). Run from backend/:
 
-    uv run python3 scripts/ask_modes_eval.py [--set first|heldout] [--only A,B,C,D] [--out PATH]
+    uv run python3 scripts/ask_modes_eval.py [--set first|heldout|sprint7] [--only A,B,C,D] [--out PATH]
 """
 
 import argparse
@@ -893,7 +894,124 @@ def run_f(index, question, history, course_name):
     return run_shipped(index, question, history, course_name, 0.4)
 
 
-MODES = {"A": run_a, "B": run_b, "C": run_c, "D": run_d, "E": run_e, "F": run_f}
+# --- mode G: no retrieval ----------------------------------------------------
+
+PROMPT_G = """You are a study assistant for a student in "{course_name}". You do NOT have access to the \
+course materials, syllabus, Canvas or the student's notes. Answer the student's question as well as you can. \
+If it is about this specific course (dates, policies, what was said in class) and you cannot know it, say so \
+instead of guessing. Be concise."""
+
+
+def run_g(_index, question: str, history: list[dict], course_name: str) -> dict:
+    """The plain-chatbot baseline for Sprint 7: the same model as the shipped
+    chat (MODEL), no search tool, no course text. What a student gets from
+    pasting the question into a general chatbot with nothing attached."""
+    client = providers.openai_client(providers.OPENAI)
+    messages = [{"role": "system", "content": PROMPT_G.format(course_name=course_name)}]
+    for turn in history:
+        messages.append({"role": "user", "content": turn["question"]})
+        messages.append({"role": "assistant", "content": turn["answer"]})
+    messages.append({"role": "user", "content": question})
+    start = time.perf_counter()
+    response = client.chat.completions.create(model=MODEL, messages=messages, temperature=TEMPERATURE)
+    elapsed = time.perf_counter() - start
+    return {
+        "answer": response.choices[0].message.content or "",
+        "searches": [],
+        "sources": [],
+        "retrieved": [],
+        "seconds": round(elapsed, 2),
+        "llm_calls": 1,
+        "prompt_tokens": response.usage.prompt_tokens,
+        "completion_tokens": response.usage.completion_tokens,
+    }
+
+
+MODES = {"A": run_a, "B": run_b, "C": run_c, "D": run_d, "E": run_e, "F": run_f, "G": run_g}
+# Modes that never retrieve: recall@5 and precision@5 are not applicable, not zero.
+MODES_WITHOUT_RETRIEVAL = {"G"}
+
+
+# --- Sprint 7 set ------------------------------------------------------------
+# Built from cases whose gold answer was verified in earlier runs (V), on the two
+# pilot courses (spec §13: 49797 is indexed here as 56350, 18654 as 55710), plus
+# reworded copies of some of them. The reworded copies ask for the same fact in
+# the way a student would actually type it, since Interviewee C's real query
+# ("genetic testing" for "genetic algorithms") found nothing. A variant inherits
+# its base case's gold fields; "variant_of" records which one.
+
+SPRINT7_BASE_IDS = [
+    # 55710 (18654)
+    "F1", "F2", "F3", "F5", "F7", "K1", "K3", "K4", "T1", "T3", "H20", "H22", "H23",
+    # 56350 (49797)
+    "H13", "H15", "H16",
+]
+
+SPRINT7_VARIANTS = [
+    ("F1", "V1", "what day is the mid-term test"),
+    ("F2", "V2", "what percent of my final grade is the last exam"),
+    ("F3", "V3", "i'm turning my homework in late, is there a penalty"),
+    ("K1", "V4", "stub vs mock, what's the difference"),
+    ("K3", "V5", "what does combinatorial test design mean"),
+    ("K4", "V6", "how does TDD work"),
+    ("H13", "V7", "what reference format am I supposed to use in Zotero"),
+    ("H15", "V8", "when do we hand in the third sprint deliverable"),
+]
+
+# No verified gold exists for this one yet: the course's genetic-algorithm material
+# should be found from the wrong name, or the assistant should ask what is meant.
+SPRINT7_EXTRA = [
+    {
+        "id": "V9",
+        "course": AI,
+        "kind": "concept_covered",
+        "turns": ["what did we learn about genetic testing"],
+        "gold_source": None,
+        "gold_answer": (
+            "The course covers genetic algorithms (for example for feature selection), not 'genetic testing'. "
+            "A good answer finds that material or asks whether the student means genetic algorithms. "
+            "Saying nothing was found, or answering from general knowledge about genetic tests, is bad"
+        ),
+        "gold_confidence": "U",
+    },
+]
+
+
+# Gold answers that were wrong by October: the earlier runs found no Sprint 3
+# deadline and no LLM certificate in course 56350, but Canvas lists both
+# (checked in Canvas on 2026-10-18). Fixed here, not in HELDOUT_CASES, so the
+# earlier held-out results still read against the gold they were graded on.
+SPRINT7_GOLD_FIXES = {
+    "H15": {
+        "kind": "course_fact",
+        "gold_source": "Sprint 3 Deliverable - Technical Feasibility and Baseline",
+        "gold_answer": (
+            "Tue Sep 15, 2026, 10:00 AM Pacific (the time Canvas shows this student); 100 points. A time stated "
+            "in another timezone that is the same moment counts as correct"
+        ),
+        "gold_confidence": "V",
+    },
+    "H16": {
+        "kind": "course_fact",
+        "gold_source": "LLM Certificate Completion",
+        "gold_answer": (
+            "The LLM Certificate Completion assignment is due Tue Nov 10, 2026, 10:00 AM Pacific (as Canvas shows this student), and is "
+            "worth 100 points. Its share of the final grade is not stated anywhere in the course materials, "
+            "so a good answer gives the due date and points and says the grade percentage is not stated"
+        ),
+        "gold_confidence": "V",
+    },
+}
+
+
+def sprint7_cases() -> list[dict]:
+    by_id = {c["id"]: {**c, **SPRINT7_GOLD_FIXES.get(c["id"], {})} for c in CASES + HELDOUT_CASES}
+    base = [by_id[i] for i in SPRINT7_BASE_IDS]
+    variants = []
+    for base_id, new_id, question in SPRINT7_VARIANTS:
+        original = by_id[base_id]
+        variants.append({**original, "id": new_id, "turns": [question], "variant_of": base_id})
+    return base + variants + SPRINT7_EXTRA
 
 
 # --- metrics: recall@5, LLM-judge (correctness / citation accuracy /
@@ -938,6 +1056,21 @@ def recall_at_5(gold_source: str | None, retrieved: list[list[str]]) -> bool | N
         return None
     key = source_key(gold_source).lower()
     return any(key in label.lower() for labels in retrieved for label in labels)
+
+
+def precision_at_k(gold_source: str | None, retrieved: list[list[str]], gold_sources: list[str] | None = None) -> float | None:
+    """Of the sources each search returned, the share that match the expected
+    source, averaged over the searches the answer made. Matches the same way
+    recall_at_5 does (a substring of the citation label), so it carries the
+    same caveat: a signal to spot-check. gold_sources lets a case name several
+    acceptable sources; otherwise the one from gold_source is used. None when
+    there is no expected source or no search was made."""
+    keys = [k.lower() for k in (gold_sources or ([source_key(gold_source)] if gold_source else []))]
+    searches = [labels for labels in retrieved if labels]
+    if not keys or not searches:
+        return None
+    per_search = [sum(any(k in label.lower() for k in keys) for label in labels) / len(labels) for labels in searches]
+    return sum(per_search) / len(per_search)
 
 
 JUDGE_PROMPT = """You are grading one chat-assistant answer for an evaluation. You did not write the \
@@ -1009,7 +1142,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", default="A,B,C")
     parser.add_argument("--cases", default="", help="comma-separated case ids; default all")
-    parser.add_argument("--set", default="first", choices=["first", "heldout"])
+    parser.add_argument("--set", default="first", choices=["first", "heldout", "sprint7"])
     parser.add_argument(
         "--out",
         default=str(Path(__file__).parent.parent.parent / "docs/evaluations/2026-09-23-ask-modes/results.json"),
@@ -1022,7 +1155,7 @@ def main():
     wanted = set(filter(None, args.cases.split(",")))
     judge_client = None if args.no_judge else providers.openai_client(providers.OPENAI)
 
-    cases = HELDOUT_CASES if args.set == "heldout" else CASES
+    cases = {"first": CASES, "heldout": HELDOUT_CASES}.get(args.set) or sprint7_cases()
     indexes = {}
     results = []
     for case in cases:
@@ -1037,7 +1170,11 @@ def main():
             for turn_num, question in enumerate(case["turns"], start=1):
                 out = MODES[mode](index, question, history, COURSE_NAMES[course_id])
                 history.append({"question": question, "answer": out["answer"]})
-                out["recall_at_5"] = recall_at_5(case.get("gold_source"), out["retrieved"])
+                if mode in MODES_WITHOUT_RETRIEVAL:
+                    out["recall_at_5"] = out["precision_at_5"] = None
+                else:
+                    out["recall_at_5"] = recall_at_5(case.get("gold_source"), out["retrieved"])
+                    out["precision_at_5"] = precision_at_k(case.get("gold_source"), out["retrieved"], case.get("gold_sources"))
                 out["cost"] = cost(out["prompt_tokens"], out["completion_tokens"])
                 if judge_client is not None:
                     out.update(judge(judge_client, COURSE_NAMES[course_id], case, question, out["answer"], out["sources"]))
@@ -1049,6 +1186,7 @@ def main():
                         "gold_source": case.get("gold_source"),
                         "gold_answer": case.get("gold_answer"),
                         "gold_confidence": case.get("gold_confidence"),
+                        "variant_of": case.get("variant_of"),
                         "turn": turn_num,
                         "mode": mode,
                         "question": question,
@@ -1072,8 +1210,8 @@ def main():
 # gold_answer can, e.g. F4's TA names and office hours) — matches why the
 # existing *-grades.json files, not the raw run output, are what's shared.
 GRADES_FIELDS = (
-    "case", "course", "kind", "gold_confidence", "turn", "mode",
-    "seconds", "cost", "recall_at_5", "correct", "citation_accuracy",
+    "case", "course", "kind", "gold_confidence", "variant_of", "turn", "mode",
+    "seconds", "cost", "recall_at_5", "precision_at_5", "correct", "citation_accuracy",
     "faithful", "abstained_correctly",
 )
 
@@ -1115,7 +1253,7 @@ def print_report(results: list[dict], modes: list[str]) -> None:
         return f"{a * 100:.0f}%" if a is not None else "n/a"
 
     print("\n## Summary\n")
-    header = "| mode | good | ok | bad | citation acc | faithful | correct abstention | recall@5 | p50 (s) | p95 (s) | avg cost |"
+    header = "| mode | good | ok | bad | citation acc | faithful | correct abstention | recall@5 | precision@5 | p50 (s) | p95 (s) | avg cost |"
     print(header)
     print("|" + "---|" * (header.count("|") - 1))
     for mode in modes:
@@ -1131,6 +1269,7 @@ def print_report(results: list[dict], modes: list[str]) -> None:
             f"{pct([1 if r.get('faithful') else 0 if r.get('faithful') is False else None for r in rows])} | "
             f"{pct([1 if r.get('abstained_correctly') else 0 if r.get('abstained_correctly') is False else None for r in rows])} | "
             f"{pct([1 if r.get('recall_at_5') else 0 if r.get('recall_at_5') is False else None for r in rows])} | "
+            f"{pct([r.get('precision_at_5') for r in rows])} | "
             f"{_percentile(seconds, 50) or 'n/a'} | {_percentile(seconds, 95) or 'n/a'} | {cost_str} |"
         )
 
