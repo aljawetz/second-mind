@@ -15,10 +15,18 @@ docs/evaluations/2026-09-23-ask-modes/report.md for the write-up.
   F  same as E with a 0.4 cutoff, to choose main.CHAT_SIMILARITY_CUTOFF.
   G  no retrieval: the plain-chatbot baseline for Sprint 7 (same model, no course text).
 
-Not a pytest test: makes real, billed OpenAI calls against the real local
-index (~/.secondmind/index.lancedb). Run from backend/:
+  --retrieval-only  search only: the same HybridRetriever the shipped chat
+     uses (chat.make_search), no model call and no API key. For each question
+     in the chosen set, scores recall@5 and precision@5 the same way the
+     Sprint 7 chat run did. Pass another retriever to score a later stage
+     (rerank, query rewrite) with those same metrics.
+
+Not a pytest test: the answering modes make real, billed OpenAI calls against
+the real local index (~/.secondmind/index.lancedb). --retrieval-only does
+not. Run from backend/:
 
     uv run python3 scripts/ask_modes_eval.py [--set first|heldout|sprint7] [--only A,B,C,D] [--out PATH]
+    uv run python3 scripts/ask_modes_eval.py --set sprint7 --retrieval-only --out PATH
 """
 
 import argparse
@@ -1105,6 +1113,180 @@ the assistant said so, false if it guessed or invented something instead, null f
 Return nothing but the JSON object, no markdown fences."""
 
 
+# --- retrieval-only: search the index, score sources, no model call --------
+# Sprint 7 measured recall@5 and precision@5 on whatever the chat searched
+# (results.md: 73% and 22% for the shipped chat). This path asks the same
+# two questions of the retriever alone: one search per question, the question
+# text as the query, then recall_at_5 and precision_at_k unchanged.
+
+
+class ShippedRetriever:
+    """The search the shipped chat uses.
+
+    chat.make_search builds generation.HybridRetriever at the default
+    similarity cutoff and returns its retrieve method. Wrapping that here
+    keeps this eval on the same search the app runs, and gives later stages
+    one object to replace: anything with retrieve(query) -> nodes.
+    """
+
+    def __init__(self, index):
+        self._search = chat.make_search(index)
+
+    def retrieve(self, query: str):
+        return self._search(query)
+
+
+def shipped_retriever(index):
+    """Default retriever_for: the shipped chat's HybridRetriever."""
+    return ShippedRetriever(index)
+
+
+def _mean(values: list[float | None]) -> float | None:
+    # Keep real zeros. A precision of 0 is a measured miss, not "no score".
+    kept = [v for v in values if v is not None]
+    if not kept:
+        return None
+    return sum(kept) / len(kept)
+
+
+def retrieval_metrics(rows: list[dict]) -> dict:
+    """Aggregate recall@5 and precision@5 the way print_report does for a mode:
+    the mean over turns where that metric applies. None when none do."""
+    recalls = [1.0 if r["recall_at_5"] else 0.0 if r["recall_at_5"] is False else None for r in rows]
+    precisions = [r["precision_at_5"] for r in rows]
+    return {
+        "n": len(rows),
+        "n_recall": sum(v is not None for v in recalls),
+        "n_precision": sum(v is not None for v in precisions),
+        "recall_at_5": _mean(recalls),
+        "precision_at_5": _mean(precisions),
+    }
+
+
+def evaluate_retrieval(cases: list[dict], index_for, retriever_for=shipped_retriever) -> dict:
+    """Search each question once and score the sources that come back.
+
+    index_for(course_id) opens that course's index. retriever_for(index) is
+    called once per course and must return an object with retrieve(query) ->
+    nodes (NodeWithScore), which is what HybridRetriever.retrieve returns.
+    The default is the shipped chat's search. A later rerank or query-rewrite
+    stage passes its own retriever_for and is scored by this same function:
+    one retrieve() call is one search, and recall@5 / precision@5 go through
+    recall_at_5 and precision_at_k.
+    """
+    indexes = {}
+    retrievers = {}
+    rows = []
+    for case in cases:
+        course_id = case.get("course", DEFAULT_COURSE)
+        if course_id not in indexes:
+            indexes[course_id] = index_for(course_id)
+            retrievers[course_id] = retriever_for(indexes[course_id])
+        retriever = retrievers[course_id]
+        for turn_num, question in enumerate(case["turns"], start=1):
+            start = time.perf_counter()
+            labels = [source_label(n) for n in retriever.retrieve(question)]
+            # One search, so the metric helpers see a single label list, the
+            # same shape the chat modes store in "retrieved".
+            retrieved = [labels]
+            rows.append(
+                {
+                    "case": case["id"],
+                    "course": course_id,
+                    "kind": case["kind"],
+                    "variant_of": case.get("variant_of"),
+                    "turn": turn_num,
+                    "mode": "retrieval-only",
+                    "question": question,
+                    "gold_source": case.get("gold_source"),
+                    "retrieved": labels,
+                    "recall_at_5": recall_at_5(case.get("gold_source"), retrieved),
+                    "precision_at_5": precision_at_k(
+                        case.get("gold_source"), retrieved, case.get("gold_sources")
+                    ),
+                    "seconds": round(time.perf_counter() - start, 2),
+                }
+            )
+    return {
+        "mode": "retrieval-only",
+        "metrics": retrieval_metrics(rows),
+        "results": rows,
+    }
+
+
+def _rate(value: float | None, scored: int | None = None, total: int | None = None) -> str:
+    if value is None:
+        return "n/a"
+    text = f"{value * 100:.0f}%"
+    if scored is not None and total is not None and scored != total:
+        text += f" ({scored} scored)"
+    return text
+
+
+def print_retrieval_report(report: dict) -> None:
+    """Per-question scores, then one row of averages. A question with no
+    expected source (recall and precision are None) is left out of the
+    average, same as the chat-mode summary."""
+    print("\n## Questions\n")
+    print("| case | recall@5 | precision@5 | returned | top source |")
+    print("|---|---|---|---|---|")
+    for row in report["results"]:
+        recall = row["recall_at_5"]
+        recall_cell = "n/a" if recall is None else ("yes" if recall else "no")
+        top = row["retrieved"][0].replace("|", "/") if row["retrieved"] else ""
+        print(
+            f"| {row['case']}.{row['turn']} | {recall_cell} | {_rate(row['precision_at_5'])} | "
+            f"{len(row['retrieved'])} | {top} |"
+        )
+
+    metrics = report["metrics"]
+    print("\n## Summary\n")
+    print("| questions | recall@5 | precision@5 |")
+    print("|---|---|---|")
+    print(
+        f"| {metrics['n']} | {_rate(metrics['recall_at_5'], metrics['n_recall'], metrics['n'])} | "
+        f"{_rate(metrics['precision_at_5'], metrics['n_precision'], metrics['n'])} |"
+    )
+    # Published Sprint 7 chat numbers (results.md), shown on a sprint7 run
+    # beside the new scores. Those numbers come from the chat's own searches.
+    if report.get("set") == "sprint7":
+        print("\nSprint 7 shipped chat baseline: recall@5 73%, precision@5 22%.")
+
+
+def run_retrieval_only(args) -> dict:
+    """CLI entry for --retrieval-only. Reads the local LanceDB index, writes
+    per-question rows plus aggregate metrics to --out, and prints the table.
+    Does not construct an API client."""
+    cases = {"first": CASES, "heldout": HELDOUT_CASES}.get(args.set) or sprint7_cases()
+    wanted = set(filter(None, args.cases.split(",")))
+    if wanted:
+        cases = [c for c in cases if c["id"] in wanted]
+    db_path = SM_HOME / "index.lancedb"
+
+    def index_for(course_id):
+        return indexing.load_index(db_path, f"course_{course_id}")
+
+    scored = evaluate_retrieval(cases, index_for)
+    report = {
+        "mode": scored["mode"],
+        "set": args.set,
+        "index": str(db_path),
+        "metrics": scored["metrics"],
+        "results": scored["results"],
+    }
+
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(report, indent=2))
+    for row in report["results"]:
+        recall = "n/a" if row["recall_at_5"] is None else row["recall_at_5"]
+        precision = "n/a" if row["precision_at_5"] is None else f"{row['precision_at_5']:.2f}"
+        print(f"[{row['case']}.{row['turn']} retrieval] recall={recall} precision={precision}", flush=True)
+    print(f"wrote {len(report['results'])} results to {out_path}")
+    print_retrieval_report(report)
+    return report
+
+
 def judge(client, course_name: str, case: dict, question: str, answer: str, sources: list[str]) -> dict:
     """One gpt-4o call grading an answer against its case's gold data. A
     case with gold_confidence "U" (no real gold_answer yet) still gets
@@ -1144,6 +1326,11 @@ def main():
     parser.add_argument("--cases", default="", help="comma-separated case ids; default all")
     parser.add_argument("--set", default="first", choices=["first", "heldout", "sprint7"])
     parser.add_argument(
+        "--retrieval-only",
+        action="store_true",
+        help="score search only (recall@5 and precision@5): no model call and no API key",
+    )
+    parser.add_argument(
         "--out",
         default=str(Path(__file__).parent.parent.parent / "docs/evaluations/2026-09-23-ask-modes/results.json"),
     )
@@ -1151,6 +1338,10 @@ def main():
         "--no-judge", action="store_true", help="skip the gpt-4o judge pass (correctness/citation/faithfulness/abstention)"
     )
     args = parser.parse_args()
+    if args.retrieval_only:
+        # Search the local index and stop. No judge, no API key, no chat mode.
+        run_retrieval_only(args)
+        return
     modes = args.only.split(",")
     wanted = set(filter(None, args.cases.split(",")))
     judge_client = None if args.no_judge else providers.openai_client(providers.OPENAI)
