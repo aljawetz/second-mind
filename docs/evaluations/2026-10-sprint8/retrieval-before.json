@@ -6,8 +6,8 @@
     "n": 25,
     "n_recall": 22,
     "n_precision": 22,
-    "recall_at_5": 0.7727272727272727,
-    "precision_at_5": 0.2318181818181818
+    "recall_at_5": 0.9090909090909091,
+    "precision_at_5": 0.36818181818181817
   },
   "results": [
     {
@@ -29,7 +29,7 @@
       ],
       "recall_at_5": false,
       "precision_at_5": 0.0,
-      "seconds": 0.08
+      "seconds": 0.07
     },
     {
       "case": "F2",
@@ -47,7 +47,7 @@
       ],
       "recall_at_5": true,
       "precision_at_5": 0.3333333333333333,
-      "seconds": 0.06
+      "seconds": 0.07
     },
     {
       "case": "F3",
@@ -67,7 +67,7 @@
       ],
       "recall_at_5": true,
       "precision_at_5": 0.2,
-      "seconds": 0.05
+      "seconds": 0.06
     },
     {
       "case": "F5",
@@ -88,7 +88,7 @@
       ],
       "recall_at_5": true,
       "precision_at_5": 0.16666666666666666,
-      "seconds": 0.07
+      "seconds": 0.06
     },
     {
       "case": "F7",
@@ -127,7 +127,7 @@
       ],
       "recall_at_5": true,
       "precision_at_5": 0.16666666666666666,
-      "seconds": 0.06
+      "seconds": 0.07
     },
     {
       "case": "K3",
@@ -148,7 +148,7 @@
       ],
       "recall_at_5": true,
       "precision_at_5": 0.5,
-      "seconds": 0.06
+      "seconds": 0.05
     },
     {
       "case": "K4",
@@ -158,7 +158,7 @@
       "turn": 1,
       "mode": "retrieval-only",
       "question": "What is test-driven development?",
-      "gold_source": "\"L1 - TDD Lab\" assignment description + required \"TDD Primer.pdf\" reading",
+      "gold_source": "\"TDD Primer.pdf\" (required reading for the \"L1 - TDD Lab\" assignment)",
       "retrieved": [
         "TDD Primer.pdf \u00b7 p.1",
         "TDD Primer.pdf \u00b7 p.19",
@@ -167,9 +167,9 @@
         "TDD Primer.pdf \u00b7 p.4",
         "TDD-Theory.pdf \u00b7 p.20"
       ],
-      "recall_at_5": false,
-      "precision_at_5": 0.0,
-      "seconds": 0.06
+      "recall_at_5": true,
+      "precision_at_5": 0.8333333333333334,
+      "seconds": 0.07
     },
     {
       "case": "T1",
@@ -231,7 +231,7 @@
       ],
       "recall_at_5": true,
       "precision_at_5": 0.2,
-      "seconds": 0.05
+      "seconds": 0.06
     },
     {
       "case": "H22",
@@ -251,7 +251,7 @@
       ],
       "recall_at_5": true,
       "precision_at_5": 0.4,
-      "seconds": 0.05
+      "seconds": 0.06
     },
     {
       "case": "H23",
@@ -281,7 +281,7 @@
       "turn": 1,
       "mode": "retrieval-only",
       "question": "Which citation style should I pick in Zotero?",
-      "gold_source": "Zotero tutorial PDF (used in Sprint 3's own ingestion baseline)",
+      "gold_source": "\"Citation & Bibliography  with Zotero.pdf\" (the Zotero tutorial PDF, used in Sprint 3's own ingestion baseline)",
       "retrieved": [
         "Citation & Bibliography  with Zotero.pdf \u00b7 p.9",
         "Citation & Bibliography  with Zotero.pdf \u00b7 p.10",
@@ -289,8 +289,8 @@
         "Citation & Bibliography  with Zotero.pdf \u00b7 p.8",
         "Citation & Bibliography  with Zotero.pdf \u00b7 p.2"
       ],
-      "recall_at_5": false,
-      "precision_at_5": 0.0,
+      "recall_at_5": true,
+      "precision_at_5": 1.0,
       "seconds": 0.05
     },
     {
@@ -311,7 +311,7 @@
       ],
       "recall_at_5": true,
       "precision_at_5": 0.2,
-      "seconds": 0.05
+      "seconds": 0.04
     },
     {
       "case": "H16",
@@ -328,7 +328,7 @@
       ],
       "recall_at_5": true,
       "precision_at_5": 1.0,
-      "seconds": 0.03
+      "seconds": 0.04
     },
     {
       "case": "V1",
@@ -349,7 +349,7 @@
       ],
       "recall_at_5": true,
       "precision_at_5": 0.3333333333333333,
-      "seconds": 0.05
+      "seconds": 0.06
     },
     {
       "case": "V2",
@@ -369,7 +369,7 @@
       ],
       "recall_at_5": true,
       "precision_at_5": 0.2,
-      "seconds": 0.07
+      "seconds": 0.05
     },
     {
       "case": "V3",
@@ -410,7 +410,7 @@
       ],
       "recall_at_5": false,
       "precision_at_5": 0.0,
-      "seconds": 0.06
+      "seconds": 0.05
     },
     {
       "case": "V5",
@@ -431,7 +431,7 @@
       ],
       "recall_at_5": true,
       "precision_at_5": 0.3333333333333333,
-      "seconds": 0.06
+      "seconds": 0.07
     },
     {
       "case": "V6",
@@ -441,7 +441,7 @@
       "turn": 1,
       "mode": "retrieval-only",
       "question": "how does TDD work",
-      "gold_source": "\"L1 - TDD Lab\" assignment description + required \"TDD Primer.pdf\" reading",
+      "gold_source": "\"TDD Primer.pdf\" (required reading for the \"L1 - TDD Lab\" assignment)",
       "retrieved": [
         "TDD-Theory.pdf \u00b7 p.4",
         "TDD Primer.pdf \u00b7 p.1",
@@ -451,8 +451,8 @@
         "TDD-Theory.pdf \u00b7 p.2"
       ],
       "recall_at_5": true,
-      "precision_at_5": 0.16666666666666666,
-      "seconds": 0.08
+      "precision_at_5": 0.3333333333333333,
+      "seconds": 0.07
     },
     {
       "case": "V7",
@@ -462,7 +462,7 @@
       "turn": 1,
       "mode": "retrieval-only",
       "question": "what reference format am I supposed to use in Zotero",
-      "gold_source": "Zotero tutorial PDF (used in Sprint 3's own ingestion baseline)",
+      "gold_source": "\"Citation & Bibliography  with Zotero.pdf\" (the Zotero tutorial PDF, used in Sprint 3's own ingestion baseline)",
       "retrieved": [
         "Citation & Bibliography  with Zotero.pdf \u00b7 p.2",
         "Citation & Bibliography  with Zotero.pdf \u00b7 p.7",
@@ -470,8 +470,8 @@
         "Citation & Bibliography  with Zotero.pdf \u00b7 p.9",
         "Citation & Bibliography  with Zotero.pdf \u00b7 p.11"
       ],
-      "recall_at_5": false,
-      "precision_at_5": 0.0,
+      "recall_at_5": true,
+      "precision_at_5": 1.0,
       "seconds": 0.04
     },
     {
@@ -509,7 +509,7 @@
       ],
       "recall_at_5": null,
       "precision_at_5": null,
-      "seconds": 0.05
+      "seconds": 0.04
     }
   ]
 }
