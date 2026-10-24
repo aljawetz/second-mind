@@ -993,6 +993,12 @@ SPRINT7_EXTRA = [
 # (checked in Canvas on 2026-10-18). Fixed here, not in HELDOUT_CASES, so the
 # earlier held-out results still read against the gold they were graded on.
 SPRINT7_GOLD_FIXES = {
+    # Answer key names that did not match the real file names, so a search
+    # that found the right file was scored as a miss. Only the names change.
+    # Variants (V6, V7) copy these from their base question.
+    "K4": {"gold_source": '"TDD Primer.pdf" (required reading for the "L1 - TDD Lab" assignment)'},
+    # The double space is in the real Canvas file name.
+    "H13": {"gold_source": '"Citation & Bibliography  with Zotero.pdf" (the Zotero tutorial PDF, used in Sprint 3\'s own ingestion baseline)'},
     "H15": {
         "kind": "course_fact",
         "gold_source": "Sprint 3 Deliverable - Technical Feasibility and Baseline",

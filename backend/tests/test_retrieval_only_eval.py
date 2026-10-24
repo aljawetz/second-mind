@@ -382,3 +382,16 @@ def test_sample_course_search_finds_the_three_real_files(eval_mod, tmp_path):
     assert "office-hours.txt" in by_id["S3"]["retrieved"][0]
     assert by_id["S4"]["recall_at_5"] is False
     assert all("animals.txt" not in label for label in by_id["S4"]["retrieved"])
+
+
+def test_fixed_answer_keys_match_real_file_names():
+    ev = _load_eval()
+    recall_at_5, sprint7_cases = ev.recall_at_5, ev.sprint7_cases
+
+    cases = {c["id"]: c for c in sprint7_cases()}
+    zotero = [["Citation & Bibliography  with Zotero.pdf · p.9"]]
+    for case_id in ("H13", "V7"):
+        assert recall_at_5(cases[case_id]["gold_source"], zotero) is True
+    primer = [["TDD Primer.pdf · p.1"]]
+    for case_id in ("K4", "V6"):
+        assert recall_at_5(cases[case_id]["gold_source"], primer) is True
