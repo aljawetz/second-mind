@@ -25,8 +25,10 @@ Not a pytest test: the answering modes make real, billed OpenAI calls against
 the real local index (~/.secondmind/index.lancedb). --retrieval-only does
 not. Run from backend/:
 
-    uv run python3 scripts/ask_modes_eval.py [--set first|heldout|sprint7] [--only A,B,C,D] [--out PATH]
+    uv run python3 scripts/ask_modes_eval.py [--set first|heldout|sprint7|sample] [--only A,B,C,D] [--out PATH]
     uv run python3 scripts/ask_modes_eval.py --set sprint7 --retrieval-only --out PATH
+    uv run python3 scripts/make_sample_index.py --out /tmp/sample.lancedb
+    uv run python3 scripts/ask_modes_eval.py --set sample --retrieval-only --index /tmp/sample.lancedb --out PATH
 """
 
 import argparse
@@ -54,6 +56,7 @@ COURSE_NAMES = {
     55710: "18-654 Software Testing & Operations",
     55016: "18-658 Software Requirements and Interaction Design",
     56350: "Advanced AI for Industry & Society",
+    1: "Sample course",
 }
 DEFAULT_COURSE = 55710
 MODEL = providers.OPENAI.model  # costs and the gpt-4o judge assume OpenAI, whatever the app is set to
@@ -1012,6 +1015,83 @@ SPRINT7_GOLD_FIXES = {
 }
 
 
+# A made-up course for the search-only proof run. The pages live in
+# SAMPLE_PAGES and are written by scripts/make_sample_index.py. Nothing
+# here is from a real course. S4 names a file that is not in the index,
+# so a correct search scores a miss on it.
+SAMPLE_COURSE = 1
+
+SAMPLE_PAGES = [
+    {
+        "source": "exam-rules.txt",
+        "item_id": "file:exam",
+        "page": 1,
+        "text": "The final exam is worth 20 percent of the course grade and is held in week 15.",
+    },
+    {
+        "source": "team-rules.txt",
+        "item_id": "file:team",
+        "page": 1,
+        "text": "A project team may include at most four students. Teams of five are not allowed.",
+    },
+    {
+        "source": "office-hours.txt",
+        "item_id": "file:hours",
+        "page": 1,
+        "text": "Staff office hours are Thursday from 3pm to 4pm in room 210.",
+    },
+]
+
+SAMPLE_CASES = [
+    {
+        "id": "S1",
+        "course": SAMPLE_COURSE,
+        "kind": "course_fact",
+        "turns": ["How much is the final exam worth?"],
+        "gold_source": "exam-rules.txt",
+        "gold_answer": "20 percent of the course grade",
+        "gold_confidence": "V",
+    },
+    {
+        "id": "S2",
+        "course": SAMPLE_COURSE,
+        "kind": "course_fact",
+        "turns": ["How many students can be on a project team?"],
+        "gold_source": "team-rules.txt",
+        "gold_answer": "at most four students",
+        "gold_confidence": "V",
+    },
+    {
+        "id": "S3",
+        "course": SAMPLE_COURSE,
+        "kind": "course_fact",
+        "turns": ["When are staff office hours?"],
+        "gold_source": "office-hours.txt",
+        "gold_answer": "Thursday from 3pm to 4pm in room 210",
+        "gold_confidence": "V",
+    },
+    {
+        "id": "S4",
+        "course": SAMPLE_COURSE,
+        "kind": "course_fact",
+        "turns": ["Which laboratory animal is required for the field trip?"],
+        "gold_source": "animals.txt",
+        "gold_answer": "This file is not in the sample index, so search should miss it.",
+        "gold_confidence": "V",
+    },
+]
+
+
+def cases_for(name: str) -> list[dict]:
+    if name == "heldout":
+        return HELDOUT_CASES
+    if name == "sprint7":
+        return sprint7_cases()
+    if name == "sample":
+        return SAMPLE_CASES
+    return CASES
+
+
 def sprint7_cases() -> list[dict]:
     by_id = {c["id"]: {**c, **SPRINT7_GOLD_FIXES.get(c["id"], {})} for c in CASES + HELDOUT_CASES}
     base = [by_id[i] for i in SPRINT7_BASE_IDS]
@@ -1257,11 +1337,11 @@ def run_retrieval_only(args) -> dict:
     """CLI entry for --retrieval-only. Reads the local LanceDB index, writes
     per-question rows plus aggregate metrics to --out, and prints the table.
     Does not construct an API client."""
-    cases = {"first": CASES, "heldout": HELDOUT_CASES}.get(args.set) or sprint7_cases()
+    cases = cases_for(args.set)
     wanted = set(filter(None, args.cases.split(",")))
     if wanted:
         cases = [c for c in cases if c["id"] in wanted]
-    db_path = SM_HOME / "index.lancedb"
+    db_path = Path(args.index) if getattr(args, "index", "") else SM_HOME / "index.lancedb"
 
     def index_for(course_id):
         return indexing.load_index(db_path, f"course_{course_id}")
@@ -1324,11 +1404,16 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", default="A,B,C")
     parser.add_argument("--cases", default="", help="comma-separated case ids; default all")
-    parser.add_argument("--set", default="first", choices=["first", "heldout", "sprint7"])
+    parser.add_argument("--set", default="first", choices=["first", "heldout", "sprint7", "sample"])
     parser.add_argument(
         "--retrieval-only",
         action="store_true",
         help="score search only (recall@5 and precision@5): no model call and no API key",
+    )
+    parser.add_argument(
+        "--index",
+        default="",
+        help="for --retrieval-only, LanceDB directory to search (default: ~/.secondmind/index.lancedb)",
     )
     parser.add_argument(
         "--out",
@@ -1346,7 +1431,7 @@ def main():
     wanted = set(filter(None, args.cases.split(",")))
     judge_client = None if args.no_judge else providers.openai_client(providers.OPENAI)
 
-    cases = {"first": CASES, "heldout": HELDOUT_CASES}.get(args.set) or sprint7_cases()
+    cases = cases_for(args.set)
     indexes = {}
     results = []
     for case in cases:
