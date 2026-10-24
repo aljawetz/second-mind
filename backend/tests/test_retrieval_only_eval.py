@@ -281,3 +281,104 @@ def test_cli_writes_results_and_does_not_open_an_api_client(eval_mod, index, tmp
     assert "| F2.1 | yes | 100% |" in printed
     assert "| 1 | 100% | 100% |" in printed
     assert "Sprint 7 shipped chat baseline: recall@5 73%, precision@5 22%." in printed
+
+
+def test_oracle_retriever_scores_perfect_recall_and_precision(eval_mod, index):
+    """A searcher that always hands back the expected source scores 100%."""
+    expected = {case["turns"][0]: case["gold_source"] for case in eval_mod.SAMPLE_CASES}
+
+    class Oracle:
+        def __init__(self, _index):
+            pass
+
+        def retrieve(self, query):
+            return [_node(expected[query], "the page the question is about")]
+
+    report = eval_mod.evaluate_retrieval(eval_mod.SAMPLE_CASES, lambda _course: index, retriever_for=Oracle)
+
+    assert report["metrics"]["recall_at_5"] == 1.0
+    assert report["metrics"]["precision_at_5"] == 1.0
+    assert report["metrics"]["n_recall"] == len(eval_mod.SAMPLE_CASES)
+    assert all(row["recall_at_5"] is True and row["precision_at_5"] == 1.0 for row in report["results"])
+
+
+def test_empty_retriever_scores_zero_recall(eval_mod, index, capsys):
+    """A searcher that returns nothing scores 0% recall. Precision stays
+    blank: the Sprint 7 definition has no share to take when a search
+    returns no sources."""
+
+    class Empty:
+        def __init__(self, _index):
+            pass
+
+        def retrieve(self, _query):
+            return []
+
+    report = eval_mod.evaluate_retrieval(eval_mod.SAMPLE_CASES, lambda _course: index, retriever_for=Empty)
+
+    assert report["metrics"]["recall_at_5"] == 0.0
+    assert report["metrics"]["precision_at_5"] is None
+    assert report["metrics"]["n_recall"] == len(eval_mod.SAMPLE_CASES)
+    assert report["metrics"]["n_precision"] == 0
+    assert all(row["recall_at_5"] is False and row["retrieved"] == [] for row in report["results"])
+
+    report["set"] = "sample"
+    eval_mod.print_retrieval_report(report)
+    assert "| 4 | 0% | n/a |" in capsys.readouterr().out
+
+
+def test_cli_records_the_sample_set_and_index_path(eval_mod, index, tmp_path, monkeypatch):
+    monkeypatch.setattr(eval_mod.indexing, "load_index", lambda _path, _table: index)
+    monkeypatch.setattr(eval_mod.providers, "openai_client", lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("api")))
+    out = tmp_path / "out.json"
+    index_path = tmp_path / "sample.lancedb"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ask_modes_eval.py",
+            "--set",
+            "sample",
+            "--retrieval-only",
+            "--index",
+            str(index_path),
+            "--out",
+            str(out),
+        ],
+    )
+    eval_mod.main()
+    report = json.loads(out.read_text())
+    assert report["set"] == "sample"
+    assert report["index"] == str(index_path)
+    assert [row["case"] for row in report["results"]] == ["S1", "S2", "S3", "S4"]
+
+
+MODEL_ONNX = Path(__file__).resolve().parent.parent / "models" / "bge-small-en-v1.5-onnx" / "model.onnx"
+
+
+def _load_builder():
+    path = Path(__file__).resolve().parent.parent / "scripts" / "make_sample_index.py"
+    spec = importlib.util.spec_from_file_location("make_sample_index", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.skipif(not MODEL_ONNX.exists(), reason="run scripts/convert_embedding_model.py first")
+def test_sample_course_search_finds_the_three_real_files(eval_mod, tmp_path):
+    db = _load_builder().build_sample_index(tmp_path / "index.lancedb")
+
+    def index_for(course_id):
+        return indexing.load_index(db, f"course_{course_id}")
+
+    report = eval_mod.evaluate_retrieval(eval_mod.SAMPLE_CASES, index_for)
+    by_id = {row["case"]: row for row in report["results"]}
+
+    assert by_id["S1"]["recall_at_5"] is True
+    assert "exam-rules.txt" in by_id["S1"]["retrieved"][0]
+    assert by_id["S2"]["recall_at_5"] is True
+    assert "team-rules.txt" in by_id["S2"]["retrieved"][0]
+    assert by_id["S3"]["recall_at_5"] is True
+    assert "office-hours.txt" in by_id["S3"]["retrieved"][0]
+    assert by_id["S4"]["recall_at_5"] is False
+    assert all("animals.txt" not in label for label in by_id["S4"]["retrieved"])
