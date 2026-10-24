@@ -1,0 +1,76 @@
+{
+  "mode": "retrieval-only",
+  "set": "sample",
+  "index": "../docs/evaluations/2026-10-sprint8/proof/sample.lancedb",
+  "metrics": {
+    "n": 4,
+    "n_recall": 4,
+    "n_precision": 3,
+    "recall_at_5": 0.75,
+    "precision_at_5": 1.0
+  },
+  "results": [
+    {
+      "case": "S1",
+      "course": 1,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "mode": "retrieval-only",
+      "question": "How much is the final exam worth?",
+      "gold_source": "exam-rules.txt",
+      "retrieved": [
+        "exam-rules.txt \u00b7 p.1"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 1.0,
+      "seconds": 0.03
+    },
+    {
+      "case": "S2",
+      "course": 1,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "mode": "retrieval-only",
+      "question": "How many students can be on a project team?",
+      "gold_source": "team-rules.txt",
+      "retrieved": [
+        "team-rules.txt \u00b7 p.1"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 1.0,
+      "seconds": 0.03
+    },
+    {
+      "case": "S3",
+      "course": 1,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "mode": "retrieval-only",
+      "question": "When are staff office hours?",
+      "gold_source": "office-hours.txt",
+      "retrieved": [
+        "office-hours.txt \u00b7 p.1"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 1.0,
+      "seconds": 0.03
+    },
+    {
+      "case": "S4",
+      "course": 1,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "mode": "retrieval-only",
+      "question": "Which laboratory animal is required for the field trip?",
+      "gold_source": "animals.txt",
+      "retrieved": [],
+      "recall_at_5": false,
+      "precision_at_5": null,
+      "seconds": 0.03
+    }
+  ]
+}
