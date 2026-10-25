@@ -72,10 +72,16 @@ RRF_K = 60
 # The reranker score is a 0 to 1 sigmoid, comparable across courses, so it
 # is the one place a cutoff applies to keyword hits too. A question with
 # nothing above the cutoff returns no results, which is the honest answer
-# for something the course never covered. See RERANK_MIN_SCORE's tuning
-# note in docs and the PR: chosen on the sprint7 eval set itself.
+# for something the course never covered.
+#
+# RERANK_MIN_SCORE was picked on the same sprint7 eval set it is measured
+# on, so treat it as a first guess, not a calibrated value. With the
+# MiniLM reranker, the unanswerable question (V9) topped out at 0.015 and
+# 0.03 is the highest cutoff that keeps recall at its no-cutoff level
+# (0.05 loses a question). The margin is thin on both sides: about 2x above
+# V9, and one real answer (H16) scored 0.045. Revisit with held-out data.
 RERANK_CANDIDATES = 20
-RERANK_MIN_SCORE = 0.01
+RERANK_MIN_SCORE = 0.03
 
 _DEFAULT = object()
 
