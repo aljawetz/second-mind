@@ -1,6 +1,7 @@
 """Local cross-encoder reranker (Sprint 8).
 
-Scores each (question, chunk) pair together with BAAI/bge-reranker-base,
+Scores each (question, chunk) pair together with cross-encoder/ms-marco-MiniLM-L-6-v2
+(88MB, 6 layers),
 run with onnxruntime + tokenizers only, the same way embeddings.py runs
 bge-small: no torch, no network, no API key at query time.
 
@@ -23,7 +24,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-MODEL_DIR = Path(__file__).parent / "models" / "bge-reranker-base-onnx"
+MODEL_DIR = Path(__file__).parent / "models" / "ms-marco-MiniLM-L-6-v2-onnx"
 MAX_SEQ_LENGTH = 512  # the model's own tokenizer_config.json model_max_length
 BATCH_SIZE = 8
 
