@@ -14,6 +14,7 @@ from llama_index.core.schema import NodeRelationship, NodeWithScore, QueryBundle
 from llama_index.core.vector_stores.utils import metadata_dict_to_node
 
 import providers
+import reranker as reranker_module
 
 # Shown when grounded=False (design spec §7: "if indexed material does not
 # support an answer, Second Mind says so rather than falling back to open-domain
@@ -64,6 +65,19 @@ FTS_TOP_K = 10
 # compared. RRF_K = 60 is the usual value from the original RRF paper.
 VECTOR_CANDIDATES = 20
 RRF_K = 60
+
+# Sprint 8 PR 3: rank fusion picks a larger pool (RERANK_CANDIDATES), a
+# local cross-encoder (reranker.py) scores each one against the question,
+# and only the best similarity_top_k at or above RERANK_MIN_SCORE are kept.
+# The reranker score is a 0 to 1 sigmoid, comparable across courses, so it
+# is the one place a cutoff applies to keyword hits too. A question with
+# nothing above the cutoff returns no results, which is the honest answer
+# for something the course never covered. See RERANK_MIN_SCORE's tuning
+# note in docs and the PR: chosen on the sprint7 eval set itself.
+RERANK_CANDIDATES = 20
+RERANK_MIN_SCORE = 0.01
+
+_DEFAULT = object()
 
 
 def reciprocal_rank_fusion(ranked_lists: list[list[NodeWithScore]], k: int = RRF_K, top_n: int = 5) -> list[NodeWithScore]:
@@ -124,12 +138,29 @@ class HybridRetriever(BaseRetriever):
 
     Sprint 8: the two lists are now merged by rank with reciprocal rank
     fusion (see reciprocal_rank_fusion) and cut to similarity_top_k. Each
-    node keeps its own original score; only the order comes from fusion."""
+    node keeps its own original score; only the order comes from fusion.
 
-    def __init__(self, index, similarity_top_k: int = 5, similarity_cutoff: float = SIMILARITY_CUTOFF):
+    Sprint 8 PR 3: when a reranker is available, fusion keeps
+    rerank_candidates results instead, the reranker scores each one, and
+    the top similarity_top_k with a rerank score of at least
+    rerank_min_score are returned, each with its rerank score (0 to 1) as
+    its score. reranker=None, or a missing model, means fusion only."""
+
+    def __init__(
+        self,
+        index,
+        similarity_top_k: int = 5,
+        similarity_cutoff: float = SIMILARITY_CUTOFF,
+        reranker=_DEFAULT,
+        rerank_candidates: int = RERANK_CANDIDATES,
+        rerank_min_score: float = RERANK_MIN_SCORE,
+    ):
         self._index = index
         self._similarity_top_k = similarity_top_k
         self._similarity_cutoff = similarity_cutoff
+        self._reranker = reranker_module.load_reranker() if reranker is _DEFAULT else reranker
+        self._rerank_candidates = rerank_candidates
+        self._rerank_min_score = rerank_min_score
         super().__init__()
 
     def _retrieve(self, query_bundle: QueryBundle) -> list[NodeWithScore]:
@@ -143,7 +174,26 @@ class HybridRetriever(BaseRetriever):
             for _, row in fts_df.iterrows()
         ]
 
-        return reciprocal_rank_fusion([vector_nodes, fts_nodes], k=RRF_K, top_n=self._similarity_top_k)
+        if self._reranker is None:
+            return reciprocal_rank_fusion([vector_nodes, fts_nodes], k=RRF_K, top_n=self._similarity_top_k)
+        pool = reciprocal_rank_fusion([vector_nodes, fts_nodes], k=RRF_K, top_n=self._rerank_candidates)
+        return rerank(self._reranker, query_bundle.query_str, pool, self._similarity_top_k, self._rerank_min_score)
+
+
+def rerank(reranker, query: str, nodes: list[NodeWithScore], top_n: int, min_score: float) -> list[NodeWithScore]:
+    """Order nodes by reranker score, drop those under min_score, keep
+    top_n. Ties keep the incoming (fusion) order. If the reranker fails at
+    query time, fall back to the incoming order cut to top_n."""
+    if not nodes:
+        return []
+    try:
+        scores = reranker.score(query, [n.node.get_content() for n in nodes])
+    except Exception:
+        reranker_module.logger.exception("Reranker failed; using rank fusion order")
+        return nodes[:top_n]
+    order = sorted(range(len(nodes)), key=lambda i: -scores[i])
+    kept = [NodeWithScore(node=nodes[i].node, score=float(scores[i])) for i in order if scores[i] >= min_score]
+    return kept[:top_n]
 
 
 def build_query_engine(index, streaming: bool = True) -> CitationQueryEngine:
