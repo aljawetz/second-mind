@@ -331,6 +331,14 @@ def get_session_detail(sm_home: Path, course_id: int, session_id: str) -> dict |
     if transcript_path.exists():
         segments = json.loads(transcript_path.read_text(encoding="utf-8"))
         detail["transcript"] = " ".join(s["text"].strip() for s in segments)
+    elif status in ("recording", "processing"):
+        # No final transcript yet: whatever slices are already transcribed,
+        # so the UI can show the lecture as it is being recorded.
+        try:
+            segments = _stitch_segments(session_dir)
+        except RuntimeError:  # no slice transcribed yet
+            segments = []
+        detail["transcript_so_far"] = " ".join(s["text"].strip() for s in segments).strip()
     summary_path = session_dir / "summary.md"
     if summary_path.exists():
         detail["summary"] = summary_path.read_text(encoding="utf-8")
