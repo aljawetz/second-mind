@@ -7,7 +7,9 @@
 // same stream (a few ms of gap), not by asking one recorder for timeslices:
 // those later pieces would not be playable on their own.
 
-export const SLICE_SECONDS = 60;
+// 30s slices show the text in about half the time of 60s ones, and in
+// benchmarks word accuracy from 15s to 60s slices stayed within run-to-run noise.
+export const SLICE_SECONDS = 30;
 const UPLOAD_ATTEMPTS = 3;
 
 type Upload = (index: number, slice: Blob) => Promise<void>;
