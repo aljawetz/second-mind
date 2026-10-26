@@ -26,6 +26,7 @@ import sys
 import threading
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
 
@@ -152,12 +153,56 @@ def save_notes(session_id: str, text: str) -> None:
     (info["dir"] / "notes.md").write_text(text, encoding="utf-8")
 
 
-def stop_session(session_id: str, audio_bytes: bytes, db_path: Path) -> dict:
+# One worker for every session: chunks transcribe in the order they arrive,
+# and two classes never compete for the CPU.
+_TRANSCRIBER = ThreadPoolExecutor(max_workers=1, thread_name_prefix="transcribe")
+
+
+def add_chunk(session_id: str, index: int, audio_bytes: bytes) -> None:
+    """A slice of the lecture, uploaded while it is still being recorded. It
+    is transcribed in the background, so that stopping only waits for the
+    last slice. Uploading the same index again replaces it."""
     info = _SESSIONS[session_id]
-    audio_path = info["dir"] / "audio.m4a"
+    chunks_dir = info["dir"] / "chunks"
+    chunks_dir.mkdir(exist_ok=True)
+    audio_path = chunks_dir / f"chunk-{index:04d}.m4a"
     audio_path.write_bytes(audio_bytes)
+    info.setdefault("chunks", {})[index] = _TRANSCRIBER.submit(_transcribe_chunk, session_id, index, audio_path)
+
+
+def _transcribe_chunk(session_id: str, index: int, audio_path: Path) -> None:
+    started = time.perf_counter()
+    raw_segments, transcribe_info = _get_model().transcribe(str(audio_path), **TRANSCRIBE_OPTIONS)
+    # transcribe() is lazy: the work happens while this loop consumes it.
+    segments = [{"start": s.start, "end": s.end, "text": s.text} for s in raw_segments]
+    payload = {"duration": transcribe_info.duration, "segments": segments}
+    audio_path.with_suffix(".json").write_text(json.dumps(payload), encoding="utf-8")
+    audio_path.unlink(missing_ok=True)  # data-model.md §1 — raw audio not kept
+    _log_stage(session_id, f"transcribe chunk {index}", started, f" for {transcribe_info.duration:.0f}s of audio")
+
+
+def _stitch_segments(session_dir: Path) -> list[dict]:
+    """Every chunk's segments on one timeline: each chunk starts where the
+    previous one's audio ended."""
+    chunk_files = sorted((session_dir / "chunks").glob("chunk-*.json"))
+    if not chunk_files:
+        raise RuntimeError("no audio was recorded")
+    segments, offset = [], 0.0
+    for chunk_file in chunk_files:
+        chunk = json.loads(chunk_file.read_text(encoding="utf-8"))
+        segments += [{**s, "start": s["start"] + offset, "end": s["end"] + offset} for s in chunk["segments"]]
+        offset += chunk["duration"]
+    return segments
+
+
+def stop_session(session_id: str, audio_bytes: bytes, db_path: Path) -> dict:
+    """audio_bytes is the last slice of the recording (empty if the client
+    already uploaded everything through add_chunk)."""
+    info = _SESSIONS[session_id]
+    if audio_bytes:
+        add_chunk(session_id, max(info.get("chunks", {}), default=-1) + 1, audio_bytes)
     info["status"] = "processing"
-    threading.Thread(target=_process_session, args=(session_id, audio_path, db_path), daemon=True).start()
+    threading.Thread(target=_process_session, args=(session_id, db_path, time.perf_counter()), daemon=True).start()
     return {"session_id": session_id, "status": "processing"}
 
 
@@ -165,18 +210,15 @@ def _log_stage(session_id: str, stage: str, started: float, detail: str = "") ->
     print(f"[sessions] {session_id} {stage}: {time.perf_counter() - started:.1f}s{detail}", file=sys.stderr, flush=True)
 
 
-def _process_session(session_id: str, audio_path: Path, db_path: Path) -> None:
+def _process_session(session_id: str, db_path: Path, stopped_at: float) -> None:
     info = _SESSIONS[session_id]
     try:
-        started = time.perf_counter()
-        raw_segments, transcribe_info = _get_model().transcribe(str(audio_path), **TRANSCRIBE_OPTIONS)
-        # transcribe() is lazy: the work happens while this loop consumes it.
-        segments = [{"start": s.start, "end": s.end, "text": s.text} for s in raw_segments]
-        _log_stage(session_id, "transcribe", started, f" for {transcribe_info.duration:.0f}s of audio")
+        for chunk in info.get("chunks", {}).values():
+            chunk.result()  # re-raises a chunk's transcription failure
+        _log_stage(session_id, "wait for transcription after stop", stopped_at)
+        segments = _stitch_segments(info["dir"])
         transcript_text = " ".join(s["text"].strip() for s in segments).strip()
         (info["dir"] / "transcript.json").write_text(json.dumps(segments, indent=2), encoding="utf-8")
-
-        audio_path.unlink(missing_ok=True)  # data-model.md §1 — raw audio not kept
 
         started = time.perf_counter()
         summary = _enhance_notes(transcript_text) if transcript_text else ""
@@ -193,6 +235,7 @@ def _process_session(session_id: str, audio_path: Path, db_path: Path) -> None:
             indexing.add_nodes(nodes, db_path, f"course_{info['course_id']}")
             _log_stage(session_id, "index", started, f" for {len(nodes)} chunks")
 
+        _log_stage(session_id, "total after stop", stopped_at)
         info["status"] = "done"
         info["transcript"] = transcript_text
         info["summary"] = summary
