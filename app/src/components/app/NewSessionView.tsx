@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { getSessionDetail, saveSessionNotes, startSession, stopSession, type SessionDetail } from "../../sidecar";
+import { ChunkedRecorder } from "../../chunkedRecorder";
+import { getSessionDetail, saveSessionNotes, startSession, stopSession, uploadChunk, type SessionDetail } from "../../sidecar";
 import SessionContent from "./SessionContent";
 
 type Phase = "idle" | "starting" | "recording" | "processing" | "done" | "error";
@@ -28,19 +29,16 @@ export default function NewSessionView({
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
 
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recorderRef = useRef<ChunkedRecorder | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     return () => {
       // Leaving the page mid-recording stops the mic, but doesn't stop the
       // session server-side — there's no "abandon" endpoint (out of scope
-      // for this pass); the recording is simply lost if not stopped first.
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      if (timerRef.current) clearInterval(timerRef.current);
+      // for this pass). Slices already uploaded stay on the backend; the
+      // slice being recorded is lost.
+      recorderRef.current?.dispose();
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, []);
@@ -55,18 +53,12 @@ export default function NewSessionView({
       onSessionCreated();
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const recorder = new MediaRecorder(stream, MediaRecorder.isTypeSupported(MIME_TYPE) ? { mimeType: MIME_TYPE } : undefined);
-      chunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
+      const recorder = new ChunkedRecorder(stream, MIME_TYPE, (index, slice) => uploadChunk(session_id, index, slice), setElapsed);
       recorder.start();
       recorderRef.current = recorder;
 
       setElapsed(0);
       setPaused(false);
-      timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
       setPhase("recording");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't start recording — check microphone permission.");
@@ -79,43 +71,36 @@ export default function NewSessionView({
     if (!recorder) return;
     if (paused) {
       recorder.resume();
-      timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
       setPaused(false);
     } else {
       recorder.pause();
-      if (timerRef.current) clearInterval(timerRef.current);
       setPaused(true);
     }
   }
 
-  function handleStop() {
+  async function handleStop() {
     const recorder = recorderRef.current;
     if (!recorder || !sessionId) return;
-    if (timerRef.current) clearInterval(timerRef.current);
     setPaused(false);
     setPhase("processing");
 
-    recorder.onstop = async () => {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      const blob = new Blob(chunksRef.current, { type: MIME_TYPE });
-      try {
-        await stopSession(sessionId, blob);
-        pollRef.current = setInterval(async () => {
-          const detail = await getSessionDetail(courseId, sessionId);
-          if (detail.status === "done" || detail.status === "error") {
-            if (pollRef.current) clearInterval(pollRef.current);
-            setResult(detail);
-            setError(detail.error ?? "Something went wrong processing the recording.");
-            setPhase(detail.status);
-            onSessionCreated();
-          }
-        }, 2000);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong processing the recording.");
-        setPhase("error");
-      }
-    };
-    recorder.stop();
+    try {
+      const lastSlice = await recorder.stop();
+      await stopSession(sessionId, lastSlice);
+      pollRef.current = setInterval(async () => {
+        const detail = await getSessionDetail(courseId, sessionId);
+        if (detail.status === "done" || detail.status === "error") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setResult(detail);
+          setError(detail.error ?? "Something went wrong processing the recording.");
+          setPhase(detail.status);
+          onSessionCreated();
+        }
+      }, 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong processing the recording.");
+      setPhase("error");
+    }
   }
 
   function handleNotesBlur() {
