@@ -11,6 +11,9 @@ type Phase = "idle" | "starting" | "recording" | "processing" | "done" | "error"
 // transcoding needed before it reaches the backend.
 const MIME_TYPE = "audio/mp4";
 
+// How often to ask the backend for the slices transcribed so far.
+const LIVE_POLL_MS = 4000;
+
 export default function NewSessionView({
   courseId,
   onBack,
@@ -28,6 +31,7 @@ export default function NewSessionView({
   const [result, setResult] = useState<SessionDetail | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState("");
 
   const recorderRef = useRef<ChunkedRecorder | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -42,6 +46,21 @@ export default function NewSessionView({
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, []);
+
+  // Show the lecture as the slices get transcribed. A failed poll is not
+  // worth interrupting a recording for: the next tick tries again.
+  useEffect(() => {
+    if (!sessionId || (phase !== "recording" && phase !== "processing")) return;
+    const timer = setInterval(async () => {
+      try {
+        const detail = await getSessionDetail(courseId, sessionId);
+        if (detail.transcript_so_far) setLiveTranscript(detail.transcript_so_far);
+      } catch {
+        /* retry on the next tick */
+      }
+    }, LIVE_POLL_MS);
+    return () => clearInterval(timer);
+  }, [courseId, sessionId, phase]);
 
   async function handleStart() {
     setPhase("starting");
@@ -151,6 +170,10 @@ export default function NewSessionView({
             ) : (
               <p className="qa-thinking">Transcribing and generating notes…</p>
             )}
+            <h3>Live transcript</h3>
+            <p className="live-transcript">
+              {liveTranscript || "The transcript appears here about a minute after you start talking."}
+            </p>
           </div>
           <div className="panel">
             <h3>Notes</h3>
