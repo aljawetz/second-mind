@@ -232,3 +232,33 @@ def test_add_chunk_leaves_no_partial_file_and_finalize_ignores_a_torn_upload(tmp
     sessions.finalize_session(tmp_path, 1, "s1", tmp_path / "db")
 
     assert sessions.get_session_detail(tmp_path, 1, "s1")["transcript"] == "hello"
+
+
+class _FakeLLM:
+    def __init__(self):
+        self.prompts = []
+
+    def complete(self, prompt):
+        self.prompts.append(prompt)
+        return f"notes {len(self.prompts)}"
+
+
+def test_short_transcript_is_summarized_in_one_call(monkeypatch):
+    llm = _FakeLLM()
+    monkeypatch.setattr(sessions.providers, "llama_llm", lambda: llm)
+    assert sessions._enhance_notes("a short lecture") == "notes 1"
+    assert len(llm.prompts) == 1
+
+
+def test_long_transcript_is_summarized_in_sections_in_order(monkeypatch):
+    monkeypatch.setattr(sessions, "SECTION_WORDS", 10)
+    monkeypatch.setattr(sessions, "SECTION_WORKERS", 1)  # deterministic call order
+    llm = _FakeLLM()
+    monkeypatch.setattr(sessions.providers, "llama_llm", lambda: llm)
+    words = [f"w{i}" for i in range(25)]
+    out = sessions._enhance_notes(" ".join(words))
+    assert len(llm.prompts) == 3
+    assert out == "notes 1\n\nnotes 2\n\nnotes 3"
+    # every word reaches exactly one section
+    for w in words:
+        assert sum(f" {w} " in p or f" {w}\n" in p or f"\n{w} " in p for p in llm.prompts) == 1

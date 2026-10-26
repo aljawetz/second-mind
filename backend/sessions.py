@@ -252,9 +252,29 @@ def _process_session(session_id: str, db_path: Path, stopped_at: float) -> None:
         info["error"] = str(e)
 
 
+# A summary call grows with the transcript, and the LLM client gives up (and
+# retries from scratch) after 60s. About 3000 words is ~20 minutes of speech,
+# so each call stays short however long the class was.
+SECTION_WORDS = 3000
+SECTION_WORKERS = 4
+
+
+def _split_sections(transcript_text: str) -> list[str]:
+    words = transcript_text.split()
+    return [" ".join(words[i : i + SECTION_WORDS]) for i in range(0, len(words), SECTION_WORDS)]
+
+
 def _enhance_notes(transcript_text: str) -> str:
     llm = providers.llama_llm()
-    return str(llm.complete(SUMMARY_TEMPLATE.format(transcript=transcript_text)))
+
+    def summarize(text: str) -> str:
+        return str(llm.complete(SUMMARY_TEMPLATE.format(transcript=text)))
+
+    sections = _split_sections(transcript_text)
+    if len(sections) <= 1:
+        return summarize(transcript_text)
+    with ThreadPoolExecutor(max_workers=SECTION_WORKERS) as pool:
+        return "\n\n".join(part.strip() for part in pool.map(summarize, sections))
 
 
 def _status_from_disk(session_dir: Path) -> str:
