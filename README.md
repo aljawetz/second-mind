@@ -2,7 +2,6 @@
 
 [![CI](https://github.com/aljawetz/second-mind/actions/workflows/ci.yml/badge.svg)](https://github.com/aljawetz/second-mind/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/aljawetz/second-mind?utm_source=oss&utm_medium=github&utm_campaign=aljawetz%2Fsecond-mind&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
 **An open-source study assistant for your Canvas courses.**
 
