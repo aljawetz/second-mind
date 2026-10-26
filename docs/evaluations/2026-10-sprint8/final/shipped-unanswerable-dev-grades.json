@@ -1,0 +1,36 @@
+[
+  {
+    "case": "P14",
+    "course": 55710,
+    "kind": "not_in_course",
+    "gold_confidence": "V",
+    "variant_of": null,
+    "turn": 1,
+    "mode": "E",
+    "seconds": 1.83,
+    "cost": 0.00038564999999999997,
+    "recall_at_5": null,
+    "precision_at_5": null,
+    "correct": "good",
+    "citation_accuracy": 1.0,
+    "faithful": true,
+    "abstained_correctly": true
+  },
+  {
+    "case": "P15",
+    "course": 55016,
+    "kind": "not_in_course",
+    "gold_confidence": "V",
+    "variant_of": null,
+    "turn": 1,
+    "mode": "E",
+    "seconds": 1.06,
+    "cost": 0.00016305,
+    "recall_at_5": null,
+    "precision_at_5": null,
+    "correct": "good",
+    "citation_accuracy": 1.0,
+    "faithful": true,
+    "abstained_correctly": true
+  }
+]

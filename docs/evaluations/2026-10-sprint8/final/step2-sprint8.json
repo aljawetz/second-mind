@@ -1,0 +1,447 @@
+{
+  "mode": "retrieval-only",
+  "set": "sprint8",
+  "index": "/Users/arthurjawetz/second-mind-eval-index-2026-10-26",
+  "metrics": {
+    "n": 15,
+    "n_recall": 13,
+    "n_precision": 13,
+    "recall_at_5": 0.9230769230769231,
+    "precision_at_5": 0.3230769230769231,
+    "fact_labels": {
+      "n": 13,
+      "hits": 11,
+      "recall": 0.8461538461538461,
+      "n_precision": 13,
+      "precision_empty_skipped": 0.18461538461538465,
+      "precision_empty_as_zero": 0.18461538461538465,
+      "top1_hits": 9,
+      "mrr": 0.7564102564102565
+    },
+    "unanswerable": {
+      "n": 2,
+      "returned": 10,
+      "with_results": 2
+    }
+  },
+  "results": [
+    {
+      "case": "P1",
+      "course": 55710,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "do i lose points if my github profile doesn't have a photo?",
+      "query": "do i lose points if my github profile doesn't have a photo?",
+      "gold_source": "Syllabus \u2014 Deductions apply for failure to complete various chores",
+      "retrieved": [
+        "GitHub Credentials",
+        "GitHub Credentials",
+        "07 - InputSpaceDesign.pdf \u00b7 p.12",
+        "03 Unit Testing Principles.pdf \u00b7 p.2",
+        "03 Unit Testing Principles  - note taking version.pdf \u00b7 p.1"
+      ],
+      "recall_at_5": false,
+      "precision_at_5": 0.4,
+      "gold_facts": [
+        "recognizable headshot photo"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.04
+    },
+    {
+      "case": "P2",
+      "course": 55710,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "when do i need to turn in the docker swarm lab?",
+      "query": "when do i need to turn in the docker swarm lab?",
+      "gold_source": "Syllabus \u2014 Tentative Course Calendar",
+      "retrieved": [
+        "Syllabus",
+        "A3 - Docker Compose",
+        "A2 - Docker images",
+        "01 CourseInfoF26.pdf \u00b7 p.22",
+        "Project Intro F26.pdf \u00b7 p.3"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.2,
+      "gold_facts": [
+        "Lab 2 due (Sunday EOD)"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.03
+    },
+    {
+      "case": "P3",
+      "course": 55710,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "is there a book we can use to learn docker for this class?",
+      "query": "is there a book we can use to learn docker for this class?",
+      "gold_source": "Syllabus \u2014 Supplemental Materials",
+      "retrieved": [
+        "A2 - Docker images",
+        "Containerization in testing - note taking version.pdf \u00b7 p.14",
+        "01 CourseInfoF26.pdf \u00b7 p.22",
+        "Project Intro F26.pdf \u00b7 p.25",
+        "Syllabus"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.2,
+      "gold_facts": [
+        "Learn Docker in a Month of Lunches"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.03
+    },
+    {
+      "case": "P4",
+      "course": 55710,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "is there class on Monday Nov 2nd?",
+      "query": "is there class on Monday Nov 2nd?",
+      "gold_source": "Syllabus \u2014 Tentative Course Calendar",
+      "retrieved": [
+        "01 CourseInfoF26.pdf \u00b7 p.4",
+        "Syllabus",
+        "06 Isolating Components - Test Doubles.pdf \u00b7 p.6",
+        "SuperMutant Project - Description - Timeline - Deliverables",
+        "01 CourseInfoF26.pdf \u00b7 p.29"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.2,
+      "gold_facts": [
+        "NO CLASS (university travel)"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.03
+    },
+    {
+      "case": "P5",
+      "course": 55710,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "how should i name my jar file for lab 2?",
+      "query": "how should i name my jar file for lab 2?",
+      "gold_source": "File-Naming Conventions in Deliverables",
+      "retrieved": [
+        "File-Naming Conventions in Deliverables",
+        "File-Naming Conventions in Deliverables",
+        "Mockito Exercises and Prep",
+        "01 CourseInfoF26.pdf \u00b7 p.11",
+        "L0 - Unit Testing Warmup and Vocareum"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.4,
+      "gold_facts": [
+        "<FirstNameLastName>.jar"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.03
+    },
+    {
+      "case": "P6",
+      "course": 55710,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what happens to my grade if my own tests only cover 70% of the code on vocareum?",
+      "query": "what happens to my grade if my own tests only cover 70% of the code on vocareum?",
+      "gold_source": "How to use Vocareum",
+      "retrieved": [
+        "How to use Vocareum",
+        "How to use Vocareum",
+        "A0 - Unit Testing Warmup and Exercises",
+        "Midterm Coding Question (access only through Midterm Exam)",
+        "  L1 - TDD Lab - Getting Started with Test-Driven Development"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.4,
+      "gold_facts": [
+        "typically 80-90% line coverage",
+        "Below 80% coverage will give you a total score of 0"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.03
+    },
+    {
+      "case": "P7",
+      "course": 55710,
+      "kind": "concept_covered",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "if my tests get 100% branch coverage, do i automatically get 100% statement coverage too?",
+      "query": "if my tests get 100% branch coverage, do i automatically get 100% statement coverage too?",
+      "gold_source": "\"11 - StructuralTesting part 1.pdf\"",
+      "retrieved": [
+        "11 - StructuralTesting part 1.pdf \u00b7 p.32",
+        "11 - StructuralTesting part 1 - note taking version.pdf \u00b7 p.28",
+        "11 - StructuralTesting part 1 - note taking version.pdf \u00b7 p.30",
+        "11 - StructuralTesting part 1.pdf \u00b7 p.29",
+        "11 - StructuralTesting part 1.pdf \u00b7 p.30"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.6,
+      "gold_facts": [
+        "100% Branch coverage \u2192 100% Statement coverage"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.4,
+      "first_rank_by_fact": 1,
+      "seconds": 0.03
+    },
+    {
+      "case": "P8",
+      "course": 55710,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "can i just say the lab was too difficult in my lab report?",
+      "query": "can i just say the lab was too difficult in my lab report?",
+      "gold_source": "\"Lab reports best practices.pdf\"",
+      "retrieved": [
+        "01 CourseInfoF26.pdf \u00b7 p.27",
+        "Lab reports best practices.pdf \u00b7 p.2",
+        "  L1 - TDD Lab - Getting Started with Test-Driven Development",
+        "UT-Koskela-Part2.pdf \u00b7 p.60",
+        "File-Naming Conventions in Deliverables"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.2,
+      "gold_facts": [
+        "It was too difficult"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 2,
+      "seconds": 0.03
+    },
+    {
+      "case": "P9",
+      "course": 55710,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "can i have chatgpt clean up the writing in my lab reports?",
+      "query": "can i have chatgpt clean up the writing in my lab reports?",
+      "gold_source": "\"Lab reports best practices.pdf\"",
+      "retrieved": [
+        "Lab reports best practices.pdf \u00b7 p.1",
+        "06 Isolating Components - Test Doubles.pdf \u00b7 p.29",
+        "  L1 - TDD Lab - Getting Started with Test-Driven Development",
+        "UT-Koskela-Part2.pdf \u00b7 p.74",
+        "01 CourseInfoF26.pdf \u00b7 p.27"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.2,
+      "gold_facts": [
+        "Feel free to use ChatGPT to polish your report",
+        "Permitted with conditions"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.03
+    },
+    {
+      "case": "P10",
+      "course": 55016,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "can i join class over zoom if i'm sick?",
+      "query": "can i join class over zoom if i'm sick?",
+      "gold_source": "Syllabus \u2014 Course Sessions",
+      "retrieved": [
+        "Syllabus",
+        "Welcome to Software Requirements and Interaction Design (18-658)!",
+        "Task 2 Plan of Attack",
+        "Class Preparation",
+        "Class Preparation"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.2,
+      "gold_facts": [
+        "attend classes remotely via Zoom is permitted only when explicitly authorized"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.02
+    },
+    {
+      "case": "P11",
+      "course": 55016,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "how many think-aloud sessions should we run for task 4?",
+      "query": "how many think-aloud sessions should we run for task 4?",
+      "gold_source": "Task 4 Plan of Attack",
+      "retrieved": [
+        "Task 4 Plan of Attack",
+        "Task 4: Submitting Your Work",
+        "Task 4 Plan of Attack",
+        "Class Preparation",
+        "Task 4 Objectives"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.4,
+      "gold_facts": [
+        "Conduct about five Think-Aloud sessions"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.02
+    },
+    {
+      "case": "P12",
+      "course": 55016,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "how much of my grade is the jama lab?",
+      "query": "how much of my grade is the jama lab?",
+      "gold_source": "Syllabus \u2014 Grading Rubric",
+      "retrieved": [
+        "Syllabus",
+        "Jama Lab",
+        "Class Preparation",
+        "Jama Lab",
+        "Task 1: Submitting Your Work "
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.2,
+      "gold_facts": [
+        "Jama Lab | Individual | 5"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.02
+    },
+    {
+      "case": "P13",
+      "course": 56350,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "when do we need to finish our off-campus stakeholder interview by?",
+      "query": "when do we need to finish our off-campus stakeholder interview by?",
+      "gold_source": "Off-Campus Stakeholder Interview: Time Slot & Interviewee Details",
+      "retrieved": [
+        "Off-Campus Stakeholder Interview: Time Slot & Interviewee Details",
+        "Off-Campus Stakeholder Interview: Time Slot & Interviewee Details",
+        "Off-Campus Stakeholder Interview: Time Slot & Interviewee Details",
+        "BrainEEG Research Project",
+        "Sprint 7 Deliverable - User/Stakeholder and Impact Validation"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.6,
+      "gold_facts": [
+        "Interviews must be completed by October 31, 2026"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 3,
+      "seconds": 0.02
+    },
+    {
+      "case": "P14",
+      "course": 55710,
+      "kind": "not_in_course",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "can i ask for my midterm to be regraded?",
+      "query": "can i ask for my midterm to be regraded?",
+      "gold_source": null,
+      "retrieved": [
+        "Midterm Coding Question (access only through Midterm Exam)",
+        "Sample Midterm Coding Question (access through Sample Midterm only)",
+        "Midterm Exam- Requires Respondus LockDown Browser",
+        "Midterm Practice Questions - Requires Respondus LockDown Browser",
+        "Midterm Exam- Requires Respondus LockDown Browser"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": null,
+      "recall_by_fact": null,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.03
+    },
+    {
+      "case": "P15",
+      "course": 55016,
+      "kind": "not_in_course",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what's the late penalty for the jama lab?",
+      "query": "what's the late penalty for the jama lab?",
+      "gold_source": null,
+      "retrieved": [
+        "Jama Lab",
+        "Class Preparation",
+        "Jama Lab",
+        "Task 3: Submitting Your Work",
+        "Task 1 Plan of Attack"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": null,
+      "recall_by_fact": null,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.02
+    }
+  ]
+}

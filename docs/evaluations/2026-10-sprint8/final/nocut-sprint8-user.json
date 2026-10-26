@@ -1,0 +1,295 @@
+{
+  "mode": "retrieval-only",
+  "set": "sprint8-user",
+  "index": "/Users/arthurjawetz/second-mind-eval-index-2026-10-26",
+  "metrics": {
+    "n": 6,
+    "n_recall": 0,
+    "n_precision": 0,
+    "recall_at_5": null,
+    "precision_at_5": null,
+    "fact_labels": {
+      "n": 4,
+      "hits": 0,
+      "recall": 0.0,
+      "n_precision": 4,
+      "precision_empty_skipped": 0.0,
+      "precision_empty_as_zero": 0.0,
+      "top1_hits": 0,
+      "mrr": 0.0
+    },
+    "unanswerable": {
+      "n": 2,
+      "returned": 10,
+      "with_results": 2
+    },
+    "follow_ups": {
+      "as_typed": {
+        "n": 3,
+        "hits": 0,
+        "top1_hits": 0,
+        "mrr": 0.0
+      },
+      "rewritten": {
+        "n": 2,
+        "hits": 1,
+        "top1_hits": 0,
+        "mrr": 0.125
+      }
+    }
+  },
+  "results": [
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what do I need to do for next week?",
+      "query": "what do I need to do for next week?",
+      "gold_source": null,
+      "retrieved": [
+        "01 CourseInfoF26.pdf \u00b7 p.5",
+        "UT-Koskela-Part2.pdf \u00b7 p.39",
+        "07 - Spec-Based Testing Intro - note taking version.pdf \u00b7 p.9",
+        "07 - SpecBasedTestingIntro.pdf \u00b7 p.17",
+        "01 CourseInfoF26.pdf \u00b7 p.26"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Due Wed, Oct 28, 2026 at 3:00 PM PDT",
+        "Assignment 3 (Docker Compose) due - Super-Mutant Milestone 1: Test Plan (Sunday EOD)"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.24
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "what do I need to do for next week?",
+      "query": "what is due the week of october 26?",
+      "gold_source": null,
+      "retrieved": [
+        "A3 - Docker Compose",
+        "A2 - Docker images",
+        "Midterm Exam- Requires Respondus LockDown Browser",
+        "01 CourseInfoF26.pdf \u00b7 p.29",
+        "01 CourseInfoF26.pdf \u00b7 p.28"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Due Wed, Oct 28, 2026 at 3:00 PM PDT",
+        "Assignment 3 (Docker Compose) due - Super-Mutant Milestone 1: Test Plan (Sunday EOD)"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.25
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what assignments do I have for next week?",
+      "query": "what assignments do I have for next week?",
+      "gold_source": null,
+      "retrieved": [
+        "01 CourseInfoF26.pdf \u00b7 p.26",
+        "01 CourseInfoF26.pdf \u00b7 p.5",
+        "06 Isolating Components - Mockito.pdf \u00b7 p.37",
+        "Syllabus",
+        "01 CourseInfoF26.pdf \u00b7 p.31"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Due Wed, Oct 28, 2026 at 3:00 PM PDT",
+        "Assignment 3 (Docker Compose) due - Super-Mutant Milestone 1: Test Plan (Sunday EOD)"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.25
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "what assignments do I have for next week?",
+      "query": "which assignments are due the week of october 26?",
+      "gold_source": null,
+      "retrieved": [
+        "01 CourseInfoF26.pdf \u00b7 p.29",
+        "Syllabus",
+        "06 Isolating Components - Mockito.pdf \u00b7 p.37",
+        "Syllabus",
+        "01 CourseInfoF26.pdf \u00b7 p.28"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Due Wed, Oct 28, 2026 at 3:00 PM PDT",
+        "Assignment 3 (Docker Compose) due - Super-Mutant Milestone 1: Test Plan (Sunday EOD)"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 4,
+      "seconds": 0.26
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 3,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what do i need to do?",
+      "query": "what do i need to do?",
+      "gold_source": null,
+      "retrieved": [
+        "06 Isolating Components - Test Doubles.pdf \u00b7 p.39",
+        "06 Isolating Components - Test Doubles part 1 - note taking version.pdf \u00b7 p.30",
+        "06 Isolating Components - Test Doubles part 1 - note taking version.pdf \u00b7 p.5",
+        "06 Isolating Components - Test Doubles.pdf \u00b7 p.8",
+        "02 Testing Basics - note taking version.pdf \u00b7 p.13"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": null,
+      "recall_by_fact": null,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.08
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 4,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what do i need to study for this exam",
+      "query": "what do i need to study for this exam",
+      "gold_source": null,
+      "retrieved": [
+        "Midterm Practice Questions - Requires Respondus LockDown Browser",
+        "Midterm Exam- Requires Respondus LockDown Browser",
+        "Midterm Exam- Requires Respondus LockDown Browser",
+        "Midterm Coding Question (access only through Midterm Exam)",
+        "Midterm Coding Question (access only through Midterm Exam)"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Release practice final exam"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.48
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 4,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "what do i need to study for this exam",
+      "query": "what should i study for the final exam?",
+      "gold_source": null,
+      "retrieved": [
+        "Syllabus",
+        "01 CourseInfoF26.pdf \u00b7 p.29",
+        "01 CourseInfoF26.pdf \u00b7 p.25",
+        "Syllabus",
+        "Midterm Exam- Requires Respondus LockDown Browser"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Release practice final exam"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.24
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 5,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "explain the last class",
+      "query": "explain the last class",
+      "gold_source": null,
+      "retrieved": [
+        "UT-Koskela-Ch7.pdf \u00b7 p.9",
+        "UT-Koskela-Part2.pdf \u00b7 p.18",
+        "Class #1 \u00b7 30:35",
+        "06 Isolating Components - Mockito.pdf \u00b7 p.34",
+        "UT-Koskela-Ch7.pdf \u00b7 p.3"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": null,
+      "recall_by_fact": null,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.52
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 6,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "where is the slide that the professor explain the assigment 2",
+      "query": "where is the slide that the professor explain the assigment 2",
+      "gold_source": null,
+      "retrieved": [
+        "01 CourseInfoF26.pdf \u00b7 p.38",
+        "UT-Koskela-Part2.pdf \u00b7 p.5",
+        "04 Design For Testability.pdf \u00b7 p.62",
+        "UT-Koskela-Part2.pdf \u00b7 p.74",
+        "File-Naming Conventions in Deliverables"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Project introduction slides and class recording, which provide context, are available on Canvas/Modules/Projects"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.22
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "questions": 32,
+  "seed": 8,
+  "noise": {
+    "clean": {
+      "hits": 27,
+      "n": 32,
+      "top1_hits": 22,
+      "mrr": 0.758
+    },
+    "typos": {
+      "hits": 23,
+      "n": 32,
+      "top1_hits": 20,
+      "mrr": 0.667
+    },
+    "ALL CAPS, no punctuation": {
+      "hits": 28,
+      "n": 32,
+      "top1_hits": 22,
+      "mrr": 0.776
+    },
+    "filler words": {
+      "hits": 27,
+      "n": 32,
+      "top1_hits": 18,
+      "mrr": 0.682
+    },
+    "cut off at 60%": {
+      "hits": 15,
+      "n": 32,
+      "top1_hits": 7,
+      "mrr": 0.316
+    },
+    "extra spaces and newlines": {
+      "hits": 27,
+      "n": 32,
+      "top1_hits": 22,
+      "mrr": 0.758
+    }
+  },
+  "load": {
+    "searches": 160,
+    "workers": 8,
+    "errors": 0,
+    "error_samples": [],
+    "p50_s": 3.137,
+    "p95_s": 4.439,
+    "max_s": 5.378,
+    "throughput_per_s": 2.6
+  }
+}

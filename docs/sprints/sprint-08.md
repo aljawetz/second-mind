@@ -1,6 +1,6 @@
 # Sprint 8 — Robustness, Responsible AI, and System Improvement
 
-**Type:** Team · **Due:** 2026-10-27 · **Points:** 100 · **Status:** Planned
+**Type:** Team · **Due:** 2026-10-27 · **Points:** 100 · **Status:** Done, report in `docs/evaluations/2026-10-sprint8/report.md`
 
 ## Purpose
 
@@ -45,13 +45,15 @@ Each step is one PR, stacked on the one before it.
 | --- | --- | --- |
 | 1 | #21 | Search-only eval: score search results (recall@5, precision@5) on real Canvas data without calling a model |
 | 2 | #22 | Merge keyword and meaning search results by rank (reciprocal rank fusion) |
-| 3 | #23 | Rerank the merged results with a small local model and drop weak matches (minimum score) |
-| 4 | next | Rewrite the question before searching, and suggest "Did you mean" topics when nothing matches |
-| 5 | next | Robustness tests: noisy or missing data, unusual inputs, API failures, load, out-of-distribution questions |
-| 6 | next | Responsible AI: keep graded quizzes out of the index, sign out and delete all data, refuse to do graded work (explainer, not helper), recording consent, and docs |
-| 7 | next | Final report in `docs/evaluations/2026-10-sprint8/` |
+| 3 | #23 | Rerank the merged results with a small local model. PR #23 also dropped weak matches under a 0.03 score; this branch removes that cutoff |
+| 4 | this branch | New held-out question sets and fact-based labels; the chat now knows today's date and adds real dates to "next week" style searches. The planned question rewriting was not built: the chat already makes a second search in the model's own words for follow-ups |
+| 5 | this branch | Robustness tests and measurements: odd inputs, failing search or model, hostile course text, noisy questions, load, out-of-scope questions |
+| 6 | partly | Responsible AI: a rule against doing graded work and a delete-all-data endpoint are done. Still open: keeping exam text out of the index, a sign-out button in the app, recording consent |
+| 7 | done | Final report in `docs/evaluations/2026-10-sprint8/report.md`, results in `docs/evaluations/2026-10-sprint8/final/` |
 
-### Status so far
+### Status at step 3 (older snapshot)
+
+The numbers below are from the PR #23 stage. Final numbers are in the report and in "What we did" below.
 
 Search-only eval on real Canvas data (sprint7 question set, 25 questions, 22 with an expected source):
 
@@ -86,4 +88,11 @@ this same question set, so we still need to check it on new questions.
 
 ## What we did
 
-TBD — fill in once this sprint is underway.
+- **Better search.** Results are merged by rank, then a small local model re-sorts the top 20. No score cutoff: a 0.03 cutoff found fewer facts on new questions, so the default is now `RERANK_MIN_SCORE = 0.0`.
+- **Measurement.** Fact-based labels, a development set (13 answerable questions) and three new sets: test (19), chat (28, multi-turn) and one team member's own chat. All final runs use one frozen index copy.
+- **Result.** Over 60 answerable questions, facts found go from 36 to 45 (10 that the old search missed). The right result is first more often: 20 to 33 of 60 (dev 7 to 10, test 7 to 12, chat 6 to 11).
+- **Dates.** The chat knows today's date and adds real dates to searches that say "today", "tomorrow", "this week" or "next week".
+- **Robustness.** 16 tests (`backend/tests/test_robustness.py`) and `scripts/robustness_eval.py` (noisy questions, load). Typos cost 4 of 27 facts. 160 searches, 8 at a time: 0 errors, median 3.1 s.
+- **Responsible AI.** Graded-work refusal rule (5 of 6 hand-picked misuse prompts declined clearly) and `DELETE /data`. The chat said it could not find an answer on 6 of 6 unanswerable questions.
+- **Not done.** Sign-out button, recording consent, exam text kept out of the index, fairness and accessibility checks. See the report for details and next steps.
+- **Tests.** 536 pass.

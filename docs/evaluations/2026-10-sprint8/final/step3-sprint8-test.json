@@ -1,0 +1,616 @@
+{
+  "mode": "retrieval-only",
+  "set": "sprint8-test",
+  "index": "/Users/arthurjawetz/second-mind-eval-index-2026-10-26",
+  "metrics": {
+    "n": 23,
+    "n_recall": 19,
+    "n_precision": 16,
+    "recall_at_5": 0.7368421052631579,
+    "precision_at_5": 0.55625,
+    "fact_labels": {
+      "n": 19,
+      "hits": 13,
+      "recall": 0.6842105263157895,
+      "n_precision": 16,
+      "precision_empty_skipped": 0.315625,
+      "precision_empty_as_zero": 0.2657894736842105,
+      "top1_hits": 12,
+      "mrr": 0.6578947368421053
+    },
+    "unanswerable": {
+      "n": 4,
+      "returned": 1,
+      "with_results": 1
+    }
+  },
+  "results": [
+    {
+      "case": "Q1",
+      "course": 55710,
+      "kind": "concept_covered",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "how do i know when i've tested enough?",
+      "query": "how do i know when i've tested enough?",
+      "gold_source": "\"02 Testing Basics.pdf\"",
+      "retrieved": [
+        "UT-Koskela-Part2.pdf \u00b7 p.60",
+        "UT-Koskela-Part2.pdf \u00b7 p.80",
+        "UT-Koskela-Part2.pdf \u00b7 p.14",
+        "UT-Koskela-Ch1-2.pdf \u00b7 p.7",
+        "02 Testing Basics.pdf \u00b7 p.2"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.2,
+      "gold_facts": [
+        "cost of detecting more defects is larger than"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.41
+    },
+    {
+      "case": "Q2",
+      "course": 55710,
+      "kind": "concept_covered",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "is tdd just writing tests first?",
+      "query": "is tdd just writing tests first?",
+      "gold_source": "\"WhatDoWeKnowAboutTDD-IEEESoftware2018.pdf\"",
+      "retrieved": [
+        "13 - MidtermReview.pdf \u00b7 p.44",
+        "WhatDoWeKnowAboutTDD-IEEESoftware2018.pdf \u00b7 p.1",
+        "  L1 - TDD Lab - Getting Started with Test-Driven Development",
+        "WhatDoWeKnowAboutTDD-IEEESoftware2018.pdf \u00b7 p.3",
+        "UT-Koskela-Ch1-2.pdf \u00b7 p.9"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.4,
+      "gold_facts": [
+        "Test-first is only one part of"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 2,
+      "seconds": 0.49
+    },
+    {
+      "case": "Q3",
+      "course": 55710,
+      "kind": "concept_covered",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what rules should the blocks of an input partition follow?",
+      "query": "what rules should the blocks of an input partition follow?",
+      "gold_source": "\"07 - InputSpaceDesign.pdf\"",
+      "retrieved": [
+        "07 - Input Space Design - note taking version.pdf \u00b7 p.3",
+        "07 - InputSpaceDesign.pdf \u00b7 p.3",
+        "10 - Systematic spec-based testing of the Date library.pdf \u00b7 p.28",
+        "07 - Spec-Based Testing Intro - note taking version.pdf \u00b7 p.14",
+        "07 - SpecBasedTestingIntro.pdf \u00b7 p.22"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.4,
+      "gold_facts": [
+        "blocks are disjoint (no overlap)"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.4,
+      "first_rank_by_fact": 1,
+      "seconds": 0.14
+    },
+    {
+      "case": "Q4",
+      "course": 55710,
+      "kind": "concept_covered",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what's the point of using hamcrest matchers in tests?",
+      "query": "what's the point of using hamcrest matchers in tests?",
+      "gold_source": "\"03 Unit Testing Principles.pdf\"",
+      "retrieved": [
+        "03 Unit Testing Principles.pdf \u00b7 p.4",
+        "03 Unit Testing Principles  - note taking version.pdf \u00b7 p.3",
+        "03 Unit Testing Principles  - note taking version.pdf \u00b7 p.4",
+        "03 Unit Testing Principles.pdf \u00b7 p.5",
+        "UT-Koskela-Part2.pdf \u00b7 p.4"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.8,
+      "gold_facts": [
+        "Hamcrest matchers make tests more natural"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.4,
+      "first_rank_by_fact": 1,
+      "seconds": 0.49
+    },
+    {
+      "case": "Q5",
+      "course": 55710,
+      "kind": "concept_covered",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "apart from finding bugs, why bother writing tests?",
+      "query": "apart from finding bugs, why bother writing tests?",
+      "gold_source": "\"02 Testing Basics.pdf\"",
+      "retrieved": [
+        "08 - CombinatorialTesting - note taking version.pdf \u00b7 p.41",
+        "08 - CombinatorialTesting.pdf \u00b7 p.51",
+        "UT-Koskela-Ch1-2.pdf \u00b7 p.2",
+        "UT-Koskela-Ch1-2.pdf \u00b7 p.3",
+        "UT-Koskela-Ch1-2.pdf \u00b7 p.4"
+      ],
+      "recall_at_5": false,
+      "precision_at_5": 0.0,
+      "gold_facts": [
+        "gives feedback, helps with diagnosis"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.49
+    },
+    {
+      "case": "Q6",
+      "course": 55710,
+      "kind": "concept_covered",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what makes a characteristic semantic instead of syntactic when modeling inputs?",
+      "query": "what makes a characteristic semantic instead of syntactic when modeling inputs?",
+      "gold_source": "\"07 - InputSpaceDesign.pdf\"",
+      "retrieved": [
+        "07 - InputSpaceDesign.pdf \u00b7 p.6",
+        "07 - Input Space Design - note taking version.pdf \u00b7 p.6",
+        "07 - Input Space Design - note taking version.pdf \u00b7 p.17",
+        "07 - InputSpaceDesign.pdf \u00b7 p.5",
+        "07 - Input Space Design - note taking version.pdf \u00b7 p.5"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 1.0,
+      "gold_facts": [
+        "conceptual, requires domain knowledge"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.4,
+      "first_rank_by_fact": 1,
+      "seconds": 0.39
+    },
+    {
+      "case": "Q7",
+      "course": 55710,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "which mockito version do i need to have before class?",
+      "query": "which mockito version do i need to have before class?",
+      "gold_source": "Mockito Exercises and Prep",
+      "retrieved": [
+        "Mockito Exercises and Prep",
+        "Mockito Exercises and Prep",
+        "A1 - Test Doubles",
+        "Mockito Exercises and Prep",
+        "06 Isolating Components - Mockito.pdf \u00b7 p.16"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.6,
+      "gold_facts": [
+        "Mockito: 3.5.11 or higher"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.4
+    },
+    {
+      "case": "Q8",
+      "course": 55710,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "can i look at my notes during the midterm?",
+      "query": "can i look at my notes during the midterm?",
+      "gold_source": "Midterm Exam- Requires Respondus LockDown Browser",
+      "retrieved": [
+        "Midterm Practice Questions - Requires Respondus LockDown Browser",
+        "Midterm Exam- Requires Respondus LockDown Browser",
+        "Sample Midterm Coding Question (access through Sample Midterm only)",
+        "Midterm Coding Question (access only through Midterm Exam)",
+        "Midterm Coding Question (access only through Midterm Exam)"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.4,
+      "gold_facts": [
+        "closed-internet and closed-book"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.4,
+      "first_rank_by_fact": 1,
+      "seconds": 0.51
+    },
+    {
+      "case": "Q9",
+      "course": 55710,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "who do i email if i don't want my coursework used in the teaching research?",
+      "query": "who do i email if i don't want my coursework used in the teaching research?",
+      "gold_source": "Syllabus \u2014 Research to Improve the Course",
+      "retrieved": [
+        "Syllabus",
+        "Syllabus",
+        "Syllabus"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 1.0,
+      "gold_facts": [
+        "Chad Hershock"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 1.0,
+      "first_rank_by_fact": 1,
+      "seconds": 0.36
+    },
+    {
+      "case": "Q10",
+      "course": 55710,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "is the final exam in class or at some other time?",
+      "query": "is the final exam in class or at some other time?",
+      "gold_source": "Syllabus \u2014 Tentative Course Calendar",
+      "retrieved": [
+        "Syllabus",
+        "UT-Koskela-Ch7.pdf \u00b7 p.9"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.5,
+      "gold_facts": [
+        "FINAL EXAM (during class time)"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.5,
+      "first_rank_by_fact": 1,
+      "seconds": 0.49
+    },
+    {
+      "case": "Q11",
+      "course": 55016,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "how many people go in an innovation project team?",
+      "query": "how many people go in an innovation project team?",
+      "gold_source": "Innovation Project Objectives",
+      "retrieved": [
+        "Innovation Project Objectives",
+        "Syllabus",
+        "Innovation Project Objectives",
+        "Class Preparation"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.5,
+      "gold_facts": [
+        "performed in teams of 4 to 5 students"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.25,
+      "first_rank_by_fact": 1,
+      "seconds": 0.17
+    },
+    {
+      "case": "Q12",
+      "course": 55016,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what do we actually do in task 3 of the innovation project?",
+      "query": "what do we actually do in task 3 of the innovation project?",
+      "gold_source": "Task 3 Objectives",
+      "retrieved": [
+        "Innovation Project Objectives",
+        "Innovation Project Objectives",
+        "Innovation Project Objectives",
+        "Innovation Project Objectives",
+        "Innovation Project Objectives"
+      ],
+      "recall_at_5": false,
+      "precision_at_5": 1.0,
+      "gold_facts": [
+        "create a long-term vision that communicates the intent of the solution"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.13
+    },
+    {
+      "case": "Q13",
+      "course": 55016,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "how many interview questions should i have ready before task 1?",
+      "query": "how many interview questions should i have ready before task 1?",
+      "gold_source": "Class Preparation",
+      "retrieved": [
+        "Class Preparation",
+        "Task 1 Plan of Attack",
+        "Task 1 Plan of Attack",
+        "Task 1 Plan of Attack",
+        "Task 1: Submitting Your Work "
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.2,
+      "gold_facts": [
+        "Prepare a list of 40-50 interview questions"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.31
+    },
+    {
+      "case": "Q14",
+      "course": 55016,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what do i need to read for the week on talking to users?",
+      "query": "what do i need to read for the week on talking to users?",
+      "gold_source": "Class Preparation",
+      "retrieved": [],
+      "recall_at_5": false,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Section on Interviewing and Observing Users"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.28
+    },
+    {
+      "case": "Q15",
+      "course": 55016,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what software do we use to manage requirements?",
+      "query": "what software do we use to manage requirements?",
+      "gold_source": "Class Preparation",
+      "retrieved": [
+        "Class Preparation",
+        "Innovation Project Objectives",
+        "Task 4 Resources",
+        "Task 3 Resources",
+        "Syllabus"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.4,
+      "gold_facts": [
+        "Jama, a requirements management tool"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.4,
+      "first_rank_by_fact": 1,
+      "seconds": 0.35
+    },
+    {
+      "case": "Q16",
+      "course": 55016,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what percent of the grade is class participation?",
+      "query": "what percent of the grade is class participation?",
+      "gold_source": "Syllabus \u2014 Grading Rubric",
+      "retrieved": [
+        "Syllabus",
+        "Class Participation and Attendance"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 0.5,
+      "gold_facts": [
+        "Class Participation and Attendance | Individual | 10"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.5,
+      "first_rank_by_fact": 1,
+      "seconds": 0.29
+    },
+    {
+      "case": "Q17",
+      "course": 55016,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "if my teammates slack off, does my project grade suffer?",
+      "query": "if my teammates slack off, does my project grade suffer?",
+      "gold_source": "Syllabus \u2014 Grading Rubric",
+      "retrieved": [],
+      "recall_at_5": false,
+      "precision_at_5": null,
+      "gold_facts": [
+        "grades of individual students will be adjusted upward or downward according to Faculty and Peer Evaluations"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.28
+    },
+    {
+      "case": "Q18",
+      "course": 56350,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "who is the fintech app idea aimed at?",
+      "query": "who is the fintech app idea aimed at?",
+      "gold_source": "\"Fintech App.docx\"",
+      "retrieved": [
+        "Fintech App.docx",
+        "Fintech App.docx",
+        "Fintech App.docx",
+        "Fintech App.docx",
+        "Fintech App.docx"
+      ],
+      "recall_at_5": true,
+      "precision_at_5": 1.0,
+      "gold_facts": [
+        "freelancers, side hustlers, and independent earners"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.24
+    },
+    {
+      "case": "Q19",
+      "course": 56350,
+      "kind": "course_fact",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "where should i search for papers for the literature review?",
+      "query": "where should i search for papers for the literature review?",
+      "gold_source": "\"Research Study.pdf\"",
+      "retrieved": [],
+      "recall_at_5": false,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Google Scholar, IEEE, ScienceDirect, PubMed"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.39
+    },
+    {
+      "case": "Q20",
+      "course": 55710,
+      "kind": "not_in_course",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what's the wifi password for room 109?",
+      "query": "what's the wifi password for room 109?",
+      "gold_source": null,
+      "retrieved": [],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": null,
+      "recall_by_fact": null,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.14
+    },
+    {
+      "case": "Q21",
+      "course": 55016,
+      "kind": "not_in_course",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "who is the guest speaker in week 10?",
+      "query": "who is the guest speaker in week 10?",
+      "gold_source": null,
+      "retrieved": [],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": null,
+      "recall_by_fact": null,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.11
+    },
+    {
+      "case": "Q22",
+      "course": 56350,
+      "kind": "not_in_course",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what programming language does the project have to be written in?",
+      "query": "what programming language does the project have to be written in?",
+      "gold_source": null,
+      "retrieved": [],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": null,
+      "recall_by_fact": null,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.31
+    },
+    {
+      "case": "Q23",
+      "course": 55710,
+      "kind": "not_in_course",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what's the deadline to drop the course?",
+      "query": "what's the deadline to drop the course?",
+      "gold_source": null,
+      "retrieved": [
+        "01 CourseInfoF26.pdf \u00b7 p.16"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": null,
+      "recall_by_fact": null,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.39
+    }
+  ]
+}
