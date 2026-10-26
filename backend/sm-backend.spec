@@ -14,6 +14,8 @@
 # Step 4. `pyinstaller sm-backend.spec` must be run as
 # `uv run --group build pyinstaller sm-backend.spec ...`.
 
+from PyInstaller.utils.hooks import collect_data_files
+
 a = Analysis(
     ["main.py"],
     pathex=[],
@@ -26,6 +28,9 @@ a = Analysis(
     datas=[
         ("models/bge-small-en-v1.5-onnx", "models/bge-small-en-v1.5-onnx"),
         ("models/faster-whisper-base", "models/faster-whisper-base"),
+        # vad_filter=True loads faster_whisper/assets/silero_vad_v6.onnx at
+        # run time; PyInstaller doesn't see a data file nothing imports.
+        *collect_data_files("faster_whisper"),
     ],
     hiddenimports=[],
     hookspath=[],
