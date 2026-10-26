@@ -331,7 +331,7 @@ export async function explainAssignment(courseId: number, assignmentId: number):
 
 // Session capture (implementation-plan.md Step 12, design spec §9.3).
 // Recording itself happens here in the frontend (getUserMedia +
-// MediaRecorder, in 60 second slices uploaded as they finish — see
+// MediaRecorder, in 30 second slices uploaded as they finish — see
 // chunkedRecorder.ts) — the backend transcribes the slices as they arrive
 // and handles the rest after stop.
 // "interrupted": the app was closed or crashed before Stop, but slices of the

@@ -172,7 +172,7 @@ export default function NewSessionView({
             )}
             <h3>Live transcript</h3>
             <p className="live-transcript">
-              {liveTranscript || "The transcript appears here about a minute after you start talking."}
+              {liveTranscript || "The transcript appears here about half a minute after you start talking."}
             </p>
           </div>
           <div className="panel">
