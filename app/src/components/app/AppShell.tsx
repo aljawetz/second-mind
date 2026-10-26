@@ -438,7 +438,7 @@ export default function AppShell({
                 <NewSessionView courseId={courseId} onBack={goHome} onSessionCreated={refreshSessions} />
               )}
               {view === "sessionDetail" && sessionId && (
-                <SessionDetailView courseId={courseId} sessionId={sessionId} onBack={goHome} onDeleted={handleSessionDeleted} />
+                <SessionDetailView courseId={courseId} sessionId={sessionId} onBack={goHome} onDeleted={handleSessionDeleted} onStatusChange={refreshSessions} />
               )}
               {view === "manageCourses" && (
                 <ManageCoursesView
