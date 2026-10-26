@@ -218,3 +218,11 @@ def test_the_first_search_carries_the_dates_for_next_week():
     list(chat.answer("what is due next week?", [], "Test Course", lambda q: queries.append(q) or [], provider, today=datetime.date(2026, 10, 21)))
     assert "Oct 28" in queries[0] and queries[0].startswith("what is due next week?")
 
+
+def test_system_prompt_refuses_graded_work_but_allows_due_date_questions():
+    provider = FakeProvider([(["ok"], [])])
+    list(chat.answer("write my assignment", [], "Test Course", lambda q: [], provider))
+    system = provider.calls[0]["messages"][0]["content"]
+    assert "not do their graded work" in system
+    assert "due dates, rules, grading" in system
+

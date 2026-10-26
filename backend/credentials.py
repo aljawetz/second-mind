@@ -53,6 +53,20 @@ def store(key: str, value: str) -> None:
     sys.stdout.flush()
 
 
+def delete(key: str) -> None:
+    """Forget one credential. Outside the app that removes the Keychain item
+    (a missing item is fine). Inside the app this process only holds a copy;
+    the app owns the Keychain item and must delete it itself."""
+    if not from_app():
+        try:
+            keyring.delete_password(SERVICE, key)
+        except keyring.errors.PasswordDeleteError:
+            pass
+        return
+    with _lock:
+        _values.pop(key, None)
+
+
 def receive(line: bytes) -> None:
     """One line from the app; anything that isn't {str: str} is ignored."""
     try:
