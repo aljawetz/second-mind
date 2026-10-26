@@ -53,7 +53,37 @@ SIMILARITY_CUTOFF = 0.5
 # CitationQueryEngine's own synthesis step is a real second line of
 # defense — verified it still correctly declined to answer even with that
 # weak match included, rather than fabricating an answer from it.
-FTS_TOP_K = 1
+# Sprint 8 raised this from 1 to 10: the FTS hits now go through rank
+# fusion with the vector hits (below), so a weak tail match only makes the
+# final top 5 if nothing ranks above it. Still no score threshold.
+FTS_TOP_K = 10
+
+# Sprint 8: both searches fetch more candidates than they return, then the
+# two lists are merged with reciprocal rank fusion (RRF). RRF only uses each
+# result's rank inside its own list, so the BM25 and cosine scales never get
+# compared. RRF_K = 60 is the usual value from the original RRF paper.
+VECTOR_CANDIDATES = 20
+RRF_K = 60
+
+
+def reciprocal_rank_fusion(ranked_lists: list[list[NodeWithScore]], k: int = RRF_K, top_n: int = 5) -> list[NodeWithScore]:
+    """Merge ranked lists into one. Each node gets the sum of 1 / (k + rank)
+    over the lists it is in (rank starts at 1). A node in two lists is kept
+    once, as its first copy, so its original score is not changed. Ties
+    keep the order the nodes were first seen in."""
+    fused: dict[str, float] = {}
+    first: dict[str, NodeWithScore] = {}
+    for ranked in ranked_lists:
+        seen_here: set[str] = set()
+        for rank, node_with_score in enumerate(ranked, start=1):
+            node_id = node_with_score.node.node_id
+            if node_id in seen_here:
+                continue
+            seen_here.add(node_id)
+            fused[node_id] = fused.get(node_id, 0.0) + 1.0 / (k + rank)
+            first.setdefault(node_id, node_with_score)
+    order = sorted(fused, key=lambda node_id: -fused[node_id])
+    return [first[node_id] for node_id in order[:top_n]]
 
 ANSWER_FIRST_TEMPLATE = PromptTemplate(
     "You are Second Mind, a study assistant. Answer the question directly and "
@@ -90,7 +120,11 @@ class HybridRetriever(BaseRetriever):
     BM25 magnitude isn't portable across corpora — only the single
     best-ranked FTS match is taken, and combined with the vector nodes
     only after both are independently decided, so nothing downstream
-    re-filters either kind against a scale it was never computed on."""
+    re-filters either kind against a scale it was never computed on.
+
+    Sprint 8: the two lists are now merged by rank with reciprocal rank
+    fusion (see reciprocal_rank_fusion) and cut to similarity_top_k. Each
+    node keeps its own original score; only the order comes from fusion."""
 
     def __init__(self, index, similarity_top_k: int = 5, similarity_cutoff: float = SIMILARITY_CUTOFF):
         self._index = index
@@ -99,21 +133,17 @@ class HybridRetriever(BaseRetriever):
         super().__init__()
 
     def _retrieve(self, query_bundle: QueryBundle) -> list[NodeWithScore]:
-        vector_nodes = self._index.as_retriever(similarity_top_k=self._similarity_top_k).retrieve(query_bundle)
+        vector_nodes = self._index.as_retriever(similarity_top_k=VECTOR_CANDIDATES).retrieve(query_bundle)
         vector_nodes = SimilarityPostprocessor(similarity_cutoff=self._similarity_cutoff).postprocess_nodes(vector_nodes)
-        seen_ids = {n.node.node_id for n in vector_nodes}
 
         table = self._index.vector_store.table
         fts_df = table.search(query_bundle.query_str, query_type="fts").limit(FTS_TOP_K).to_pandas()
-        fts_nodes = []
-        for _, row in fts_df.iterrows():
-            node = metadata_dict_to_node(row["metadata"])
-            if node.node_id in seen_ids:
-                continue
-            fts_nodes.append(NodeWithScore(node=node, score=float(row["_score"])))
-            seen_ids.add(node.node_id)
+        fts_nodes = [
+            NodeWithScore(node=metadata_dict_to_node(row["metadata"]), score=float(row["_score"]))
+            for _, row in fts_df.iterrows()
+        ]
 
-        return vector_nodes + fts_nodes
+        return reciprocal_rank_fusion([vector_nodes, fts_nodes], k=RRF_K, top_n=self._similarity_top_k)
 
 
 def build_query_engine(index, streaming: bool = True) -> CitationQueryEngine:
