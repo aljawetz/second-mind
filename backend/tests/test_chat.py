@@ -187,3 +187,34 @@ def test_unclosed_bracket_in_prose_is_not_held_forever():
 def test_a_dropped_citation_split_across_chunks_leaves_no_stray_space():
     text, *_ = _run("q", replies=[(["True", " [", "7]. Next."], [])], results={"q": [_node("a", "A.pdf")]})
     assert text == "True. Next."
+
+
+
+def test_system_prompt_tells_the_model_todays_date():
+    import datetime
+
+    provider = FakeProvider([(["ok"], [])])
+    list(chat.answer("what is due next week?", [], "Test Course", lambda q: [], provider, today=datetime.date(2026, 10, 26)))
+    system = provider.calls[0]["messages"][0]["content"]
+    assert "Today is Monday, October 26, 2026." in system
+
+
+def test_relative_dates_become_real_dates_in_the_search():
+    import datetime
+
+    monday = datetime.date(2026, 10, 19)  # a Monday
+    assert chat.expand_relative_dates("what is due next week?", monday) == (
+        "what is due next week? Oct 26 Oct 27 Oct 28 Oct 29 Oct 30 Oct 31 Nov 1 2026"
+    )
+    assert chat.expand_relative_dates("anything due tomorrow?", monday) == "anything due tomorrow? Oct 20 2026"
+    assert chat.expand_relative_dates("when is the midterm?", monday) == "when is the midterm?"
+
+
+def test_the_first_search_carries_the_dates_for_next_week():
+    import datetime
+
+    queries = []
+    provider = FakeProvider([(["ok"], [])])
+    list(chat.answer("what is due next week?", [], "Test Course", lambda q: queries.append(q) or [], provider, today=datetime.date(2026, 10, 21)))
+    assert "Oct 28" in queries[0] and queries[0].startswith("what is due next week?")
+

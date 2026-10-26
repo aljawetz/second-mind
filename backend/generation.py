@@ -68,20 +68,21 @@ RRF_K = 60
 
 # Sprint 8 PR 3: rank fusion picks a larger pool (RERANK_CANDIDATES), a
 # local cross-encoder (reranker.py) scores each one against the question,
-# and only the best similarity_top_k at or above RERANK_MIN_SCORE are kept.
-# The reranker score is a 0 to 1 sigmoid, comparable across courses, so it
-# is the one place a cutoff applies to keyword hits too. A question with
-# nothing above the cutoff returns no results, which is the honest answer
-# for something the course never covered.
+# and the best similarity_top_k are kept in rerank order. The score is a 0
+# to 1 sigmoid, so a cutoff is possible (RERANK_MIN_SCORE), but the default
+# is no cutoff.
 #
-# RERANK_MIN_SCORE was picked on the same sprint7 eval set it is measured
-# on, so treat it as a first guess, not a calibrated value. With the
-# MiniLM reranker, the unanswerable question (V9) topped out at 0.015 and
-# 0.03 is the highest cutoff that keeps recall at its no-cutoff level
-# (0.05 loses a question). The margin is thin on both sides: about 2x above
-# V9, and one real answer (H16) scored 0.045. Revisit with held-out data.
+# A cutoff of 0.03 was tried first and then measured on fresh, never-tuned
+# questions (docs/evaluations/2026-10-sprint8/final). It lost facts on every
+# set (test 13 vs 15, chat 13 vs 18, dev 10 vs 12 of the answerable ones)
+# and returned nothing for some answerable questions, because the model
+# scores short or structured chunks (calendar rows, one-line policies) near
+# 0. Rerank order with no cutoff kept the ordering gain and the recall. The
+# cost: unanswerable questions now get 5 chunks instead of none, so
+# abstaining is left to the answer prompt. Check that with the full-answer
+# eval before relying on it.
 RERANK_CANDIDATES = 20
-RERANK_MIN_SCORE = 0.03
+RERANK_MIN_SCORE = 0.0
 
 _DEFAULT = object()
 

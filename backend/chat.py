@@ -29,6 +29,7 @@ Memory is never course material: its [M1] labels are stripped from the
 answer here, and forget_memory only accepts labels shown in this turn.
 """
 
+import datetime
 import json
 import re
 from typing import Callable, Iterator
@@ -63,6 +64,8 @@ say so in one sentence.
 extra example): a part that starts with the line "{label}". \
 Everything you add from your own knowledge goes here, and nothing without a citation goes above it.
 - Use the conversation so far to understand follow-up questions.
+- Today is {today}. Use it to work out what "today", "tomorrow", "this week" and "next week" mean. Only \
+the course materials say what is due and when, and an assignment already past is not due next week.
 - Answer first, be concise."""
 
 SEARCH_TOOL = {
@@ -225,6 +228,31 @@ class CitationRenumberer:
         return _MEMORY_LABEL.sub("", _CITATION.sub(self._renumber, text))
 
 
+_RELATIVE_DAYS = {"today": (0, 0), "tomorrow": (1, 1)}
+
+
+def expand_relative_dates(query: str, today: datetime.date) -> str:
+    """Course pages say "Due Wed, Oct 28, 2026", never "next week", so a
+    search for "what is due next week?" misses them (seen in the Sprint 8
+    eval). Add the real dates after the student's words: today, tomorrow,
+    this week and next week (Monday to Sunday). A query with none of those
+    words comes back unchanged."""
+    text = query.lower()
+    days: list[datetime.date] = []
+    monday = today - datetime.timedelta(days=today.weekday())
+    for phrase, (start, end) in _RELATIVE_DAYS.items():
+        if re.search(rf"\b{phrase}\b", text):
+            days += [today + datetime.timedelta(days=d) for d in range(start, end + 1)]
+    if re.search(r"\bthis week\b", text):
+        days += [monday + datetime.timedelta(days=d) for d in range(7)]
+    if re.search(r"\bnext week\b", text):
+        days += [monday + datetime.timedelta(days=7 + d) for d in range(7)]
+    if not days:
+        return query
+    dates = " ".join(f"{d:%b} {d.day}" for d in dict.fromkeys(days))
+    return f"{query} {dates} {days[-1].year}"
+
+
 def make_search(index, similarity_cutoff: float = generation.SIMILARITY_CUTOFF) -> Callable[[str], list[NodeWithScore]]:
     """index=None (course not indexed yet) searches nothing, so the model says
     it couldn't find anything instead of the request failing."""
@@ -242,6 +270,7 @@ def answer(
     provider: LLMProvider,
     memory=None,
     summary: str = "",
+    today: datetime.date | None = None,
 ) -> Iterator[dict]:
     """Yields /ask's stream events: {"delta"} text pieces, then one
     {"citations", "grounded"}, then {"done": True}. With `memory` (a
@@ -257,12 +286,13 @@ def answer(
     sources: list[NodeWithScore] = []
     number_of: dict[str, int] = {}
     shown: dict[str, str] = {}  # "M1" -> memory id, what forget_memory accepts
+    today = today or datetime.date.today()
     used: dict[str, str] = {}  # memory id -> text, in the order first shown
     forgotten: set[str] = set()
 
     def run_search(query: str) -> str:
         parts = []
-        for node_with_score in search(query):
+        for node_with_score in search(expand_relative_dates(query, today)):
             node_id = node_with_score.node.node_id
             if node_id not in number_of:
                 sources.append(node_with_score)
@@ -308,7 +338,11 @@ def answer(
             return run_forget(call.arguments.get("labels"))
         return "Unknown tool or empty query."
 
-    prompt = SYSTEM_PROMPT.format(course_name=course_name, label=GENERAL_KNOWLEDGE_LABEL)
+    prompt = SYSTEM_PROMPT.format(
+        course_name=course_name,
+        label=GENERAL_KNOWLEDGE_LABEL,
+        today=f"{today:%A}, {today:%B} {today.day}, {today.year}",
+    )
     tools = [SEARCH_TOOL]
     if memory is not None:
         tools = [SEARCH_TOOL, RECALL_TOOL, FORGET_TOOL]

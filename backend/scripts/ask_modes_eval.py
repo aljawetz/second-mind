@@ -25,13 +25,14 @@ Not a pytest test: the answering modes make real, billed OpenAI calls against
 the real local index (~/.secondmind/index.lancedb). --retrieval-only does
 not. Run from backend/:
 
-    uv run python3 scripts/ask_modes_eval.py [--set first|heldout|sprint7|sample] [--only A,B,C,D] [--out PATH]
+    uv run python3 scripts/ask_modes_eval.py [--set first|heldout|sprint7|sprint8|sprint8-test|sprint8-chat|sprint8-user|sample] [--only A,B,C,D] [--out PATH]
     uv run python3 scripts/ask_modes_eval.py --set sprint7 --retrieval-only --out PATH
     uv run python3 scripts/make_sample_index.py --out /tmp/sample.lancedb
     uv run python3 scripts/ask_modes_eval.py --set sample --retrieval-only --index /tmp/sample.lancedb --out PATH
 """
 
 import argparse
+import datetime
 import json
 import re
 import sys
@@ -869,6 +870,11 @@ def run_d(index, question, history, course_name):
     return run_tool_loop(index, question, history, PROMPT_D.format(course_name=course_name))
 
 
+# The day the Sprint 8 chats were written, so "next week" means the same
+# week on every run. The shipped chat uses the real date.
+EVAL_TODAY = datetime.date(2026, 10, 21)
+
+
 def run_shipped(index, question, history, course_name, cutoff):
     searches: list[str] = []
     retrieved: list[list[str]] = []
@@ -881,7 +887,7 @@ def run_shipped(index, question, history, course_name, cutoff):
         return nodes
 
     start = time.perf_counter()
-    events = list(chat.answer(question, history, course_name, search, llm.OpenAIProvider(providers.OPENAI, temperature=TEMPERATURE)))
+    events = list(chat.answer(question, history, course_name, search, llm.OpenAIProvider(providers.OPENAI, temperature=TEMPERATURE), today=EVAL_TODAY))
     elapsed = time.perf_counter() - start
     final = next(e for e in events if "citations" in e)
     usage = final.get("usage")  # None unless OpenAIProvider reported it (see llm.py's TurnEnd.usage)
@@ -993,6 +999,9 @@ SPRINT7_EXTRA = [
 # (checked in Canvas on 2026-10-18). Fixed here, not in HELDOUT_CASES, so the
 # earlier held-out results still read against the gold they were graded on.
 SPRINT7_GOLD_FIXES = {
+    # The syllabus is not the only place the date appears. These two chunks
+    # state it, so a search that returns them found the answer (V1 copies F1).
+    "F1": {"gold_facts": ["Midterm: Wednesday, October 7th", "Due Wed, Oct 7, 2026"]},
     # Answer key names that did not match the real file names, so a search
     # that found the right file was scored as a miss. Only the names change.
     # Variants (V6, V7) copy these from their base question.
@@ -1088,9 +1097,520 @@ SAMPLE_CASES = [
 ]
 
 
+# Sprint 8 held-out set. Written on 2026-10-25 from the indexed text of courses
+# 55710, 55016 and 56350, phrased the way a student types. Nothing is tuned on
+# these: no cutoff, weight or prompt may be chosen by looking at their scores.
+# They exist to check whether the gains measured on the Sprint 7 set hold on
+# questions the system was never adjusted for. Every question was checked
+# against the index text before the first search was run: each gold fact is
+# there word for word, and the two unanswerable topics are not.
+#
+# gold_facts is the label that counts: a result is relevant when its text
+# holds one of the facts, whatever file it came from. gold_source and
+# gold_sources keep the Sprint 7 file-name scoring alongside it.
+SPRINT8_CASES = [
+    {
+        "id": "P1",
+        "course": TST,
+        "kind": "course_fact",
+        "turns": ["do i lose points if my github profile doesn't have a photo?"],
+        "gold_source": "Syllabus — Deductions apply for failure to complete various chores",
+        "gold_sources": ["Syllabus", "GitHub Credentials"],
+        "gold_facts": ["recognizable headshot photo"],
+        "gold_answer": (
+            "Yes. The syllabus lists not uploading required information, such as a real name and a "
+            "recognizable headshot photo, to course tools as a deduction. The GitHub Credentials "
+            "assignment requires a headshot (no icons, cartoons or avatars) on the profile"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "P2",
+        "course": TST,
+        "kind": "course_fact",
+        "turns": ["when do i need to turn in the docker swarm lab?"],
+        "gold_source": "Syllabus — Tentative Course Calendar",
+        "gold_facts": ["Lab 2 due (Sunday EOD)"],
+        "gold_answer": "Lab 2 (Docker Swarm) is due Sunday end of day in the week of 11/09",
+        "gold_confidence": "V",
+    },
+    {
+        "id": "P3",
+        "course": TST,
+        "kind": "course_fact",
+        "turns": ["is there a book we can use to learn docker for this class?"],
+        "gold_source": "Syllabus — Supplemental Materials",
+        "gold_facts": ["Learn Docker in a Month of Lunches"],
+        "gold_answer": (
+            "No book is required. The supplemental list includes Stoneman (2020), Learn Docker in a Month "
+            "of Lunches, Manning"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "P4",
+        "course": TST,
+        "kind": "course_fact",
+        "turns": ["is there class on Monday Nov 2nd?"],
+        "gold_source": "Syllabus — Tentative Course Calendar",
+        "gold_facts": ["NO CLASS (university travel)"],
+        "gold_answer": (
+            "No. Week 10 (11/02) has no class because of university travel; a lecture recording is "
+            "provided instead"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "P5",
+        "course": TST,
+        "kind": "course_fact",
+        "turns": ["how should i name my jar file for lab 2?"],
+        "gold_source": "File-Naming Conventions in Deliverables",
+        "gold_facts": ["<FirstNameLastName>.jar"],
+        "gold_answer": "L2-FirstNameLastName.jar (code files use <A|L><Number>-<FirstNameLastName>.jar), e.g. L2-JohnWang.jar",
+        "gold_confidence": "V",
+    },
+    {
+        "id": "P6",
+        "course": TST,
+        "kind": "course_fact",
+        "turns": ["what happens to my grade if my own tests only cover 70% of the code on vocareum?"],
+        "gold_source": "How to use Vocareum",
+        "gold_sources": ["How to use Vocareum", "Mockito Exercises and Prep"],
+        "gold_facts": ["typically 80-90% line coverage", "Below 80% coverage will give you a total score of 0"],
+        "gold_answer": (
+            "Below the minimum coverage (typically 80-90% line coverage depending on the assignment) you "
+            "receive no points; the Mockito exercises state 80% and a total score of 0 below it"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "P7",
+        "course": TST,
+        "kind": "concept_covered",
+        "turns": ["if my tests get 100% branch coverage, do i automatically get 100% statement coverage too?"],
+        "gold_source": '"11 - StructuralTesting part 1.pdf"',
+        "gold_facts": ["100% Branch coverage → 100% Statement coverage"],
+        "gold_answer": (
+            "Yes: branch coverage subsumes statement coverage. The converse is not true, because full "
+            "statement coverage can leave a branch untaken"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "P8",
+        "course": TST,
+        "kind": "course_fact",
+        "turns": ["can i just say the lab was too difficult in my lab report?"],
+        "gold_source": '"Lab reports best practices.pdf"',
+        "gold_facts": ["It was too difficult"],
+        "gold_answer": (
+            "Not as the reflection. 'It was too difficult' is listed as a bad answer; it is only appropriate "
+            "in the last (comments and suggestions) section, and only if specific"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "P9",
+        "course": TST,
+        "kind": "course_fact",
+        "turns": ["can i have chatgpt clean up the writing in my lab reports?"],
+        "gold_source": '"Lab reports best practices.pdf"',
+        "gold_sources": ["Lab reports best practices.pdf", "Syllabus"],
+        "gold_facts": ["Feel free to use ChatGPT to polish your report", "Permitted with conditions"],
+        "gold_answer": (
+            "Yes, the lab report guide says to feel free to use ChatGPT to polish the report, and points to "
+            "the syllabus AI policy (permitted with conditions, including stating that and how much it was used)"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "P10",
+        "course": REQ,
+        "kind": "course_fact",
+        "turns": ["can i join class over zoom if i'm sick?"],
+        "gold_source": "Syllabus — Course Sessions",
+        "gold_facts": ["attend classes remotely via Zoom is permitted only when explicitly authorized"],
+        "gold_answer": (
+            "Not on your own say-so. Remote attendance is permitted only when explicitly authorized by the "
+            "department, the Office of Disability Resources and the instructor, and attendance is mandatory"
+        ),
+        "gold_confidence": "V",
+    },
+    {
+        "id": "P11",
+        "course": REQ,
+        "kind": "course_fact",
+        "turns": ["how many think-aloud sessions should we run for task 4?"],
+        "gold_source": "Task 4 Plan of Attack",
+        "gold_facts": ["Conduct about five Think-Aloud sessions"],
+        "gold_answer": "About five Think-Aloud sessions with users, starting with the TA and fellow students",
+        "gold_confidence": "V",
+    },
+    {
+        "id": "P12",
+        "course": REQ,
+        "kind": "course_fact",
+        "turns": ["how much of my grade is the jama lab?"],
+        "gold_source": "Syllabus — Grading Rubric",
+        "gold_facts": ["Jama Lab | Individual | 5"],
+        "gold_answer": "5% of the grade, graded individually",
+        "gold_confidence": "V",
+    },
+    {
+        "id": "P13",
+        "course": AI,
+        "kind": "course_fact",
+        "turns": ["when do we need to finish our off-campus stakeholder interview by?"],
+        "gold_source": "Off-Campus Stakeholder Interview: Time Slot & Interviewee Details",
+        "gold_facts": ["Interviews must be completed by October 31, 2026"],
+        "gold_answer": "October 31, 2026 (the time slot and interviewee form itself is due Oct 4)",
+        "gold_confidence": "V",
+    },
+    {
+        "id": "P14",
+        "course": TST,
+        "kind": "not_in_course",
+        "turns": ["can i ask for my midterm to be regraded?"],
+        "gold_source": None,
+        "gold_answer": "The course materials do not describe a regrade process; a good answer says so and does not invent one",
+        "gold_confidence": "V",
+    },
+    {
+        "id": "P15",
+        "course": REQ,
+        "kind": "not_in_course",
+        "turns": ["what's the late penalty for the jama lab?"],
+        "gold_source": None,
+        "gold_answer": (
+            "The materials give no late policy for the Jama Lab (the 55016 syllabus has none; the 55710 "
+            "10% per day rule is a different course). A good answer says so"
+        ),
+        "gold_confidence": "V",
+    },
+]
+
+
+# Sprint 8 test set. Written on 2026-10-25 after the SPRINT8_CASES results
+# were read, from slide decks, a paper and class pages those 15 questions did
+# not use, with more conceptual and more loosely worded questions. It is the
+# set the final claims rest on, so it is frozen: search it once, when the
+# design is settled, and change nothing because of its scores. Each gold fact
+# was checked word for word against the index text, and the unanswerable
+# topics were checked absent, without running a single search. Single-turn
+# only: this eval searches the question text alone, so a follow-up like "and
+# the final?" would not mean anything here.
+def _test_case(case_id, course, kind, question, gold_source, gold_facts, gold_answer, gold_sources=None):
+    case = {
+        "id": case_id,
+        "course": course,
+        "kind": kind,
+        "turns": [question],
+        "gold_source": gold_source,
+        "gold_answer": gold_answer,
+        "gold_confidence": "V",
+    }
+    if gold_facts:
+        case["gold_facts"] = gold_facts
+    if gold_sources:
+        case["gold_sources"] = gold_sources
+    return case
+
+
+SPRINT8_TEST_CASES = [
+    _test_case(
+        "Q1", TST, "concept_covered", "how do i know when i've tested enough?",
+        '"02 Testing Basics.pdf"',
+        ["cost of detecting more defects is larger than"],
+        "Five stopping criteria (from Ryber), among them: coverage aims reached, the defect target reached, "
+        "and the cost of finding more defects exceeding the estimated loss from the ones left",
+    ),
+    _test_case(
+        "Q2", TST, "concept_covered", "is tdd just writing tests first?",
+        '"WhatDoWeKnowAboutTDD-IEEESoftware2018.pdf"',
+        ["Test-first is only one part of"],
+        "No. Using TDD and test-first interchangeably is a common misconception; test-first is only one "
+        "part of TDD (short red-green-refactor cycles, small tasks, writing only the code a failing test needs)",
+    ),
+    _test_case(
+        "Q3", TST, "concept_covered", "what rules should the blocks of an input partition follow?",
+        '"07 - InputSpaceDesign.pdf"',
+        ["blocks are disjoint (no overlap)"],
+        "Blocks should be disjoint (no overlap) and complete (together they cover the whole characteristic); "
+        "ideally also uniform",
+        gold_sources=["07 - InputSpaceDesign.pdf", "07 - Input Space Design - note taking version.pdf"],
+    ),
+    _test_case(
+        "Q4", TST, "concept_covered", "what's the point of using hamcrest matchers in tests?",
+        '"03 Unit Testing Principles.pdf"',
+        ["Hamcrest matchers make tests more natural"],
+        "They make assertions read more naturally and give better failure output, e.g. "
+        "assertThat(actual, matcher) instead of an expected value",
+        gold_sources=["03 Unit Testing Principles.pdf", "03 Unit Testing Principles  - note taking version.pdf"],
+    ),
+    _test_case(
+        "Q5", TST, "concept_covered", "apart from finding bugs, why bother writing tests?",
+        '"02 Testing Basics.pdf"',
+        ["gives feedback, helps with diagnosis"],
+        "Testing also scopes the work ('done when these tests pass'), gives feedback that helps diagnosis, "
+        "and documents behavior",
+    ),
+    _test_case(
+        "Q6", TST, "concept_covered", "what makes a characteristic semantic instead of syntactic when modeling inputs?",
+        '"07 - InputSpaceDesign.pdf"',
+        ["conceptual, requires domain knowledge"],
+        "Syntactic characteristics are mechanical and depend on one attribute (e.g. sign of an attribute); "
+        "semantic ones are conceptual, need domain knowledge and depend on several attributes",
+        gold_sources=["07 - InputSpaceDesign.pdf", "07 - Input Space Design - note taking version.pdf"],
+    ),
+    _test_case(
+        "Q7", TST, "course_fact", "which mockito version do i need to have before class?",
+        "Mockito Exercises and Prep",
+        ["Mockito: 3.5.11 or higher"],
+        "Mockito 3.5.11 or higher (with JUnit 4.13 or higher and Hamcrest 2.2 or higher)",
+    ),
+    _test_case(
+        "Q8", TST, "course_fact", "can i look at my notes during the midterm?",
+        "Midterm Exam- Requires Respondus LockDown Browser",
+        ["closed-internet and closed-book"],
+        "No. The exam is closed-internet and closed-book, taken in the Respondus LockDown Browser",
+        gold_sources=["Midterm Exam- Requires Respondus LockDown Browser", "Midterm Practice Questions - Requires Respondus LockDown Browser"],
+    ),
+    _test_case(
+        "Q9", TST, "course_fact", "who do i email if i don't want my coursework used in the teaching research?",
+        "Syllabus — Research to Improve the Course",
+        ["Chad Hershock"],
+        "Chad Hershock at the Eberly Center (hershock@andrew.cmu.edu); opting out is confidential and does not affect the course",
+    ),
+    _test_case(
+        "Q10", TST, "course_fact", "is the final exam in class or at some other time?",
+        "Syllabus — Tentative Course Calendar",
+        ["FINAL EXAM (during class time)"],
+        "During class time, in the last week (11/30), after the final exam review",
+    ),
+    _test_case(
+        "Q11", REQ, "course_fact", "how many people go in an innovation project team?",
+        "Innovation Project Objectives",
+        ["performed in teams of 4 to 5 students"],
+        "Teams of 4 to 5 students",
+    ),
+    _test_case(
+        "Q12", REQ, "course_fact", "what do we actually do in task 3 of the innovation project?",
+        "Task 3 Objectives",
+        ["create a long-term vision that communicates the intent of the solution"],
+        "Solution envisioning: create a long-term vision that communicates the intent of the solution and "
+        "identify a Minimum Viable Product",
+        gold_sources=["Task 3 Objectives", "Innovation Project Objectives"],
+    ),
+    _test_case(
+        "Q13", REQ, "course_fact", "how many interview questions should i have ready before task 1?",
+        "Class Preparation",
+        ["Prepare a list of 40-50 interview questions"],
+        "A list of 40 to 50 interview questions, using the Interview Question Template",
+    ),
+    _test_case(
+        "Q14", REQ, "course_fact", "what do i need to read for the week on talking to users?",
+        "Class Preparation",
+        ["Section on Interviewing and Observing Users"],
+        "Cooper, About Face, Chapter 2 (Understanding the Problem: Design Research), the section on Interviewing "
+        "and Observing Users, pp 44-56",
+    ),
+    _test_case(
+        "Q15", REQ, "course_fact", "what software do we use to manage requirements?",
+        "Class Preparation",
+        ["Jama, a requirements management tool"],
+        "Jama",
+        gold_sources=["Class Preparation", "Innovation Project Objectives"],
+    ),
+    _test_case(
+        "Q16", REQ, "course_fact", "what percent of the grade is class participation?",
+        "Syllabus — Grading Rubric",
+        ["Class Participation and Attendance | Individual | 10"],
+        "10%, graded individually",
+    ),
+    _test_case(
+        "Q17", REQ, "course_fact", "if my teammates slack off, does my project grade suffer?",
+        "Syllabus — Grading Rubric",
+        ["grades of individual students will be adjusted upward or downward according to Faculty and Peer Evaluations"],
+        "Work is done in teams, but individual grades are adjusted up or down according to Faculty and Peer Evaluations",
+    ),
+    _test_case(
+        "Q18", AI, "course_fact", "who is the fintech app idea aimed at?",
+        '"Fintech App.docx"',
+        ["freelancers, side hustlers, and independent earners"],
+        "Freelancers, gig workers, side hustlers and other variable-income earners (the BenchWise idea)",
+    ),
+    _test_case(
+        "Q19", AI, "course_fact", "where should i search for papers for the literature review?",
+        '"Research Study.pdf"',
+        ["Google Scholar, IEEE, ScienceDirect, PubMed"],
+        "Google Scholar, IEEE, ScienceDirect, PubMed, and similar",
+    ),
+    _test_case(
+        "Q20", TST, "not_in_course", "what's the wifi password for room 109?", None, None,
+        "Not in the course materials; a good answer says so and does not invent one",
+    ),
+    _test_case(
+        "Q21", REQ, "not_in_course", "who is the guest speaker in week 10?", None, None,
+        "The materials name no guest speaker for this course; a good answer says so",
+    ),
+    _test_case(
+        "Q22", AI, "not_in_course", "what programming language does the project have to be written in?", None, None,
+        "The materials set no required language; a good answer says so rather than guessing",
+    ),
+    _test_case(
+        "Q23", TST, "not_in_course", "what's the deadline to drop the course?", None, None,
+        "No drop deadline appears in the course materials (the syllabus defers to university policies); a good "
+        "answer says so and does not invent a date",
+    ),
+]
+
+
+# Sprint 8 chat set: short conversations with follow-ups. Written on
+# 2026-10-25 after the SPRINT8_CASES results were read, and frozen like
+# SPRINT8_TEST_CASES: search once when the design is settled, tune nothing on it.
+#
+# Each turn is (typed, rewrite, facts). typed is what the student wrote.
+# rewrite is a standalone version of it, written by hand the way a good model
+# would, with no answer words in it; None when the turn already stands alone.
+# facts is the text that answers that turn; None when the course cannot
+# answer it. The eval searches the typed text and the rewrite separately.
+def _chat_case(case_id, course, answer, turns):
+    return {
+        "id": case_id,
+        "course": course,
+        "kind": "follow_up",
+        "turns": [t[0] for t in turns],
+        "rewrites": [t[1] for t in turns],
+        "turn_facts": [t[2] for t in turns],
+        "gold_source": None,
+        "gold_answer": answer,
+        "gold_confidence": "V",
+    }
+
+
+SPRINT8_CHAT_CASES = [
+    _chat_case("CH1", TST, "Assignment 3 (Docker Compose) and Assignment 2 (Docker images) due dates from the syllabus calendar", [
+        ("when is the docker compose assignment due?", None, ["Assignment 3 (Docker Compose) due"]),
+        ("and the docker images one?", "when is the docker images assignment due?", ["Assignment 2 (Docker images) due (Thursday EOD)"]),
+    ]),
+    _chat_case("CH2", TST, "Vocareum coverage minimum, then the Mockito exercises minimum, then the API rule", [
+        ("what's the minimum coverage for vocareum assignments?", None, ["typically 80-90% line coverage"]),
+        ("what about for the mockito exercises?", "what is the minimum coverage for the mockito exercises?", ["Below 80% coverage will give you a total score of 0"]),
+        ("and if my code doesn't match the api?", "what happens if my mockito exercises code doesn't match the api requirements?", ["If you don't comply with the API requirements, your code will not compile"]),
+    ]),
+    _chat_case("CH3", TST, "What Hamcrest is for, then the matchers that combine conditions (logical matchers)", [
+        ("what's hamcrest for?", None, ["Hamcrest matchers make tests more natural"]),
+        ("which ones combine conditions?", "which hamcrest matchers combine multiple conditions?", ["allOf - matches if all matchers match"]),
+    ]),
+    _chat_case("CH4", TST, "Midterm rules: allowed tools, phones, and the wrong-answer penalty", [
+        ("what can i bring to the midterm?", None, ["pen/pencil and white scratch paper"]),
+        ("and my phone?", "can i have my phone during the midterm?", ["Cell phones and electronic devices"]),
+        ("do wrong answers cost me points?", "do wrong answers lose points on the midterm?", ["incur a penalty for each wrong answer"]),
+    ]),
+    _chat_case("CH5", TST, "Instructor email, then the office hours (Mondays and Wednesdays 2-3pm, room 104)", [
+        ("what's the instructor's email?", None, ["rafal.wlodarski@sv.cmu.edu"]),
+        ("and when are the office hours?", "when are the instructor's office hours?", ["Office Hours: 2:00-3:00pm Mondays/Wednesday (room 104)"]),
+    ]),
+    _chat_case("CH6", REQ, "Task 2 (conceptual design), Task 4 (prototyping and backlog), and Task 4's length (2 weeks)", [
+        ("what's task 2 about?", None, ["brainstorm solution ideas and generate alternative viable design concepts"]),
+        ("and task 4?", "what's task 4 about?", ["Create a medium-fidelity prototype for your minimum viable product"]),
+        ("how long do we get for it?", "how long do we get for task 4?", ["Task 4: Prototyping and Backlog Preparation (2 weeks)"]),
+    ]),
+    _chat_case("CH7", REQ, "Task 4 deliverables, then the non-functional requirements part (3 highest priority, Planguage)", [
+        ("what do we hand in for task 4?", None, ["Medium-Fidelity Prototype for your first product increment"]),
+        ("how should we do the non-functional part?", "how should we elaborate the non-functional requirements in task 4?", ["Elaborate your 3 highest priority non-functional requirements using Planguage"]),
+    ]),
+    _chat_case("CH8", REQ, "Class attendance is mandatory Mondays and Wednesdays; Friday recitations mandatory only on December 5", [
+        ("do i have to show up to class every time?", None, ["Class attendance is mandatory, both Mondays and Wednesdays"]),
+        ("what about fridays?", "are the friday recitations mandatory?", ["Friday recitations are mandatory only on December 5"]),
+    ]),
+    _chat_case("CH9", REQ, "Professor and teaching assistant contact details from the syllabus", [
+        ("who teaches the course?", None, ["cecile.peraire@sv.cmu.edu"]),
+        ("and who's the ta?", "who is the teaching assistant?", ["shaldipu@andrew.cmu.edu"]),
+    ]),
+    _chat_case("CH10", AI, "Sprint 8 due Oct 27 10:00 AM PDT, Sprint 9 due Nov 17", [
+        ("when is the sprint 8 deliverable due?", None, ["Due Tue, Oct 27, 2026 at 10:00 AM PDT"]),
+        ("and sprint 9?", "when is the sprint 9 deliverable due?", ["Due Tue, Nov 17, 2026"]),
+    ]),
+    _chat_case("CH11", TST, "The calendar lists the operational excellence guest lecture; no guest name appears anywhere, so the follow-up is unanswerable", [
+        ("when is the operational excellence class?", None, ["Operational excellence (guest lecture)"]),
+        ("what's the guest's name?", "who is the guest lecturer for the operational excellence class?", None),
+    ]),
+    _chat_case("CH12", TST, "Lab 3 (Observability) and Lab 2 (Docker Swarm) due dates, both Sunday end of day", [
+        ("when is lab 3 due?", None, ["Lab 3: Observability due (Sunday EOD)"]),
+        ("and lab 2?", "when is lab 2 due?", ["Lab 2 due (Sunday EOD)"]),
+    ]),
+    _chat_case("CH13", TST, "No class on Thanksgiving; then a separate question about a Docker book (Learn Docker in a Month of Lunches)", [
+        ("is there class on thanksgiving?", None, ["THANKSGIVING (NO CLASSES)"]),
+        ("separate question: which book covers docker?", None, ["Learn Docker in a Month of Lunches"]),
+    ]),
+]
+
+
+# A chat written by the student (Arthur) in the Chat Writer page on 2026-10-25, typed
+# as he would in the app, with no look at any search result. Labels were checked
+# against Canvas and the index synced on 2026-10-26 (the index in use before that
+# was last synced on 2026-10-18 and lacked A2, A3 and the Docker decks).
+# Questions 1, 2 and 4 depend on today's date, which the chat prompt does not
+# carry. Their rewrite is the question as a date-aware app would write it, so the
+# typed and rewritten rows show what the missing date costs. Q3 and Q5 have no
+# facts: Q3 is too vague to answer and Q5 asks for the last class, whose
+# transcript is a single junk sentence. This chat has no follow-ups that lean on
+# an earlier turn, so it does not test conversation memory.
+SPRINT8_USER_CASES = [
+    {
+        "id": "U1",
+        "course": TST,
+        "kind": "follow_up",
+        "turns": [
+            "what do I need to do for next week?",
+            "what assignments do I have for next week?",
+            "what do i need to do?",
+            "what do i need to study for this exam",
+            "explain the last class",
+            "where is the slide that the professor explain the assigment 2",
+        ],
+        "rewrites": [
+            "what is due the week of october 26?",
+            "which assignments are due the week of october 26?",
+            None,
+            "what should i study for the final exam?",
+            None,
+            None,
+        ],
+        "turn_facts": [
+            ["Due Wed, Oct 28, 2026 at 3:00 PM PDT", "Assignment 3 (Docker Compose) due - Super-Mutant Milestone 1: Test Plan (Sunday EOD)"],
+            ["Due Wed, Oct 28, 2026 at 3:00 PM PDT", "Assignment 3 (Docker Compose) due - Super-Mutant Milestone 1: Test Plan (Sunday EOD)"],
+            None,
+            ["Release practice final exam"],
+            None,
+            ["Project introduction slides and class recording, which provide context, are available on Canvas/Modules/Projects"],
+        ],
+        "gold_source": None,
+        "gold_answer": (
+            "Q1/Q2: A3 (Docker Compose) is due Wed Oct 28, 3:00 PM PDT, and Super-Mutant Milestone 1 (Test Plan) Sunday. "
+            "Q3: too vague; a good answer asks what the student means. "
+            "Q4: the final exam is next (a practice final is released the week of 11/16, review 11/30). "
+            "Q5: the last class has no usable transcript; a good answer says it cannot tell. "
+            "Q6: the A2 page points to the project introduction slides on Canvas (Project Intro F26.pdf)"
+        ),
+        "gold_confidence": "V",
+    },
+]
+
+
 def cases_for(name: str) -> list[dict]:
     if name == "heldout":
         return HELDOUT_CASES
+    if name == "sprint8-user":
+        return SPRINT8_USER_CASES
+    if name == "sprint8-chat":
+        return SPRINT8_CHAT_CASES
+    if name == "sprint8-test":
+        return SPRINT8_TEST_CASES
+    if name == "sprint8":
+        return SPRINT8_CASES
     if name == "sprint7":
         return sprint7_cases()
     if name == "sample":
@@ -1167,6 +1687,48 @@ def precision_at_k(gold_source: str | None, retrieved: list[list[str]], gold_sou
     return sum(per_search) / len(per_search)
 
 
+def _squash(text: str) -> str:
+    return " ".join(text.split()).lower()
+
+
+def contains_fact(gold_facts: list[str], text: str) -> bool:
+    """A result is relevant when its text holds the fact that answers the
+    question, whatever file it came from. Case and whitespace are ignored
+    (slide text breaks lines in odd places)."""
+    body = _squash(text)
+    return any(_squash(fact) in body for fact in gold_facts)
+
+
+def recall_by_fact(gold_facts: list[str] | None, texts: list[str]) -> bool | None:
+    """None when the case has no gold_facts, so source-name scoring still
+    decides it. Otherwise true when any returned result holds a fact."""
+    if not gold_facts:
+        return None
+    return any(contains_fact(gold_facts, text) for text in texts)
+
+
+def precision_by_fact(gold_facts: list[str] | None, texts: list[str]) -> float | None:
+    """Share of the returned results that hold a fact. None when the case has
+    no gold_facts or the search returned nothing (nothing to take a share of,
+    the same rule as precision_at_k)."""
+    if not gold_facts or not texts:
+        return None
+    return sum(contains_fact(gold_facts, text) for text in texts) / len(texts)
+
+
+def first_rank_by_fact(gold_facts: list[str] | None, texts: list[str]) -> int | None:
+    """Position (1 is the top result) of the first result that holds a fact.
+    None when the case has no gold_facts or no returned result holds one.
+    Unlike precision, this cannot be raised by returning fewer results: it
+    only moves when the right chunk moves up."""
+    if not gold_facts:
+        return None
+    for position, text in enumerate(texts, start=1):
+        if contains_fact(gold_facts, text):
+            return position
+    return None
+
+
 JUDGE_PROMPT = """You are grading one chat-assistant answer for an evaluation. You did not write the \
 answer and have no stake in it scoring well or badly — grade strictly against the gold facts given below, \
 not against how confident or polished the answer sounds.
@@ -1197,6 +1759,31 @@ behavior is to say the information isn't available (a trap question, or material
 the assistant said so, false if it guessed or invented something instead, null for every other case.
 
 Return nothing but the JSON object, no markdown fences."""
+
+
+# What the answer judge is told a turn must say, where the retrieval fact is
+# only a fragment (a calendar cell or heading with no date or detail in it).
+# Retrieval labels are untouched: the chat set was meant to be searched once,
+# so the answer judge reads these notes and the search scoring does not.
+JUDGE_NOTES = {
+    "CH1": {
+        1: "Assignment 3 (Docker Compose) is due Wed, Oct 28, 2026 at 3:00 PM PDT.",
+        2: "Assignment 2 (Docker images) is due Thu, Oct 22, 2026 at 11:59 PM PDT.",
+    },
+    "CH4": {2: "Phones and other electronic devices may not be reachable or visible from the workspace during the exam."},
+    "CH11": {1: "The operational excellence class (a guest lecture) is in the week of 11/16, the Monday class."},
+    "CH12": {
+        1: "Lab 3: Observability is due Sunday EOD, in the 11/16 week row of the calendar, so Sunday Nov 22, 2026.",
+        2: "Lab 2 is due Sunday EOD, in the 11/9 week row of the calendar, so Sunday Nov 15, 2026.",
+    },
+    "U1": {
+        1: "Due the week of Oct 26 to Nov 1: Assignment 3 (Docker Compose) on Wed, Oct 28, 2026 at 3:00 PM PDT, and Super-Mutant Milestone 1 (Test Plan) on Sunday EOD. Assignment 2 was due Oct 22, so listing it as due next week is wrong.",
+        2: "Due the week of Oct 26 to Nov 1: Assignment 3 (Docker Compose) on Wed, Oct 28, 2026 at 3:00 PM PDT, and Super-Mutant Milestone 1 (Test Plan) on Sunday EOD. Assignment 2 was due Oct 22, so listing it as due next week is wrong.",
+    },
+}
+for _case in SPRINT8_CHAT_CASES + SPRINT8_USER_CASES:
+    if _case["id"] in JUDGE_NOTES:
+        _case["judge_notes"] = JUDGE_NOTES[_case["id"]]
 
 
 # --- retrieval-only: search the index, score sources, no model call --------
@@ -1238,15 +1825,61 @@ def _mean(values: list[float | None]) -> float | None:
 def retrieval_metrics(rows: list[dict]) -> dict:
     """Aggregate recall@5 and precision@5 the way print_report does for a mode:
     the mean over turns where that metric applies. None when none do."""
+    all_rows = rows
+    # A rewritten query is a second search for the same turn. Only what the
+    # student typed counts toward the headline numbers.
+    rows = [r for r in all_rows if r.get("variant", "as_typed") == "as_typed"]
     recalls = [1.0 if r["recall_at_5"] else 0.0 if r["recall_at_5"] is False else None for r in rows]
     precisions = [r["precision_at_5"] for r in rows]
-    return {
+    metrics = {
         "n": len(rows),
         "n_recall": sum(v is not None for v in recalls),
         "n_precision": sum(v is not None for v in precisions),
         "recall_at_5": _mean(recalls),
         "precision_at_5": _mean(precisions),
     }
+    # Fact labels: scored only on questions that carry gold_facts. Precision is
+    # given both ways, empty results skipped and counted as 0, because a search
+    # that returns nothing is the point of the score cutoff.
+    fact_rows = [r for r in rows if r.get("gold_facts")]
+    if fact_rows:
+        fact_recalls = [1.0 if r["recall_by_fact"] else 0.0 for r in fact_rows]
+        metrics["fact_labels"] = {
+            "n": len(fact_rows),
+            "hits": int(sum(fact_recalls)),
+            "recall": _mean(fact_recalls),
+            "n_precision": sum(r["precision_by_fact"] is not None for r in fact_rows),
+            "precision_empty_skipped": _mean([r["precision_by_fact"] for r in fact_rows]),
+            "precision_empty_as_zero": _mean([r["precision_by_fact"] or 0.0 for r in fact_rows]),
+            # Ranking quality that truncation cannot inflate: how many right
+            # chunks come first, and the mean of 1/rank (0 when not returned).
+            "top1_hits": sum(r["first_rank_by_fact"] == 1 for r in fact_rows),
+            "mrr": _mean([1 / r["first_rank_by_fact"] if r["first_rank_by_fact"] else 0.0 for r in fact_rows]),
+        }
+    # Questions the course cannot answer: the best search returns nothing.
+    unanswerable = [r for r in rows if r["gold_source"] is None and not r.get("gold_facts")]
+    if unanswerable:
+        metrics["unanswerable"] = {
+            "n": len(unanswerable),
+            "returned": sum(len(r["retrieved"]) for r in unanswerable),
+            "with_results": sum(bool(r["retrieved"]) for r in unanswerable),
+        }
+    # Follow-up turns ("and the final?"): the text as typed against a
+    # hand-written standalone rewrite. The gap is what a good query rewrite
+    # could win; it is an upper bound, since a model's rewrite can be worse.
+    follow_rows = [r for r in all_rows if r["turn"] > 1 and r.get("gold_facts")]
+    if any(r.get("variant") == "rewritten" for r in follow_rows):
+        def summarize(variant):
+            chosen = [r for r in follow_rows if r.get("variant", "as_typed") == variant]
+            return {
+                "n": len(chosen),
+                "hits": sum(bool(r["recall_by_fact"]) for r in chosen),
+                "top1_hits": sum(r["first_rank_by_fact"] == 1 for r in chosen),
+                "mrr": _mean([1 / r["first_rank_by_fact"] if r["first_rank_by_fact"] else 0.0 for r in chosen]),
+            }
+
+        metrics["follow_ups"] = {"as_typed": summarize("as_typed"), "rewritten": summarize("rewritten")}
+    return metrics
 
 
 def evaluate_retrieval(cases: list[dict], index_for, retriever_for=shipped_retriever) -> dict:
@@ -1269,30 +1902,47 @@ def evaluate_retrieval(cases: list[dict], index_for, retriever_for=shipped_retri
             indexes[course_id] = index_for(course_id)
             retrievers[course_id] = retriever_for(indexes[course_id])
         retriever = retrievers[course_id]
+        turn_facts = case.get("turn_facts")
+        rewrites = case.get("rewrites")
         for turn_num, question in enumerate(case["turns"], start=1):
-            start = time.perf_counter()
-            labels = [source_label(n) for n in retriever.retrieve(question)]
-            # One search, so the metric helpers see a single label list, the
-            # same shape the chat modes store in "retrieved".
-            retrieved = [labels]
-            rows.append(
-                {
-                    "case": case["id"],
-                    "course": course_id,
-                    "kind": case["kind"],
-                    "variant_of": case.get("variant_of"),
-                    "turn": turn_num,
-                    "mode": "retrieval-only",
-                    "question": question,
-                    "gold_source": case.get("gold_source"),
-                    "retrieved": labels,
-                    "recall_at_5": recall_at_5(case.get("gold_source"), retrieved),
-                    "precision_at_5": precision_at_k(
-                        case.get("gold_source"), retrieved, case.get("gold_sources")
-                    ),
-                    "seconds": round(time.perf_counter() - start, 2),
-                }
-            )
+            # A chat case lists facts per turn; a single-question case uses gold_facts.
+            facts = turn_facts[turn_num - 1] if turn_facts else case.get("gold_facts")
+            queries = [("as_typed", question)]
+            rewrite = rewrites[turn_num - 1] if rewrites else None
+            if rewrite:
+                queries.append(("rewritten", rewrite))
+            for variant, query in queries:
+                start = time.perf_counter()
+                nodes = list(retriever.retrieve(query))
+                labels = [source_label(n) for n in nodes]
+                texts = [n.get_content() for n in nodes]
+                # One search, so the metric helpers see a single label list, the
+                # same shape the chat modes store in "retrieved".
+                retrieved = [labels]
+                rows.append(
+                    {
+                        "case": case["id"],
+                        "course": course_id,
+                        "kind": case["kind"],
+                        "variant_of": case.get("variant_of"),
+                        "turn": turn_num,
+                        "variant": variant,
+                        "mode": "retrieval-only",
+                        "question": question,
+                        "query": query,
+                        "gold_source": case.get("gold_source"),
+                        "retrieved": labels,
+                        "recall_at_5": recall_at_5(case.get("gold_source"), retrieved),
+                        "precision_at_5": precision_at_k(
+                            case.get("gold_source"), retrieved, case.get("gold_sources")
+                        ),
+                        "gold_facts": facts,
+                        "recall_by_fact": recall_by_fact(facts, texts),
+                        "precision_by_fact": precision_by_fact(facts, texts),
+                        "first_rank_by_fact": first_rank_by_fact(facts, texts),
+                        "seconds": round(time.perf_counter() - start, 2),
+                    }
+                )
     return {
         "mode": "retrieval-only",
         "metrics": retrieval_metrics(rows),
@@ -1313,17 +1963,25 @@ def print_retrieval_report(report: dict) -> None:
     """Per-question scores, then one row of averages. A question with no
     expected source (recall and precision are None) is left out of the
     average, same as the chat-mode summary."""
+    has_facts = any(r.get("gold_facts") for r in report["results"])
     print("\n## Questions\n")
-    print("| case | recall@5 | precision@5 | returned | top source |")
-    print("|---|---|---|---|---|")
+    if has_facts:
+        print("| case | recall@5 | precision@5 | fact recall | fact precision | returned | top source |")
+        print("|---|---|---|---|---|---|---|")
+    else:
+        print("| case | recall@5 | precision@5 | returned | top source |")
+        print("|---|---|---|---|---|")
     for row in report["results"]:
         recall = row["recall_at_5"]
         recall_cell = "n/a" if recall is None else ("yes" if recall else "no")
         top = row["retrieved"][0].replace("|", "/") if row["retrieved"] else ""
-        print(
-            f"| {row['case']}.{row['turn']} | {recall_cell} | {_rate(row['precision_at_5'])} | "
-            f"{len(row['retrieved'])} | {top} |"
-        )
+        label = f"{row['case']}.{row['turn']}" + (" (rewritten)" if row.get("variant") == "rewritten" else "")
+        cells = [label, recall_cell, _rate(row["precision_at_5"])]
+        if has_facts:
+            fact = row.get("recall_by_fact")
+            cells += ["n/a" if fact is None else ("yes" if fact else "no"), _rate(row.get("precision_by_fact"))]
+        cells += [str(len(row["retrieved"])), top]
+        print("| " + " | ".join(cells) + " |")
 
     metrics = report["metrics"]
     print("\n## Summary\n")
@@ -1333,6 +1991,37 @@ def print_retrieval_report(report: dict) -> None:
         f"| {metrics['n']} | {_rate(metrics['recall_at_5'], metrics['n_recall'], metrics['n'])} | "
         f"{_rate(metrics['precision_at_5'], metrics['n_precision'], metrics['n'])} |"
     )
+    facts = metrics.get("fact_labels")
+    if facts:
+        print("\n## Scored by the fact in the text (not the file name)\n")
+        print("| questions | recall@5 | right chunk first | MRR | precision@5, empty skipped | precision@5, empty as 0 |")
+        print("|---|---|---|---|---|---|")
+        print(
+            f"| {facts['n']} | {facts['hits']}/{facts['n']} ({_rate(facts['recall'])}) | "
+            f"{facts['top1_hits']}/{facts['n']} | {facts['mrr']:.3f} | "
+            f"{_rate(facts['precision_empty_skipped'], facts['n_precision'], facts['n'])} | "
+            f"{_rate(facts['precision_empty_as_zero'])} |"
+        )
+        print(
+            "\nPrecision rises when a search returns fewer results, even if ranking is no better. "
+            "Read it with MRR and 'right chunk first'."
+        )
+    follow = metrics.get("follow_ups")
+    if follow:
+        print("\n## Follow-up turns: as typed vs a standalone rewrite\n")
+        print("| query | turns | recall@5 | right chunk first | MRR |")
+        print("|---|---|---|---|---|")
+        for name, label in (("as_typed", "as typed"), ("rewritten", "rewritten")):
+            row = follow[name]
+            print(f"| {label} | {row['n']} | {row['hits']}/{row['n']} | {row['top1_hits']}/{row['n']} | {row['mrr']:.3f} |")
+        print("\nThe rewrites are written by hand, so the gap is an upper bound on what query rewriting can win.")
+    unanswerable = metrics.get("unanswerable")
+    if unanswerable:
+        print(
+            f"\nQuestions the course cannot answer: {unanswerable['with_results']} of "
+            f"{unanswerable['n']} returned results ({unanswerable['returned']} results in all). "
+            "Fewer is better."
+        )
     # Published Sprint 7 chat numbers (results.md), shown on a sprint7 run
     # beside the new scores. Those numbers come from the chat's own searches.
     if report.get("set") == "sprint7":
@@ -1373,7 +2062,27 @@ def run_retrieval_only(args) -> dict:
     return report
 
 
-def judge(client, course_name: str, case: dict, question: str, answer: str, sources: list[str]) -> dict:
+def turn_gold_answer(case: dict, turn_num: int) -> str | None:
+    """The gold answer to grade one turn against. A case with per-turn facts
+    is graded turn by turn: the facts that turn must state, or, when it has
+    none, the instruction to say the course cannot answer. Without turn_facts
+    the case's own gold_answer stands (None here)."""
+    note = case.get("judge_notes", {}).get(turn_num)
+    if note:
+        return note
+    turn_facts = case.get("turn_facts")
+    if not turn_facts:
+        return None
+    facts = turn_facts[turn_num - 1]
+    if facts:
+        return "The answer must state this information (the wording may differ): " + " | ".join(facts)
+    return (
+        "The course materials do not answer this turn. Correct behavior is to say the information is not "
+        "available, or to ask the student what they mean, and not to guess."
+    )
+
+
+def judge(client, course_name: str, case: dict, question: str, answer: str, sources: list[str], gold_answer: str | None = None) -> dict:
     """One gpt-4o call grading an answer against its case's gold data. A
     case with gold_confidence "U" (no real gold_answer yet) still gets
     judged, against whatever's in gold_answer (often just "not confirmed
@@ -1384,7 +2093,7 @@ def judge(client, course_name: str, case: dict, question: str, answer: str, sour
         question=question,
         kind=case["kind"],
         gold_source=case.get("gold_source") or "(none — see gold_answer for the correct behavior)",
-        gold_answer=case.get("gold_answer") or "(not established this session — grade cautiously)",
+        gold_answer=gold_answer or case.get("gold_answer") or "(not established this session — grade cautiously)",
         answer=answer,
         sources=", ".join(sources) or "(none)",
     )
@@ -1410,7 +2119,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", default="A,B,C")
     parser.add_argument("--cases", default="", help="comma-separated case ids; default all")
-    parser.add_argument("--set", default="first", choices=["first", "heldout", "sprint7", "sample"])
+    parser.add_argument("--set", default="first", choices=["first", "heldout", "sprint7", "sprint8", "sprint8-test", "sprint8-chat", "sprint8-user", "sample"])
     parser.add_argument(
         "--retrieval-only",
         action="store_true",
@@ -1459,7 +2168,7 @@ def main():
                     out["precision_at_5"] = precision_at_k(case.get("gold_source"), out["retrieved"], case.get("gold_sources"))
                 out["cost"] = cost(out["prompt_tokens"], out["completion_tokens"])
                 if judge_client is not None:
-                    out.update(judge(judge_client, COURSE_NAMES[course_id], case, question, out["answer"], out["sources"]))
+                    out.update(judge(judge_client, COURSE_NAMES[course_id], case, question, out["answer"], out["sources"], turn_gold_answer(case, turn_num)))
                 results.append(
                     {
                         "case": case["id"],

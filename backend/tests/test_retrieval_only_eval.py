@@ -153,7 +153,8 @@ def test_search_only_scores_recall_and_precision_on_the_fixture_index(eval_mod, 
     assert by_id["NONE"]["precision_at_5"] is None
 
     # NONE has no expected source, so it stays out of both averages.
-    assert report["metrics"] == {
+    averages = {k: report["metrics"][k] for k in ("n", "n_recall", "n_precision", "recall_at_5", "precision_at_5")}
+    assert averages == {
         "n": 3,
         "n_recall": 2,
         "n_precision": 2,
