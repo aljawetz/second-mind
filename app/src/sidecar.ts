@@ -347,6 +347,8 @@ export interface SessionSummary {
 
 export interface SessionDetail extends SessionSummary {
   transcript?: string;
+  // While recording/processing: the slices transcribed so far.
+  transcript_so_far?: string;
   summary?: string;
   notes?: string;
   error?: string;
