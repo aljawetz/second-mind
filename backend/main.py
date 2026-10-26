@@ -89,6 +89,7 @@ SESSION_START_PATH = re.compile(r"^/courses/(\d+)/sessions/start$")
 SESSION_DETAIL_PATH = re.compile(r"^/courses/(\d+)/sessions/([\w-]+)$")
 SESSION_RENAME_PATH = re.compile(r"^/courses/(\d+)/sessions/([\w-]+)/rename$")
 SESSION_STOP_PATH = re.compile(r"^/sessions/([\w-]+)/stop$")
+SESSION_CHUNK_PATH = re.compile(r"^/sessions/([\w-]+)/chunks/(\d+)$")
 SESSION_NOTES_PATH = re.compile(r"^/sessions/([\w-]+)/notes$")
 CONVERSATION_LIST_PATH = re.compile(r"^/courses/(\d+)/conversations$")
 CONVERSATION_DETAIL_PATH = re.compile(r"^/courses/(\d+)/conversations/([\w-]+)$")
@@ -513,6 +514,11 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_session_stop(session_stop_match.group(1))
             return
 
+        session_chunk_match = SESSION_CHUNK_PATH.match(path)
+        if session_chunk_match:
+            self._handle_session_chunk(session_chunk_match.group(1), int(session_chunk_match.group(2)))
+            return
+
         session_notes_match = SESSION_NOTES_PATH.match(path)
         if session_notes_match:
             self._handle_session_notes(session_notes_match.group(1))
@@ -606,6 +612,18 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
             return
         self._send_json(200, result)
+
+    def _handle_session_chunk(self, session_id: str, index: int):
+        import sessions
+
+        length = int(self.headers.get("Content-Length", 0))
+        audio_bytes = self.rfile.read(length)
+        try:
+            sessions.add_chunk(session_id, index, audio_bytes)
+        except KeyError:
+            self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
+            return
+        self._send_json(200, {"status": "queued"})
 
     def _handle_session_notes(self, session_id: str):
         import sessions
