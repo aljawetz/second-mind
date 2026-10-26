@@ -16,6 +16,7 @@ export class ChunkedRecorder {
   private slice!: { recorder: MediaRecorder; parts: Blob[] };
   private seconds = 0;
   private sliceSeconds = 0;
+  private lastTick = 0;
   private nextIndex = 0;
   private paused = false;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -31,21 +32,35 @@ export class ChunkedRecorder {
 
   start() {
     this.beginSlice();
+    this.lastTick = Date.now();
     this.timer = setInterval(() => {
-      if (this.paused) return;
-      this.seconds += 1;
-      this.sliceSeconds += 1;
-      this.onTick(this.seconds);
-      if (this.sliceSeconds >= SLICE_SECONDS) this.rotate();
+      this.advanceClock();
+      if (!this.paused && this.sliceSeconds >= SLICE_SECONDS) this.rotate();
     }, 1000);
   }
 
+  // Time is measured on the clock, not by counting timer ticks: the webview
+  // slows timers down when the window is in the background, and counting
+  // ticks then made "60 second" slices up to twice as long.
+  private advanceClock() {
+    const now = Date.now();
+    if (!this.paused) {
+      const elapsed = (now - this.lastTick) / 1000;
+      this.seconds += elapsed;
+      this.sliceSeconds += elapsed;
+      this.onTick(Math.floor(this.seconds));
+    }
+    this.lastTick = now;
+  }
+
   pause() {
+    this.advanceClock();
     this.slice.recorder.pause();
     this.paused = true;
   }
 
   resume() {
+    this.lastTick = Date.now();
     this.slice.recorder.resume();
     this.paused = false;
   }
