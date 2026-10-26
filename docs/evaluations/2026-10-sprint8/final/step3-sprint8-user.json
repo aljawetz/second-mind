@@ -1,0 +1,252 @@
+{
+  "mode": "retrieval-only",
+  "set": "sprint8-user",
+  "index": "/Users/arthurjawetz/second-mind-eval-index-2026-10-26",
+  "metrics": {
+    "n": 6,
+    "n_recall": 0,
+    "n_precision": 0,
+    "recall_at_5": null,
+    "precision_at_5": null,
+    "fact_labels": {
+      "n": 4,
+      "hits": 0,
+      "recall": 0.0,
+      "n_precision": 3,
+      "precision_empty_skipped": 0.0,
+      "precision_empty_as_zero": 0.0,
+      "top1_hits": 0,
+      "mrr": 0.0
+    },
+    "unanswerable": {
+      "n": 2,
+      "returned": 0,
+      "with_results": 0
+    },
+    "follow_ups": {
+      "as_typed": {
+        "n": 3,
+        "hits": 0,
+        "top1_hits": 0,
+        "mrr": 0.0
+      },
+      "rewritten": {
+        "n": 2,
+        "hits": 0,
+        "top1_hits": 0,
+        "mrr": 0.0
+      }
+    }
+  },
+  "results": [
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what do I need to do for next week?",
+      "query": "what do I need to do for next week?",
+      "gold_source": null,
+      "retrieved": [
+        "01 CourseInfoF26.pdf \u00b7 p.5"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Due Wed, Oct 28, 2026 at 3:00 PM PDT",
+        "Assignment 3 (Docker Compose) due - Super-Mutant Milestone 1: Test Plan (Sunday EOD)"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.26
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "what do I need to do for next week?",
+      "query": "what is due the week of october 26?",
+      "gold_source": null,
+      "retrieved": [],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Due Wed, Oct 28, 2026 at 3:00 PM PDT",
+        "Assignment 3 (Docker Compose) due - Super-Mutant Milestone 1: Test Plan (Sunday EOD)"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.34
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what assignments do I have for next week?",
+      "query": "what assignments do I have for next week?",
+      "gold_source": null,
+      "retrieved": [
+        "01 CourseInfoF26.pdf \u00b7 p.26"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Due Wed, Oct 28, 2026 at 3:00 PM PDT",
+        "Assignment 3 (Docker Compose) due - Super-Mutant Milestone 1: Test Plan (Sunday EOD)"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.33
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "what assignments do I have for next week?",
+      "query": "which assignments are due the week of october 26?",
+      "gold_source": null,
+      "retrieved": [
+        "01 CourseInfoF26.pdf \u00b7 p.29"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Due Wed, Oct 28, 2026 at 3:00 PM PDT",
+        "Assignment 3 (Docker Compose) due - Super-Mutant Milestone 1: Test Plan (Sunday EOD)"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.31
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 3,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what do i need to do?",
+      "query": "what do i need to do?",
+      "gold_source": null,
+      "retrieved": [],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": null,
+      "recall_by_fact": null,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.1
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 4,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what do i need to study for this exam",
+      "query": "what do i need to study for this exam",
+      "gold_source": null,
+      "retrieved": [
+        "Midterm Practice Questions - Requires Respondus LockDown Browser",
+        "Midterm Exam- Requires Respondus LockDown Browser"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Release practice final exam"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.64
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 4,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "what do i need to study for this exam",
+      "query": "what should i study for the final exam?",
+      "gold_source": null,
+      "retrieved": [
+        "Syllabus"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Release practice final exam"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.29
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 5,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "explain the last class",
+      "query": "explain the last class",
+      "gold_source": null,
+      "retrieved": [],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": null,
+      "recall_by_fact": null,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.62
+    },
+    {
+      "case": "U1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 6,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "where is the slide that the professor explain the assigment 2",
+      "query": "where is the slide that the professor explain the assigment 2",
+      "gold_source": null,
+      "retrieved": [],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Project introduction slides and class recording, which provide context, are available on Canvas/Modules/Projects"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.25
+    }
+  ]
+}

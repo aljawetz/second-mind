@@ -1,0 +1,1271 @@
+{
+  "mode": "retrieval-only",
+  "set": "sprint8-chat",
+  "index": "/Users/arthurjawetz/second-mind-eval-index-2026-10-26",
+  "metrics": {
+    "n": 29,
+    "n_recall": 0,
+    "n_precision": 0,
+    "recall_at_5": null,
+    "precision_at_5": null,
+    "fact_labels": {
+      "n": 28,
+      "hits": 15,
+      "recall": 0.5357142857142857,
+      "n_precision": 28,
+      "precision_empty_skipped": 0.1285714285714286,
+      "precision_empty_as_zero": 0.1285714285714286,
+      "top1_hits": 10,
+      "mrr": 0.42976190476190473
+    },
+    "unanswerable": {
+      "n": 1,
+      "returned": 5,
+      "with_results": 1
+    },
+    "follow_ups": {
+      "as_typed": {
+        "n": 15,
+        "hits": 7,
+        "top1_hits": 3,
+        "mrr": 0.3222222222222222
+      },
+      "rewritten": {
+        "n": 14,
+        "hits": 12,
+        "top1_hits": 8,
+        "mrr": 0.6571428571428571
+      }
+    }
+  },
+  "results": [
+    {
+      "case": "CH1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "when is the docker compose assignment due?",
+      "query": "when is the docker compose assignment due?",
+      "gold_source": null,
+      "retrieved": [
+        "A3 - Docker Compose",
+        "A3 - Docker Compose",
+        "A3 - Docker Compose",
+        "16 - Docker compose + Networking basics.pdf \u00b7 p.6",
+        "16 - Docker compose + Networking basics.pdf \u00b7 p.24"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Assignment 3 (Docker Compose) due"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "and the docker images one?",
+      "query": "and the docker images one?",
+      "gold_source": null,
+      "retrieved": [
+        "14 - Containerization.pdf \u00b7 p.21",
+        "14 - Containerization.pdf \u00b7 p.16",
+        "14 - Containerization.pdf \u00b7 p.20",
+        "14 - Containerization.pdf \u00b7 p.22",
+        "14 - Containerization.pdf \u00b7 p.14"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Assignment 2 (Docker images) due (Thursday EOD)"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH1",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "and the docker images one?",
+      "query": "when is the docker images assignment due?",
+      "gold_source": null,
+      "retrieved": [
+        "A2 - Docker images",
+        "A2 - Docker images",
+        "A3 - Docker Compose",
+        "14 - Containerization.pdf \u00b7 p.21",
+        "Syllabus"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Assignment 2 (Docker images) due (Thursday EOD)"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 5,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH2",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what's the minimum coverage for vocareum assignments?",
+      "query": "what's the minimum coverage for vocareum assignments?",
+      "gold_source": null,
+      "retrieved": [
+        "How to use Vocareum",
+        "A0 - Unit Testing Warmup and Exercises",
+        "How to use Vocareum",
+        "01 CourseInfoF26.pdf \u00b7 p.26",
+        "How to use Vocareum"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "typically 80-90% line coverage"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH2",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what about for the mockito exercises?",
+      "query": "what about for the mockito exercises?",
+      "gold_source": null,
+      "retrieved": [
+        "Mockito Exercises and Prep",
+        "06 Isolating Components - Mockito.pdf \u00b7 p.9",
+        "Mockito Exercises and Prep",
+        "06 Isolating Components - Test Doubles.pdf \u00b7 p.6",
+        "Mockito Exercises and Prep"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Below 80% coverage will give you a total score of 0"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH2",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "what about for the mockito exercises?",
+      "query": "what is the minimum coverage for the mockito exercises?",
+      "gold_source": null,
+      "retrieved": [
+        "Mockito Exercises and Prep",
+        "Mockito Exercises and Prep",
+        "06 Isolating Components - Mockito.pdf \u00b7 p.9",
+        "Mockito Exercises and Prep",
+        "06 Isolating Components - Test Doubles.pdf \u00b7 p.6"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Below 80% coverage will give you a total score of 0"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH2",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 3,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "and if my code doesn't match the api?",
+      "query": "and if my code doesn't match the api?",
+      "gold_source": null,
+      "retrieved": [
+        "UT-Koskela-Part2.pdf \u00b7 p.88",
+        "UT-Koskela-Part2.pdf \u00b7 p.3",
+        "UT-Koskela-Part2.pdf \u00b7 p.37",
+        "UT-Koskela-Part2.pdf \u00b7 p.4",
+        "ObjectCommunication.pdf \u00b7 p.3"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "If you don't comply with the API requirements, your code will not compile"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH2",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 3,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "and if my code doesn't match the api?",
+      "query": "what happens if my mockito exercises code doesn't match the api requirements?",
+      "gold_source": null,
+      "retrieved": [
+        "Mockito Exercises and Prep",
+        "UT-Koskela-Ch3.pdf \u00b7 p.16",
+        "Mockito Exercises and Prep",
+        "A1 - Test Doubles",
+        "06 Isolating Components - Test Doubles part 1 - note taking version.pdf \u00b7 p.31"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "If you don't comply with the API requirements, your code will not compile"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 3,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH3",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what's hamcrest for?",
+      "query": "what's hamcrest for?",
+      "gold_source": null,
+      "retrieved": [
+        "03 Unit Testing Principles  - note taking version.pdf \u00b7 p.3",
+        "Mockito Exercises and Prep",
+        "Mockito Exercises and Prep",
+        "03 Unit Testing Principles.pdf \u00b7 p.15",
+        "03 Unit Testing Principles  - note taking version.pdf \u00b7 p.14"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Hamcrest matchers make tests more natural"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH3",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "which ones combine conditions?",
+      "query": "which ones combine conditions?",
+      "gold_source": null,
+      "retrieved": [
+        "11 - StructuralTesting part 1 - note taking version.pdf \u00b7 p.35",
+        "11 - StructuralTesting part 1.pdf \u00b7 p.37",
+        "13 - MidtermReview.pdf \u00b7 p.5",
+        "11 - StructuralTesting part 1.pdf \u00b7 p.74",
+        "11 - StructuralTesting part 1 - note taking version.pdf \u00b7 p.70"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "allOf - matches if all matchers match"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH3",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "which ones combine conditions?",
+      "query": "which hamcrest matchers combine multiple conditions?",
+      "gold_source": null,
+      "retrieved": [
+        "03 Unit Testing Principles  - note taking version.pdf \u00b7 p.3",
+        "03 Unit Testing Principles.pdf \u00b7 p.4",
+        "03 Unit Testing Principles.pdf \u00b7 p.5",
+        "03 Unit Testing Principles  - note taking version.pdf \u00b7 p.4",
+        "06 Isolating Components - Mockito.pdf \u00b7 p.7"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "allOf - matches if all matchers match"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.4,
+      "first_rank_by_fact": 3,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH4",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what can i bring to the midterm?",
+      "query": "what can i bring to the midterm?",
+      "gold_source": null,
+      "retrieved": [
+        "13 - MidtermReview.pdf \u00b7 p.36",
+        "Midterm Exam- Requires Respondus LockDown Browser",
+        "13 - MidtermReview.pdf \u00b7 p.2",
+        "Midterm Coding Question (access only through Midterm Exam)",
+        "13 - MidtermReview.pdf \u00b7 p.24"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "pen/pencil and white scratch paper"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH4",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "and my phone?",
+      "query": "and my phone?",
+      "gold_source": null,
+      "retrieved": [
+        "UT-Koskela-Part2.pdf \u00b7 p.5",
+        "Midterm Exam- Requires Respondus LockDown Browser",
+        "Midterm Practice Questions - Requires Respondus LockDown Browser",
+        "UT-Koskela-Part2.pdf \u00b7 p.19",
+        "Midterm Exam- Requires Respondus LockDown Browser"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Cell phones and electronic devices"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.4,
+      "first_rank_by_fact": 2,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH4",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "and my phone?",
+      "query": "can i have my phone during the midterm?",
+      "gold_source": null,
+      "retrieved": [
+        "Midterm Practice Questions - Requires Respondus LockDown Browser",
+        "Sample Midterm Coding Question (access through Sample Midterm only)",
+        "Midterm Exam- Requires Respondus LockDown Browser",
+        "Midterm Coding Question (access only through Midterm Exam)",
+        "Midterm Practice Questions - Requires Respondus LockDown Browser"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Cell phones and electronic devices"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.4,
+      "first_rank_by_fact": 1,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH4",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 3,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "do wrong answers cost me points?",
+      "query": "do wrong answers cost me points?",
+      "gold_source": null,
+      "retrieved": [
+        "Midterm Exam- Requires Respondus LockDown Browser",
+        "01 CourseInfoF26.pdf \u00b7 p.34",
+        "A1 - Test Doubles",
+        "04 Design For Testability.pdf \u00b7 p.41",
+        "A0 - Unit Testing Warmup and Exercises"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "incur a penalty for each wrong answer"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH4",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 3,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "do wrong answers cost me points?",
+      "query": "do wrong answers lose points on the midterm?",
+      "gold_source": null,
+      "retrieved": [
+        "Midterm Exam- Requires Respondus LockDown Browser",
+        "Midterm Coding Question (access only through Midterm Exam)",
+        "Midterm Coding Question (access only through Midterm Exam)",
+        "Midterm Exam- Requires Respondus LockDown Browser",
+        "Midterm Exam- Requires Respondus LockDown Browser"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "incur a penalty for each wrong answer"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.4,
+      "first_rank_by_fact": 1,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH5",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what's the instructor's email?",
+      "query": "what's the instructor's email?",
+      "gold_source": null,
+      "retrieved": [
+        "01 CourseInfoF26.pdf \u00b7 p.2",
+        "01 CourseInfoF26.pdf \u00b7 p.6",
+        "Syllabus",
+        "01 CourseInfoF26.pdf \u00b7 p.3",
+        "01 CourseInfoF26.pdf \u00b7 p.24"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "rafal.wlodarski@sv.cmu.edu"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.4,
+      "first_rank_by_fact": 1,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH5",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "and when are the office hours?",
+      "query": "and when are the office hours?",
+      "gold_source": null,
+      "retrieved": [
+        "Syllabus",
+        "Syllabus",
+        "01 CourseInfoF26.pdf \u00b7 p.2",
+        "01 CourseInfoF26.pdf \u00b7 p.3",
+        "TDD Primer.pdf \u00b7 p.2"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Office Hours: 2:00-3:00pm Mondays/Wednesday (room 104)"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 2,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH5",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "and when are the office hours?",
+      "query": "when are the instructor's office hours?",
+      "gold_source": null,
+      "retrieved": [
+        "Syllabus",
+        "Syllabus",
+        "01 CourseInfoF26.pdf \u00b7 p.2",
+        "01 CourseInfoF26.pdf \u00b7 p.3",
+        "01 CourseInfoF26.pdf \u00b7 p.4"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Office Hours: 2:00-3:00pm Mondays/Wednesday (room 104)"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH6",
+      "course": 55016,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what's task 2 about?",
+      "query": "what's task 2 about?",
+      "gold_source": null,
+      "retrieved": [
+        "Innovation Project Objectives",
+        "Task 2 Objectives",
+        "Task 2: Submitting Your Work",
+        "Innovation Project Objectives",
+        "Innovation Project Objectives"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "brainstorm solution ideas and generate alternative viable design concepts"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.4,
+      "first_rank_by_fact": 1,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH6",
+      "course": 55016,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "and task 4?",
+      "query": "and task 4?",
+      "gold_source": null,
+      "retrieved": [
+        "Task 4: Submitting Your Work",
+        "Task 4: Submitting Your Work",
+        "Class Preparation",
+        "Task 4 Plan of Attack",
+        "Innovation Project Objectives"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Create a medium-fidelity prototype for your minimum viable product"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH6",
+      "course": 55016,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "and task 4?",
+      "query": "what's task 4 about?",
+      "gold_source": null,
+      "retrieved": [
+        "Task 4: Submitting Your Work",
+        "Task 4: Submitting Your Work",
+        "Class Preparation",
+        "Task 4 Plan of Attack",
+        "Innovation Project Objectives"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Create a medium-fidelity prototype for your minimum viable product"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH6",
+      "course": 55016,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 3,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "how long do we get for it?",
+      "query": "how long do we get for it?",
+      "gold_source": null,
+      "retrieved": [
+        "Syllabus",
+        "Task 1 Objectives",
+        "Innovation Project Objectives",
+        "Class Preparation",
+        "Innovation Project Objectives"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Task 4: Prototyping and Backlog Preparation (2 weeks)"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH6",
+      "course": 55016,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 3,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "how long do we get for it?",
+      "query": "how long do we get for task 4?",
+      "gold_source": null,
+      "retrieved": [
+        "Task 4: Submitting Your Work",
+        "Innovation Project Objectives",
+        "Innovation Project Objectives",
+        "Class Preparation",
+        "Task 4: Submitting Your Work"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Task 4: Prototyping and Backlog Preparation (2 weeks)"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH7",
+      "course": 55016,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what do we hand in for task 4?",
+      "query": "what do we hand in for task 4?",
+      "gold_source": null,
+      "retrieved": [
+        "Task 4: Submitting Your Work",
+        "Task 4: Submitting Your Work",
+        "Task 4 Plan of Attack",
+        "Class Preparation",
+        "Field Project Objective and Plan of Attack\u00a0"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Medium-Fidelity Prototype for your first product increment"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH7",
+      "course": 55016,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "how should we do the non-functional part?",
+      "query": "how should we do the non-functional part?",
+      "gold_source": null,
+      "retrieved": [
+        "Class Preparation",
+        "Task 4 Plan of Attack",
+        "Task 4: Submitting Your Work",
+        "Task 5: Submitting Your Work",
+        "Task 4: Submitting Your Work"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Elaborate your 3 highest priority non-functional requirements using Planguage"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 2,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH7",
+      "course": 55016,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "how should we do the non-functional part?",
+      "query": "how should we elaborate the non-functional requirements in task 4?",
+      "gold_source": null,
+      "retrieved": [
+        "Task 4 Plan of Attack",
+        "Task 4: Submitting Your Work",
+        "Task 4: Submitting Your Work",
+        "Task 4 Objectives",
+        "Task 4 Plan of Attack"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Elaborate your 3 highest priority non-functional requirements using Planguage"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH8",
+      "course": 55016,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "do i have to show up to class every time?",
+      "query": "do i have to show up to class every time?",
+      "gold_source": null,
+      "retrieved": [
+        "Syllabus",
+        "Task 2 Plan of Attack",
+        "Class Participation and Attendance",
+        "Class Preparation",
+        "Task 2: Submitting Your Work"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Class attendance is mandatory, both Mondays and Wednesdays"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH8",
+      "course": 55016,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what about fridays?",
+      "query": "what about fridays?",
+      "gold_source": null,
+      "retrieved": [
+        "Syllabus",
+        "Class Preparation",
+        "Class Preparation",
+        "Class Preparation",
+        "Class Preparation"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Friday recitations are mandatory only on December 5"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH8",
+      "course": 55016,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "what about fridays?",
+      "query": "are the friday recitations mandatory?",
+      "gold_source": null,
+      "retrieved": [
+        "Syllabus",
+        "Class Preparation",
+        "Class Preparation",
+        "Class Preparation",
+        "Class Preparation"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Friday recitations are mandatory only on December 5"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH9",
+      "course": 55016,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "who teaches the course?",
+      "query": "who teaches the course?",
+      "gold_source": null,
+      "retrieved": [
+        "Class Preparation",
+        "Syllabus",
+        "CMU Faculty Course Evaluation",
+        "Class Preparation",
+        "Welcome to Software Requirements and Interaction Design (18-658)!"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "cecile.peraire@sv.cmu.edu"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH9",
+      "course": 55016,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "and who's the ta?",
+      "query": "and who's the ta?",
+      "gold_source": null,
+      "retrieved": [
+        "Class Preparation",
+        "Class Preparation",
+        "Task 4: Submitting Your Work",
+        "Task 3: Submitting Your Work",
+        "Task 2: Submitting Your Work"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "shaldipu@andrew.cmu.edu"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH9",
+      "course": 55016,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "and who's the ta?",
+      "query": "who is the teaching assistant?",
+      "gold_source": null,
+      "retrieved": [
+        "Syllabus",
+        "Class Preparation",
+        "Task 4: Submitting Your Work",
+        "Task 3: Submitting Your Work",
+        "Task 2: Submitting Your Work"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "shaldipu@andrew.cmu.edu"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH10",
+      "course": 56350,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "when is the sprint 8 deliverable due?",
+      "query": "when is the sprint 8 deliverable due?",
+      "gold_source": null,
+      "retrieved": [
+        "Sprint 8 Deliverable - Robustness, Responsible AI, and System Improvement",
+        "Sprint 1 Deliverable - Individual",
+        "Sprint 9 Deliverable - Beta Release and Independent Testing",
+        "Sprint 3 Deliverable - Technical Feasibility and Baseline",
+        "Sprint 2 Deliverable - Problem Validation, Requirements, and MVP Scope"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Due Tue, Oct 27, 2026 at 10:00 AM PDT"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH10",
+      "course": 56350,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "and sprint 9?",
+      "query": "and sprint 9?",
+      "gold_source": null,
+      "retrieved": [
+        "Sprint 9 Deliverable - Beta Release and Independent Testing",
+        "Sprint 9 Deliverable - Beta Release and Independent Testing",
+        "Sprint 1 Deliverable - Individual",
+        "Sprint 1 Deliverable - Individual",
+        "Sprint 1 Deliverable - Individual"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Due Tue, Nov 17, 2026"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH10",
+      "course": 56350,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "and sprint 9?",
+      "query": "when is the sprint 9 deliverable due?",
+      "gold_source": null,
+      "retrieved": [
+        "Sprint 9 Deliverable - Beta Release and Independent Testing",
+        "Sprint 1 Deliverable - Individual",
+        "Sprint 3 Deliverable - Technical Feasibility and Baseline",
+        "Sprint 6 Deliverable - End-to-End Alpha System",
+        "Sprint 5 Deliverable - Core AI/Technology Prototype"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Due Tue, Nov 17, 2026"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.02
+    },
+    {
+      "case": "CH11",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "when is the operational excellence class?",
+      "query": "when is the operational excellence class?",
+      "gold_source": null,
+      "retrieved": [
+        "UT-Koskela-Part2.pdf \u00b7 p.19",
+        "  L1 - TDD Lab - Getting Started with Test-Driven Development",
+        "01 CourseInfoF26.pdf \u00b7 p.24",
+        "Mockito Exercises and Prep",
+        "UT-Koskela-Part2.pdf \u00b7 p.10"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Operational excellence (guest lecture)"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH11",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "what's the guest's name?",
+      "query": "what's the guest's name?",
+      "gold_source": null,
+      "retrieved": [
+        "16 - Docker compose + Networking basics.pdf \u00b7 p.5",
+        "GitHub Credentials",
+        "14 - Containerization.pdf \u00b7 p.20",
+        "TDD Evidence.pdf \u00b7 p.4",
+        "06 Isolating Components - Test Doubles.pdf \u00b7 p.2"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": null,
+      "recall_by_fact": null,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH11",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "what's the guest's name?",
+      "query": "who is the guest lecturer for the operational excellence class?",
+      "gold_source": null,
+      "retrieved": [
+        "Syllabus",
+        "UT-Koskela-Part2.pdf \u00b7 p.19",
+        "  L1 - TDD Lab - Getting Started with Test-Driven Development",
+        "01 CourseInfoF26.pdf \u00b7 p.24",
+        "Mockito Exercises and Prep"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": null,
+      "recall_by_fact": null,
+      "precision_by_fact": null,
+      "first_rank_by_fact": null,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH12",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "when is lab 3 due?",
+      "query": "when is lab 3 due?",
+      "gold_source": null,
+      "retrieved": [
+        "A3 - Docker Compose",
+        "  L1 - TDD Lab - Getting Started with Test-Driven Development",
+        "01 CourseInfoF26.pdf \u00b7 p.5",
+        "Syllabus",
+        "Syllabus"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Lab 3: Observability due (Sunday EOD)"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 5,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH12",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "and lab 2?",
+      "query": "and lab 2?",
+      "gold_source": null,
+      "retrieved": [
+        "03 Unit Testing Principles  - note taking version.pdf \u00b7 p.1",
+        "01 CourseInfoF26.pdf \u00b7 p.22",
+        "Syllabus",
+        "01 CourseInfoF26.pdf \u00b7 p.27",
+        "01 CourseInfoF26.pdf \u00b7 p.9"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Lab 2 due (Sunday EOD)"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 3,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH12",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "rewritten",
+      "mode": "retrieval-only",
+      "question": "and lab 2?",
+      "query": "when is lab 2 due?",
+      "gold_source": null,
+      "retrieved": [
+        "Syllabus",
+        "03 Unit Testing Principles.pdf \u00b7 p.2",
+        "Syllabus",
+        "03 Unit Testing Principles  - note taking version.pdf \u00b7 p.1",
+        "  L1 - TDD Lab - Getting Started with Test-Driven Development"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Lab 2 due (Sunday EOD)"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 3,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH13",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 1,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "is there class on thanksgiving?",
+      "query": "is there class on thanksgiving?",
+      "gold_source": null,
+      "retrieved": [
+        "Syllabus",
+        "01 CourseInfoF26.pdf \u00b7 p.30",
+        "Class #2 \u00b7 0:00",
+        "Class #1 \u00b7 30:35",
+        "A1 - Test Doubles"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "THANKSGIVING (NO CLASSES)"
+      ],
+      "recall_by_fact": true,
+      "precision_by_fact": 0.2,
+      "first_rank_by_fact": 1,
+      "seconds": 0.03
+    },
+    {
+      "case": "CH13",
+      "course": 55710,
+      "kind": "follow_up",
+      "variant_of": null,
+      "turn": 2,
+      "variant": "as_typed",
+      "mode": "retrieval-only",
+      "question": "separate question: which book covers docker?",
+      "query": "separate question: which book covers docker?",
+      "gold_source": null,
+      "retrieved": [
+        "01 CourseInfoF26.pdf \u00b7 p.22",
+        "01 CourseInfoF26.pdf \u00b7 p.29",
+        "14 - Containerization.pdf \u00b7 p.23",
+        "Project Intro F26.pdf \u00b7 p.25",
+        "16 - Docker compose + Networking basics.pdf \u00b7 p.1"
+      ],
+      "recall_at_5": null,
+      "precision_at_5": null,
+      "gold_facts": [
+        "Learn Docker in a Month of Lunches"
+      ],
+      "recall_by_fact": false,
+      "precision_by_fact": 0.0,
+      "first_rank_by_fact": null,
+      "seconds": 0.1
+    }
+  ]
+}
