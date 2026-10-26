@@ -331,7 +331,9 @@ export async function explainAssignment(courseId: number, assignmentId: number):
 
 // Session capture (implementation-plan.md Step 12, design spec §9.3).
 // Recording itself happens here in the frontend (getUserMedia +
-// MediaRecorder) — the backend only handles what comes after stop.
+// MediaRecorder, in 60 second slices uploaded as they finish — see
+// chunkedRecorder.ts) — the backend transcribes the slices as they arrive
+// and handles the rest after stop.
 export type SessionRunStatus = "recording" | "processing" | "done" | "error";
 
 export interface SessionSummary {
@@ -355,8 +357,18 @@ export async function startSession(
   return res.json();
 }
 
+// One finished slice of the recording, sent while the class is still going
+// so the backend can transcribe it right away. Throws on a non-2xx reply so
+// the caller can retry.
+export async function uploadChunk(sessionId: string, index: number, slice: Blob): Promise<void> {
+  const res = await fetch(`http://127.0.0.1:8756/sessions/${sessionId}/chunks/${index}`, { method: "POST", body: slice });
+  if (!res.ok) throw new Error(`chunk ${index} upload failed (${res.status})`);
+}
+
 // Raw audio bytes as the body (audio/mp4 from MediaRecorder) — not
 // JSON/base64, this backend already reads raw request bodies elsewhere.
+// It is the last slice of the recording; earlier slices go through
+// uploadChunk.
 export async function stopSession(sessionId: string, audioBlob: Blob): Promise<{ session_id: string; status: string }> {
   const res = await fetch(`http://127.0.0.1:8756/sessions/${sessionId}/stop`, {
     method: "POST",
