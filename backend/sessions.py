@@ -22,7 +22,9 @@ though its files are still sitting right there on disk.
 
 import json
 import shutil
+import sys
 import threading
+import time
 import traceback
 from datetime import date
 from pathlib import Path
@@ -153,17 +155,26 @@ def stop_session(session_id: str, audio_bytes: bytes, db_path: Path) -> dict:
     return {"session_id": session_id, "status": "processing"}
 
 
+def _log_stage(session_id: str, stage: str, started: float, detail: str = "") -> None:
+    print(f"[sessions] {session_id} {stage}: {time.perf_counter() - started:.1f}s{detail}", file=sys.stderr, flush=True)
+
+
 def _process_session(session_id: str, audio_path: Path, db_path: Path) -> None:
     info = _SESSIONS[session_id]
     try:
-        raw_segments, _ = _get_model().transcribe(str(audio_path))
+        started = time.perf_counter()
+        raw_segments, transcribe_info = _get_model().transcribe(str(audio_path))
+        # transcribe() is lazy: the work happens while this loop consumes it.
         segments = [{"start": s.start, "end": s.end, "text": s.text} for s in raw_segments]
+        _log_stage(session_id, "transcribe", started, f" for {transcribe_info.duration:.0f}s of audio")
         transcript_text = " ".join(s["text"].strip() for s in segments).strip()
         (info["dir"] / "transcript.json").write_text(json.dumps(segments, indent=2), encoding="utf-8")
 
         audio_path.unlink(missing_ok=True)  # data-model.md §1 — raw audio not kept
 
+        started = time.perf_counter()
         summary = _enhance_notes(transcript_text) if transcript_text else ""
+        _log_stage(session_id, "summarize", started, f" for {len(transcript_text.split())} words")
         (info["dir"] / "summary.md").write_text(summary, encoding="utf-8")
 
         source_label = info["source_label"]
@@ -172,7 +183,9 @@ def _process_session(session_id: str, audio_path: Path, db_path: Path) -> None:
         if notes_path.exists():
             nodes += indexing.notes_to_nodes(notes_path.read_text(encoding="utf-8"), source_label, session_id)
         if nodes:
+            started = time.perf_counter()
             indexing.add_nodes(nodes, db_path, f"course_{info['course_id']}")
+            _log_stage(session_id, "index", started, f" for {len(nodes)} chunks")
 
         info["status"] = "done"
         info["transcript"] = transcript_text

@@ -49,3 +49,33 @@ def test_list_sessions_and_detail_expose_class_num(tmp_path: Path):
 
     detail = sessions.get_session_detail(tmp_path, 111, started["session_id"])
     assert detail["class_num"] == 1
+
+
+class _FakeModel:
+    def transcribe(self, path):
+        class Seg:
+            start, end, text = 0.0, 2.0, " hello class"
+
+        class Info:
+            duration = 2.0
+
+        return iter([Seg()]), Info()
+
+
+def test_process_session_logs_each_stage_duration(tmp_path: Path, monkeypatch, capsys):
+    monkeypatch.setattr(sessions, "_get_model", lambda: _FakeModel())
+    monkeypatch.setattr(sessions, "_enhance_notes", lambda text: "notes")
+    monkeypatch.setattr(sessions.indexing, "add_nodes", lambda *a, **k: None)
+    session_dir = tmp_path / "s1"
+    session_dir.mkdir()
+    audio = session_dir / "audio.m4a"
+    audio.write_bytes(b"x")
+    sessions._SESSIONS["s1"] = {"status": "processing", "course_id": 1, "dir": session_dir, "class_num": 1, "source_label": "Class #1"}
+
+    sessions._process_session("s1", audio, tmp_path / "db")
+
+    err = capsys.readouterr().err
+    assert "[sessions] s1 transcribe: " in err and "for 2s of audio" in err
+    assert "[sessions] s1 summarize: " in err and "for 2 words" in err
+    assert "[sessions] s1 index: " in err and "chunks" in err
+    assert sessions._SESSIONS["s1"]["status"] == "done"
