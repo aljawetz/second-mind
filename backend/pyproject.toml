@@ -50,4 +50,5 @@ convert = [
 pythonpath = ["."]
 markers = [
     "integration: subprocess lifecycle tests against real main.py",
+    "real_reranker: uses the real reranker model, skipped if it is not converted",
 ]
