@@ -38,6 +38,12 @@ import providers
 
 MODEL_DIR = Path(__file__).parent / "models" / "faster-whisper-base"
 
+# Measured on a 13 minute clip (base model, int8, CPU): greedy decoding plus
+# skipping silence runs 1.5-2x faster than the defaults (beam 5, no VAD) with
+# no loss in word accuracy. cpu_threads is deliberately left at its default:
+# forcing all 10 cores was 3-5x slower (efficiency cores drag the pool).
+TRANSCRIBE_OPTIONS = {"beam_size": 1, "vad_filter": True}
+
 _model: WhisperModel | None = None
 _model_lock = threading.Lock()
 
@@ -163,7 +169,7 @@ def _process_session(session_id: str, audio_path: Path, db_path: Path) -> None:
     info = _SESSIONS[session_id]
     try:
         started = time.perf_counter()
-        raw_segments, transcribe_info = _get_model().transcribe(str(audio_path))
+        raw_segments, transcribe_info = _get_model().transcribe(str(audio_path), **TRANSCRIBE_OPTIONS)
         # transcribe() is lazy: the work happens while this loop consumes it.
         segments = [{"start": s.start, "end": s.end, "text": s.text} for s in raw_segments]
         _log_stage(session_id, "transcribe", started, f" for {transcribe_info.duration:.0f}s of audio")

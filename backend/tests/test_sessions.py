@@ -52,7 +52,8 @@ def test_list_sessions_and_detail_expose_class_num(tmp_path: Path):
 
 
 class _FakeModel:
-    def transcribe(self, path):
+    def transcribe(self, path, **options):
+        self.options = options
         class Seg:
             start, end, text = 0.0, 2.0, " hello class"
 
@@ -79,3 +80,19 @@ def test_process_session_logs_each_stage_duration(tmp_path: Path, monkeypatch, c
     assert "[sessions] s1 summarize: " in err and "for 2 words" in err
     assert "[sessions] s1 index: " in err and "chunks" in err
     assert sessions._SESSIONS["s1"]["status"] == "done"
+
+
+def test_transcription_skips_silence_and_decodes_greedily(tmp_path: Path, monkeypatch):
+    model = _FakeModel()
+    monkeypatch.setattr(sessions, "_get_model", lambda: model)
+    monkeypatch.setattr(sessions, "_enhance_notes", lambda text: "notes")
+    monkeypatch.setattr(sessions.indexing, "add_nodes", lambda *a, **k: None)
+    session_dir = tmp_path / "s2"
+    session_dir.mkdir()
+    audio = session_dir / "audio.m4a"
+    audio.write_bytes(b"x")
+    sessions._SESSIONS["s2"] = {"status": "processing", "course_id": 1, "dir": session_dir, "class_num": 1, "source_label": "Class #2"}
+
+    sessions._process_session("s2", audio, tmp_path / "db")
+
+    assert model.options == {"beam_size": 1, "vad_filter": True}
