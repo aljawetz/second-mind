@@ -558,6 +558,16 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(404, {"error": {"code": "not_found", "message": "no such route"}})
 
     def do_DELETE(self):
+        path, _, query = self.path.partition("?")
+        if path == "/data":
+            import privacy
+
+            # Wipes everything, so a bare DELETE /data is refused.
+            if query != "confirm=delete-all-my-data":
+                self._send_json(400, {"error": {"code": "confirmation_required", "message": "add ?confirm=delete-all-my-data to delete all data"}})
+                return
+            self._send_json(200, privacy.delete_all_data(SM_HOME))
+            return
         detail_match = SESSION_DETAIL_PATH.match(self.path)
         if detail_match:
             self._handle_session_delete(detail_match.group(1), detail_match.group(2))
