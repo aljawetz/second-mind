@@ -334,7 +334,9 @@ export async function explainAssignment(courseId: number, assignmentId: number):
 // MediaRecorder, in 60 second slices uploaded as they finish — see
 // chunkedRecorder.ts) — the backend transcribes the slices as they arrive
 // and handles the rest after stop.
-export type SessionRunStatus = "recording" | "processing" | "done" | "error";
+// "interrupted": the app was closed or crashed before Stop, but slices of the
+// recording reached the disk, so finalizeSession can still process them.
+export type SessionRunStatus = "recording" | "processing" | "done" | "error" | "interrupted";
 
 export interface SessionSummary {
   session_id: string;
@@ -348,6 +350,8 @@ export interface SessionDetail extends SessionSummary {
   summary?: string;
   notes?: string;
   error?: string;
+  // Only for an interrupted session: how much of the recording was transcribed.
+  recorded_seconds?: number;
 }
 
 export async function startSession(
@@ -375,6 +379,16 @@ export async function stopSession(sessionId: string, audioBlob: Blob): Promise<{
     body: audioBlob,
   });
   return res.json();
+}
+
+// Turns whatever reached the disk of an interrupted session into a
+// transcript and notes. Throws if the backend refuses (not interrupted).
+export async function finalizeSession(courseId: number, sessionId: string): Promise<void> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/sessions/${sessionId}/finalize`, { method: "POST" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error?.message ?? `Couldn't finish this session (${res.status})`);
+  }
 }
 
 export async function saveSessionNotes(sessionId: string, text: string): Promise<void> {

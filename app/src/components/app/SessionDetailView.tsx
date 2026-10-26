@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { deleteSession, getSessionDetail, renameSession, type SessionDetail } from "../../sidecar";
+import { useEffect, useRef, useState } from "react";
+import { deleteSession, finalizeSession, getSessionDetail, renameSession, type SessionDetail } from "../../sidecar";
 import SessionContent from "./SessionContent";
 
 export default function SessionDetailView({
@@ -7,17 +7,23 @@ export default function SessionDetailView({
   sessionId,
   onBack,
   onDeleted,
+  onStatusChange,
 }: {
   courseId: number;
   sessionId: string;
   onBack: () => void;
   onDeleted: () => void;
+  onStatusChange: () => void;
 }) {
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [error, setError] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // The parent passes a new function every render; a ref keeps the polling
+  // interval below from restarting each time.
+  const onStatusChangeRef = useRef(onStatusChange);
+  onStatusChangeRef.current = onStatusChange;
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +41,36 @@ export default function SessionDetailView({
       cancelled = true;
     };
   }, [courseId, sessionId]);
+
+  // A session being processed (just finalized, or opened mid-processing)
+  // reloads itself until it finishes.
+  useEffect(() => {
+    if (detail?.status !== "processing") return;
+    const id = setInterval(async () => {
+      try {
+        const next = await getSessionDetail(courseId, sessionId);
+        if (next.status !== "processing") {
+          setDetail(next);
+          onStatusChangeRef.current();
+        }
+      } catch {
+        // keep polling; the backend may be busy
+      }
+    }, 2000);
+    return () => clearInterval(id);
+  }, [detail?.status, courseId, sessionId]);
+
+  async function handleFinalize() {
+    if (!detail) return;
+    setError("");
+    try {
+      await finalizeSession(courseId, sessionId);
+      setDetail({ ...detail, status: "processing" });
+      onStatusChange();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't finish this session");
+    }
+  }
 
   async function handleRenameSave() {
     const title = titleDraft.trim();
@@ -108,6 +144,17 @@ export default function SessionDetailView({
 
           {detail.status === "recording" || detail.status === "processing" ? (
             <p className="qa-thinking">Still processing…</p>
+          ) : detail.status === "interrupted" ? (
+            <div className="panel">
+              <p>
+                This recording was interrupted before it was stopped
+                {detail.recorded_seconds ? `, but at least ${Math.max(1, Math.round(detail.recorded_seconds / 60))} min of it was saved` : ", but part of it was saved"}.
+                You can still turn what was saved into a transcript and notes.
+              </p>
+              <button className="btn-primary" onClick={handleFinalize}>
+                Finish processing
+              </button>
+            </div>
           ) : detail.status === "error" && !detail.summary ? (
             <p className="qa-a-error">{detail.error ?? "This recording couldn't be processed."}</p>
           ) : (

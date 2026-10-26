@@ -183,6 +183,11 @@ export default function Sidebar({
                             {(s.status === "recording" || s.status === "processing") && (
                               <span className="session-status-dot" title="Processing…"></span>
                             )}
+                            {s.status === "interrupted" && (
+                              <span className="side-warn" title="Interrupted, can be finished">
+                                !
+                              </span>
+                            )}
                             {s.status === "error" && (
                               <span className="side-warn" title="Couldn't be processed">
                                 !
