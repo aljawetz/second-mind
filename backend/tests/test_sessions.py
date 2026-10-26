@@ -262,3 +262,27 @@ def test_long_transcript_is_summarized_in_sections_in_order(monkeypatch):
     # every word reaches exactly one section
     for w in words:
         assert sum(f" {w} " in p or f" {w}\n" in p or f"\n{w} " in p for p in llm.prompts) == 1
+
+
+def test_transcript_so_far_grows_while_recording_and_is_replaced_when_done(tmp_path: Path, monkeypatch):
+    session_dir = tmp_path / "courses" / "1" / "sessions" / "s1"
+    session_dir.mkdir(parents=True)
+    info = _register(tmp_path, monkeypatch)
+    info["dir"] = session_dir
+    detail = lambda: sessions.get_session_detail(tmp_path, 1, "s1")
+
+    assert detail()["transcript_so_far"] == ""  # recording, nothing transcribed yet
+
+    sessions.add_chunk("s1", 0, b"60:first part")
+    info["chunks"][0].result()
+    assert detail()["transcript_so_far"] == "first part"
+
+    sessions.add_chunk("s1", 1, b"30:second part")
+    info["chunks"][1].result()
+    assert detail()["transcript_so_far"] == "first part second part"
+    assert "transcript" not in detail()
+
+    _finish("s1", tmp_path)
+    final = detail()
+    assert final["transcript"] == "first part second part"
+    assert "transcript_so_far" not in final
