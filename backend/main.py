@@ -87,6 +87,7 @@ EXPLAIN_PATH = re.compile(r"^/courses/(\d+)/assignments/(\d+)/explain$")
 SESSION_LIST_PATH = re.compile(r"^/courses/(\d+)/sessions$")
 SESSION_START_PATH = re.compile(r"^/courses/(\d+)/sessions/start$")
 SESSION_DETAIL_PATH = re.compile(r"^/courses/(\d+)/sessions/([\w-]+)$")
+SESSION_FINALIZE_PATH = re.compile(r"^/courses/(\d+)/sessions/([\w-]+)/finalize$")
 SESSION_RENAME_PATH = re.compile(r"^/courses/(\d+)/sessions/([\w-]+)/rename$")
 SESSION_STOP_PATH = re.compile(r"^/sessions/([\w-]+)/stop$")
 SESSION_CHUNK_PATH = re.compile(r"^/sessions/([\w-]+)/chunks/(\d+)$")
@@ -524,6 +525,11 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_session_notes(session_notes_match.group(1))
             return
 
+        finalize_match = SESSION_FINALIZE_PATH.match(path)
+        if finalize_match:
+            self._handle_session_finalize(finalize_match.group(1), finalize_match.group(2))
+            return
+
         rename_match = SESSION_RENAME_PATH.match(path)
         if rename_match:
             self._handle_session_rename(rename_match.group(1), rename_match.group(2))
@@ -641,6 +647,22 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
             return
         self._send_json(200, {"status": "saved"})
+
+    def _handle_session_finalize(self, course_id: str, session_id: str):
+        import sessions
+
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        try:
+            result = sessions.finalize_session(SM_HOME, int(course_id), session_id, SM_HOME / "index.lancedb")
+        except KeyError:
+            self._send_json(404, {"error": {"code": "not_found", "message": "no such session"}})
+            return
+        except ValueError as e:
+            self._send_json(409, {"error": {"code": "conflict", "message": str(e)}})
+            return
+        self._send_json(200, result)
 
     def _handle_session_rename(self, course_id: str, session_id: str):
         import sessions

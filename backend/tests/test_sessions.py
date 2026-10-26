@@ -7,6 +7,8 @@ import json
 import time
 from pathlib import Path
 
+import pytest
+
 import sessions
 
 
@@ -145,3 +147,88 @@ def test_transcription_skips_silence_and_decodes_greedily(tmp_path: Path, monkey
     _finish("s1", tmp_path)
 
     assert info["model"].options == {"beam_size": 1, "vad_filter": True}
+
+
+def _lost_session(sm_home: Path, session_id: str = "2026-10-25-class-4") -> Path:
+    """A session directory as a crash leaves it: nothing tracked in memory."""
+    session_dir = sm_home / "courses" / "1" / "sessions" / session_id
+    (session_dir / "chunks").mkdir(parents=True)
+    sessions._write_meta(session_dir, {"title": "Class #4", "class_num": 4})
+    sessions._SESSIONS.pop(session_id, None)
+    return session_dir
+
+
+def _transcribed_chunk(session_dir: Path, index: int, duration: float, text: str) -> None:
+    payload = {"duration": duration, "segments": [{"start": 1.0, "end": 2.0, "text": f" {text}"}]}
+    (session_dir / "chunks" / f"chunk-{index:04d}.json").write_text(json.dumps(payload))
+
+
+def test_session_with_slices_on_disk_but_no_summary_is_interrupted(tmp_path: Path):
+    session_dir = _lost_session(tmp_path)
+    assert sessions.get_session_detail(tmp_path, 1, session_dir.name)["status"] == "error"
+
+    _transcribed_chunk(session_dir, 0, 60, "one")
+    _transcribed_chunk(session_dir, 1, 45, "two")
+    detail = sessions.get_session_detail(tmp_path, 1, session_dir.name)
+
+    assert detail["status"] == "interrupted"
+    assert detail["recorded_seconds"] == 105
+    assert [s["status"] for s in sessions.list_sessions(tmp_path, 1)] == ["interrupted"]
+
+
+def test_finalize_recovers_transcribed_and_untranscribed_slices(tmp_path: Path, monkeypatch):
+    session_dir = _lost_session(tmp_path)
+    _transcribed_chunk(session_dir, 0, 60, "one")
+    (session_dir / "chunks" / "chunk-0001.m4a").write_bytes(b"30:two")  # uploaded, never transcribed
+    model = _FakeModel()
+    monkeypatch.setattr(sessions, "_get_model", lambda: model)
+    monkeypatch.setattr(sessions, "_enhance_notes", lambda text: f"notes for: {text}")
+    monkeypatch.setattr(sessions.indexing, "add_nodes", lambda *a, **k: None)
+    monkeypatch.setattr(sessions.threading, "Thread", lambda target, args, daemon: type("T", (), {"start": lambda self: target(*args)})())
+
+    sessions.finalize_session(tmp_path, 1, session_dir.name, tmp_path / "db")
+
+    detail = sessions.get_session_detail(tmp_path, 1, session_dir.name)
+    assert detail["status"] == "done"
+    assert detail["transcript"] == "one two"
+    assert detail["summary"] == "notes for: one two"
+    assert not list((session_dir / "chunks").glob("*.m4a"))
+
+
+@pytest.mark.parametrize("live_status", ["recording", "processing", "done"])
+def test_finalize_refuses_a_session_that_is_not_interrupted(tmp_path: Path, live_status: str):
+    session_dir = _lost_session(tmp_path)
+    sessions._SESSIONS[session_dir.name] = {"status": live_status, "course_id": 1, "dir": session_dir}
+
+    with pytest.raises(ValueError):
+        sessions.finalize_session(tmp_path, 1, session_dir.name, tmp_path / "db")
+
+
+def test_finalize_refuses_a_session_that_finished_in_an_earlier_run(tmp_path: Path):
+    session_dir = _lost_session(tmp_path)
+    _transcribed_chunk(session_dir, 0, 60, "one")
+    (session_dir / "summary.md").write_text("notes")
+
+    with pytest.raises(ValueError):
+        sessions.finalize_session(tmp_path, 1, session_dir.name, tmp_path / "db")
+
+
+def test_finalize_unknown_session_raises_keyerror(tmp_path: Path):
+    with pytest.raises(KeyError):
+        sessions.finalize_session(tmp_path, 1, "nope", tmp_path / "db")
+
+
+def test_add_chunk_leaves_no_partial_file_and_finalize_ignores_a_torn_upload(tmp_path: Path, monkeypatch):
+    sessions_dir = tmp_path / "courses" / "1" / "sessions"
+    sessions_dir.mkdir(parents=True)
+    info = _register(sessions_dir, monkeypatch)
+    sessions.add_chunk("s1", 0, b"5:hello")
+    sessions._TRANSCRIBER.submit(lambda: None).result()  # let the queued transcription finish
+    assert not list((info["dir"] / "chunks").glob("*.part"))
+
+    (info["dir"] / "chunks" / "chunk-0001.m4a.part").write_bytes(b"torn upload")
+    info["status"] = "error"  # as after a restart: nothing is running
+    monkeypatch.setattr(sessions.threading, "Thread", lambda target, args, daemon: type("T", (), {"start": lambda self: target(*args)})())
+    sessions.finalize_session(tmp_path, 1, "s1", tmp_path / "db")
+
+    assert sessions.get_session_detail(tmp_path, 1, "s1")["transcript"] == "hello"
