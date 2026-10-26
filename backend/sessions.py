@@ -166,7 +166,11 @@ def add_chunk(session_id: str, index: int, audio_bytes: bytes) -> None:
     chunks_dir = info["dir"] / "chunks"
     chunks_dir.mkdir(exist_ok=True)
     audio_path = chunks_dir / f"chunk-{index:04d}.m4a"
-    audio_path.write_bytes(audio_bytes)
+    # Written then renamed, so a crash mid-upload can't leave a half-written
+    # slice that finalize_session would later transcribe as if it were whole.
+    partial_path = audio_path.with_name(audio_path.name + ".part")
+    partial_path.write_bytes(audio_bytes)
+    partial_path.replace(audio_path)
     info.setdefault("chunks", {})[index] = _TRANSCRIBER.submit(_transcribe_chunk, session_id, index, audio_path)
 
 
@@ -256,10 +260,11 @@ def _enhance_notes(transcript_text: str) -> str:
 def _status_from_disk(session_dir: Path) -> str:
     if (session_dir / "summary.md").exists():
         return "done"
-    # A session directory with no summary.md and not actively tracked in
-    # _SESSIONS is either from a run that errored, or one abandoned
-    # mid-recording (app closed before stop) — both look the same from
-    # disk alone, and both are dead ends the student can only delete.
+    # No summary.md and not tracked in _SESSIONS: the app was closed or
+    # crashed before the session finished. If slices of the recording reached
+    # the disk, finalize_session can still turn them into a transcript.
+    if any((session_dir / "chunks").glob("chunk-*")):
+        return "interrupted"
     return "error"
 
 
@@ -299,6 +304,9 @@ def get_session_detail(sm_home: Path, course_id: int, session_id: str) -> dict |
     }
     if live and "error" in live:
         detail["error"] = live["error"]
+    if status == "interrupted":
+        chunk_files = (session_dir / "chunks").glob("chunk-*.json")
+        detail["recorded_seconds"] = round(sum(json.loads(f.read_text(encoding="utf-8"))["duration"] for f in chunk_files))
     transcript_path = session_dir / "transcript.json"
     if transcript_path.exists():
         segments = json.loads(transcript_path.read_text(encoding="utf-8"))
@@ -310,6 +318,35 @@ def get_session_detail(sm_home: Path, course_id: int, session_id: str) -> dict |
     if notes_path.exists():
         detail["notes"] = notes_path.read_text(encoding="utf-8")
     return detail
+
+
+def finalize_session(sm_home: Path, course_id: int, session_id: str, db_path: Path) -> dict:
+    """Finish a session the app lost before Stop: transcribe any slice that
+    was uploaded but not yet transcribed, then stitch, summarize and index
+    whatever reached the disk, exactly as a normal stop would."""
+    session_dir = _session_dir(sm_home, course_id, session_id)
+    if not session_dir.exists():
+        raise KeyError(session_id)
+    live = _SESSIONS.get(session_id)
+    status = live["status"] if live else _status_from_disk(session_dir)
+    if status not in ("interrupted", "error"):
+        # Finishing a "done" session again would index its transcript twice.
+        raise ValueError(f"this session is {status}, only an interrupted one can be finalized")
+    meta = _read_meta(session_dir)
+    info = {
+        "status": "processing",
+        "course_id": course_id,
+        "dir": session_dir,
+        "class_num": meta.get("class_num"),
+        "source_label": meta.get("title", session_id),
+        "chunks": {},
+    }
+    _SESSIONS[session_id] = info
+    for audio_path in sorted((session_dir / "chunks").glob("chunk-*.m4a")):
+        index = int(audio_path.stem.split("-")[1])
+        info["chunks"][index] = _TRANSCRIBER.submit(_transcribe_chunk, session_id, index, audio_path)
+    threading.Thread(target=_process_session, args=(session_id, db_path, time.perf_counter()), daemon=True).start()
+    return {"session_id": session_id, "status": "processing"}
 
 
 def rename_session(sm_home: Path, course_id: int, session_id: str, title: str) -> None:
