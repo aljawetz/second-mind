@@ -61,11 +61,13 @@ step("Backend: installing Python dependencies (uv sync --all-groups)",
      backend, "uv", "sync", "--all-groups")
 step("Backend: generating the local embedding model (one-time, needs network access to Hugging Face)",
      backend, "uv", "run", "python", "scripts/convert_embedding_model.py")
+step("Backend: generating the local reranker model (one-time, needs network access to Hugging Face)",
+     backend, "uv", "run", "python", "scripts/convert_reranker_model.py")
 step("Backend: fetching the session-transcription model (one-time, needs network access to Hugging Face)",
      backend, "uv", "run", "python", "scripts/fetch_whisper_model.py")
 step("Backend: running the test suite to confirm the environment is sound",
      backend, "uv", "run", "pytest", "tests/", "-q")
-# After the model steps: the spec bundles both models into the build.
+# After the model steps: the spec bundles all three models into the build.
 step("Backend: building it for the app (PyInstaller, in its own .venv-build)",
      backend, "uv", "run", "--no-project", "python", "scripts/build_sidecar.py")
 step("Frontend: installing npm dependencies", app, "npm", "install")

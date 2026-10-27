@@ -28,6 +28,10 @@ a = Analysis(
     datas=[
         ("models/bge-small-en-v1.5-onnx", "models/bge-small-en-v1.5-onnx"),
         ("models/faster-whisper-base", "models/faster-whisper-base"),
+        # reranker.py finds this the same way. Left out, the app starts fine
+        # and quietly searches with rank fusion only (seen in the app log:
+        # "Reranker model not found ... using rank fusion only").
+        ("models/ms-marco-MiniLM-L-6-v2-onnx", "models/ms-marco-MiniLM-L-6-v2-onnx"),
         # vad_filter=True loads faster_whisper/assets/silero_vad_v6.onnx at
         # run time; PyInstaller doesn't see a data file nothing imports.
         *collect_data_files("faster_whisper"),
