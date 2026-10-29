@@ -379,6 +379,11 @@ details.panel[open] summary{margin-bottom:10px}
   max-height:260px;overflow-y:auto;margin:0;font-size:var(--t3);line-height:1.6;color:var(--ink-2);
 }
 .indexed-tag{display:flex;align-items:center;gap:6px;font-size:var(--t1);color:var(--done);margin-top:10px}
+.rec{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+.rec-dot{width:10px;height:10px;border-radius:50%;background:var(--neg);flex:none}
+.rec-dot.paused{background:var(--muted)}
+.rec-time{font-size:1.875rem;font-weight:400;letter-spacing:-.03em;line-height:1.1}
+.muted{color:var(--muted)}
 .recording-actions{display:flex;gap:10px}
 .recording-actions .btn-primary,.recording-actions .btn-secondary{width:auto;flex:1}
 
