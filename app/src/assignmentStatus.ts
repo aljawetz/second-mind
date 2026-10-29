@@ -38,7 +38,7 @@ export function splitAssignments(assignments: CanvasAssignment[]): {
 }
 
 // Calendar days from today to the due date, in local time: 0 is today.
-function daysUntil(dueAt: string): number {
+export function daysUntil(dueAt: string): number {
   const due = new Date(dueAt);
   due.setHours(0, 0, 0, 0);
   const today = new Date();
@@ -55,4 +55,38 @@ export function statusPill(a: CanvasAssignment): { text: string; cls: string } {
   if (days === 0) return { text: "Due today", cls: "pill-red" };
   if (days === 1) return { text: "Due tomorrow", cls: "pill-red" };
   return { text: `Due ${formatDue(a.due_at)}`, cls: "pill-ochre" };
+}
+
+export type StatusTone = "late" | "ok" | "normal";
+
+// The same facts as statusPill, as plain text for the assignments list. Red is
+// only for what is missing or due within a day; a few days out reads as a count.
+export function statusText(a: CanvasAssignment): { text: string; tone: StatusTone } {
+  const pts = a.points_possible != null ? ` · ${a.points_possible} pts` : "";
+  if (a.missing) return { text: `Missing${pts}`, tone: "late" };
+  if (a.submitted) return { text: `${a.late ? "Submitted late" : "Submitted"}${pts}`, tone: a.late ? "late" : "ok" };
+  if (!a.due_at) return { text: `No due date${pts}`, tone: "normal" };
+  const days = daysUntil(a.due_at);
+  if (days === 0) return { text: `Due today${pts}`, tone: "late" };
+  if (days === 1) return { text: `Due tomorrow${pts}`, tone: "late" };
+  if (days > 1 && days <= 7) return { text: `Due in ${days} days${pts}`, tone: "normal" };
+  return { text: `Due ${formatDue(a.due_at)}${pts}`, tone: "normal" };
+}
+
+// The big day number and weekday shown beside an assignment, or dashes when it has no date.
+export function dueParts(dueAt: string | null): { day: string; dow: string } {
+  if (!dueAt) return { day: "–", dow: "No date" };
+  const d = new Date(dueAt);
+  return {
+    day: String(d.getDate()).padStart(2, "0"),
+    dow: d.toLocaleDateString(undefined, { weekday: "short" }),
+  };
+}
+
+// How full the countdown bar is: empty a week out, full when it is due.
+export function countdownPercent(a: CanvasAssignment): number | null {
+  if (a.submitted || a.missing || !a.due_at) return null;
+  const days = daysUntil(a.due_at);
+  if (days < 0 || days > 7) return null;
+  return Math.round((1 - days / 7) * 100);
 }

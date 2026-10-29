@@ -291,28 +291,33 @@ sup.fn{cursor:default}
 .ask-send:disabled{background:#C9CCD1}
 .ask-send svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
-.assign-body{flex:1;min-height:0;overflow-y:auto;padding:8px}
-.home-side{display:flex;flex-direction:column;gap:16px;min-height:0;min-width:0}
-.home-side .assign-panel{flex:1 1 0}
-.assign-body > .qa-empty,.assign-body > .qa-a-error{padding:10px}
+.assign-body{flex:1;min-height:0;overflow-y:auto;padding:4px 16px 16px}
+.home-side{display:flex;flex-direction:column;gap:12px;min-height:0;min-width:0;overflow-y:auto}
+.home-side .assign-panel,.home-side .study-panel{flex:none;max-height:none}
+.assign-body > .qa-empty,.assign-body > .qa-a-error{padding:10px 8px}
 .assign-row{
-  position:relative;display:flex;align-items:center;gap:10px;width:100%;text-align:left;cursor:pointer;
-  background:none;border:none;border-radius:var(--r-md);padding:10px;
+  display:grid;grid-template-columns:48px minmax(0,1fr);gap:14px;align-items:center;width:100%;
+  text-align:left;cursor:pointer;background:none;border:none;border-radius:var(--r-sm);padding:10px 8px;
 }
-.assign-row:hover{background:var(--panel-2)}
-/* Hairline between rows, inset so it doesn't bend round the hover corners. */
-.assign-row + .assign-row::before{content:"";position:absolute;top:0;left:10px;right:10px;border-top:1px solid var(--line)}
-.assign-row:hover + .assign-row::before,.assign-row + .assign-row:hover::before{display:none}
-.assign-row .body{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
-.assign-row .ttl{font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+.assign-row:hover{background:var(--raised)}
+.assign-row .when{display:flex;flex-direction:column;align-items:flex-start;line-height:1}
+.assign-row .day{font-size:1.875rem;letter-spacing:-.03em}
+.assign-row .dow{font-size:.75rem;color:var(--muted);margin-top:4px}
+.assign-row .body{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+.assign-row .ttl{font-weight:500;line-height:1.35;overflow-wrap:anywhere}
+.assign-row .status{font-size:var(--t2);color:var(--muted)}
+.assign-row .status.late{color:var(--late)}
+.assign-row .status.ok{color:var(--done)}
+.assign-row .count{align-self:stretch;height:4px;border-radius:2px;background:var(--raised);margin-top:8px}
+.assign-row:hover .count{background:var(--surface)}
+.assign-row .count i{display:block;height:100%;border-radius:2px;background:var(--blue)}
 .chev{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.assign-row .chev{color:var(--ink-3)}
 .assign-toggle{
   display:flex;align-items:center;gap:6px;width:100%;cursor:pointer;background:none;border:none;
-  border-top:1px solid var(--line);border-radius:0;padding:12px 10px;margin-top:4px;
-  font-size:var(--t1);font-weight:600;color:var(--ink-3);
+  border-radius:var(--r-sm);padding:10px 8px;margin-top:4px;
+  font-size:var(--t2);color:var(--muted);
 }
-.assign-toggle:hover{color:var(--ink)}
+.assign-toggle:hover{color:var(--text)}
 
 /* ---------- pills ---------- */
 .pill{
