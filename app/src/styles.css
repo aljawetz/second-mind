@@ -23,9 +23,9 @@
   --shadow:0 1px 2px rgba(26,31,30,.07),0 12px 30px -14px rgba(26,31,30,.28);
   --shadow-pop:0 12px 32px -10px rgba(26,31,30,.3);
 
-  --f-head:'Plus Jakarta Sans',ui-sans-serif,system-ui,-apple-system,sans-serif;
-  --f-body:'Public Sans',ui-sans-serif,system-ui,-apple-system,sans-serif;
-  --f-mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  --f-head:'Geist Variable',ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --f-body:'Geist Variable',ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --f-mono:'Geist Variable',ui-sans-serif,system-ui,-apple-system,sans-serif;
   /* The whole type scale. */
   --t1:.6875rem; --t2:.8125rem; --t3:.9375rem; --t4:1.125rem;
   --r:16px; --r-md:12px; --r-sm:8px;
