@@ -10,9 +10,9 @@ export default function SessionContent({ transcript, summary }: { transcript?: s
             <ReactMarkdown>{summary}</ReactMarkdown>
           </div>
         ) : (
-          <div className="qa-empty">Nothing was transcribed — the recording may have been silent or too short.</div>
+          <div className="qa-empty">Nothing was transcribed. The recording may have been silent or too short.</div>
         )}
-        {summary && <div className="indexed-tag">✓ indexed — searchable in Q&A and artifacts</div>}
+        {summary && <div className="indexed-tag">Indexed, searchable in answers and study material</div>}
       </div>
       {transcript && (
         <details className="panel">
