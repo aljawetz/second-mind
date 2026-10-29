@@ -43,7 +43,7 @@ export default function StartupGate({ onReady }: { onReady: () => void }) {
             return;
           }
           if (elapsed > GRACE_MS) {
-            setMessage("First launch can take a minute or two while your Mac verifies the app — this only happens once.");
+            setMessage("First launch can take a minute or two while your Mac verifies the app. This only happens once.");
           }
           setTimeout(poll, POLL_MS);
         });

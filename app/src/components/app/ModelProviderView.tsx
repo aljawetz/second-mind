@@ -48,7 +48,6 @@ export default function ModelProviderView({ onBack }: { onBack: () => void }) {
       </p>
 
       <div className="home-block model-provider-form">
-        <div className="section-label">Model provider</div>
         <ProviderKeyFields state={state} />
         <div className="model-provider-actions">
           <button className="btn-primary" disabled={!state.loaded || saving || key.trim() === ""} onClick={handleSave}>

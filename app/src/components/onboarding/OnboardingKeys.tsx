@@ -67,7 +67,7 @@ export default function OnboardingKeys({ onNext }: { onNext: (canvasUrl: string)
         </div>
         <div>
           <h2 className="onboard-title">Connect your accounts</h2>
-          <p className="onboard-sub">Keys stay on this device — Second Mind talks to Canvas and your model provider directly.</p>
+          <p className="onboard-sub">Keys stay on this device. Second Mind talks to Canvas and your model provider directly.</p>
         </div>
         <div className="field">
           <label htmlFor="canvas-url">Your school's Canvas URL</label>
@@ -78,7 +78,7 @@ export default function OnboardingKeys({ onNext }: { onNext: (canvasUrl: string)
             value={canvasUrl}
             onChange={(e) => setCanvasUrl(e.target.value)}
           />
-          <span className="hint">The Canvas address you already use to log in — e.g. canvas.cmu.edu</span>
+          <span className="hint">The Canvas address you already use to log in, for example canvas.cmu.edu.</span>
         </div>
         <div className="field">
           <label htmlFor="key-canvas">Canvas API token</label>
@@ -96,7 +96,7 @@ export default function OnboardingKeys({ onNext }: { onNext: (canvasUrl: string)
         </div>
         <ProviderKeyFields state={llm} />
         <button className="btn-primary" disabled={!canProceed} onClick={handleConnect}>
-          {submitting ? "Connecting…" : "Connect →"}
+          {submitting ? "Connecting…" : "Connect"}
         </button>
       </div>
     </div>

@@ -70,7 +70,7 @@ export default function OnboardingCourses({
         </div>
         <div>
           <h2 className="onboard-title">Select your courses</h2>
-          <p className="onboard-sub">Found on your Canvas — pick which ones Second Mind should index.</p>
+          <p className="onboard-sub">Found on your Canvas. Pick which ones Second Mind should index.</p>
         </div>
         {loading && <p className="onboard-sub">Loading your courses…</p>}
         {error && <p className="field-error">{error}</p>}
@@ -89,7 +89,7 @@ export default function OnboardingCourses({
         )}
         <div className="course-count">{selectedCount} selected</div>
         <button className="btn-primary" disabled={selectedCount === 0} onClick={handleImport}>
-          Import selected courses →
+          Import selected courses
         </button>
       </div>
     </div>

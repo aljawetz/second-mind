@@ -152,7 +152,7 @@ export default function ManageMemoriesView({
               </button>
               <button
                 className="icon-btn icon-btn-danger"
-                title="Forget — permanently removes this memory"
+                title="Forget: permanently removes this memory"
                 disabled={forgettingId === m.id}
                 onClick={() => setConfirmingForgetId(m.id)}
               >
@@ -182,7 +182,7 @@ export default function ManageMemoriesView({
         <div className="section-label">Saved memories</div>
         {memories === null && !loadError && <p className="qa-thinking">Loading memories…</p>}
         {memories !== null && memories.length === 0 && !loadError && (
-          <div className="qa-empty">Nothing saved yet — tell Second Mind something in chat and it may appear here.</div>
+          <div className="qa-empty">Nothing saved yet. Tell Second Mind something in chat and it may appear here.</div>
         )}
         {memories !== null && memories.length > 0 && (
           <div className="course-pick">{memories.map(renderMemoryRow)}</div>
