@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { askQuestion, getConversation, type Citation, type MemoryUsed } from "../../sidecar";
+import { askQuestion, getConversation, type CanvasAssignment, type Citation, type MemoryUsed, type UiBlock } from "../../sidecar";
 import Answer, { stripCitations } from "./Answer";
+import UiBlocks from "./blocks/UiBlocks";
 
 interface ChatTurn {
   question: string;
@@ -8,6 +9,7 @@ interface ChatTurn {
   citations: Citation[];
   grounded: boolean;
   memoriesUsed: MemoryUsed[];
+  ui: UiBlock[];
   status: "loading" | "streaming" | "done" | "error";
   error?: string;
 }
@@ -21,6 +23,8 @@ export default function ChatPanel({
   onInitialQuestionSent,
   onConversationSaved,
   onOpenCitation,
+  assignments,
+  onOpenAssignment,
 }: {
   courseId: number;
   courseName: string;
@@ -32,6 +36,9 @@ export default function ChatPanel({
   onInitialQuestionSent?: () => void;
   onConversationSaved: (conversationId: string) => void;
   onOpenCitation: (c: Citation) => void;
+  // For the deadlines card: live status, and opening a row.
+  assignments: CanvasAssignment[];
+  onOpenAssignment: (id: number) => void;
 }) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [title, setTitle] = useState<string | null>(null);
@@ -85,6 +92,7 @@ export default function ChatPanel({
             citations: t.citations,
             grounded: t.grounded,
             memoriesUsed: [],
+            ui: t.ui ?? [],
             status: "done" as const,
           }))
         );
@@ -132,7 +140,7 @@ export default function ChatPanel({
     const history = turns.filter((t) => t.status === "done").map((t) => ({ question: t.question, answer: t.answer }));
     setTurns((prev) => [
       ...prev,
-      { question, answer: "", citations: [], grounded: false, memoriesUsed: [], status: "loading" },
+      { question, answer: "", citations: [], grounded: false, memoriesUsed: [], ui: [], status: "loading" },
     ]);
 
     const update = (patch: Partial<ChatTurn>) =>
@@ -148,6 +156,13 @@ export default function ChatPanel({
         if (event.delta) {
           setTurns((prev) =>
             prev.map((t, i) => (i === turnIndex ? { ...t, answer: t.answer + event.delta, status: "streaming" } : t))
+          );
+        }
+        if (event.ui) {
+          const block = event.ui;
+          // A card can come before any text: show it instead of "Searching…".
+          setTurns((prev) =>
+            prev.map((t, i) => (i === turnIndex ? { ...t, ui: [...t.ui, block], status: "streaming" } : t))
           );
         }
         if (event.citations !== undefined) {
@@ -232,6 +247,7 @@ export default function ChatPanel({
                         grounded={turn.grounded}
                         memoriesUsed={turn.memoriesUsed}
                         onOpenCitation={onOpenCitation}
+                        blocks={<UiBlocks blocks={turn.ui} ctx={{ assignments, onOpenAssignment }} />}
                         actions={
                           turn.status === "done" && (
                             <div className="qa-actions">
