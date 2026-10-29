@@ -188,7 +188,8 @@ def quiz_started(topic: str) -> str:
     return (
         f"A 5-question practice quiz {about}is being written from the course material. It appears below your answer "
         "in under a minute, and the student takes it there. Don't write any questions yourself. In one sentence, say "
-        "what it covers. If they asked for more questions, say a longer quiz can be made from the Study panel."
+        "what it covers. Only if they asked for a number of questions above 5, add that a longer quiz can be made from "
+        "the Study panel; otherwise don't mention it."
     )
 
 
