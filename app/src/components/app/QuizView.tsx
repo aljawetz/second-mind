@@ -24,14 +24,23 @@ export default function QuizView({
   onBack,
   onExplain,
   onOpenCitation,
+  initial,
+  onOpenFull,
 }: {
   courseId: number;
   artifactId: string;
-  onBack: () => void;
+  // Full page (Study panel): a back link. In a chat answer (QuizBlock):
+  // no back link, no keyboard shortcuts (a chat can hold several quizzes),
+  // and an "Open full quiz" link instead.
+  onBack?: () => void;
   onExplain: (prompt: string) => void;
   onOpenCitation: (c: Citation) => void;
+  // Already loaded by the caller, so it isn't fetched twice.
+  initial?: StudyArtifact;
+  onOpenFull?: () => void;
 }) {
-  const [quiz, setQuiz] = useState<StudyArtifact | null>(null);
+  const compact = !onBack;
+  const [quiz, setQuiz] = useState<StudyArtifact | null>(initial ?? null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [position, setPosition] = useState(0);
@@ -40,18 +49,23 @@ export default function QuizView({
 
   useEffect(() => {
     let cancelled = false;
+    const load = (q: StudyArtifact) => {
+      setQuiz(q);
+      setAnswers(q.progress.answers ?? {});
+      setPosition(Math.min(q.progress.position ?? 0, q.items.length - 1));
+      setFinished(!!q.progress.finished);
+    };
+    if (initial) {
+      load(initial);
+      return;
+    }
     getStudy(courseId, artifactId)
-      .then((q) => {
-        if (cancelled) return;
-        setQuiz(q);
-        setAnswers(q.progress.answers ?? {});
-        setPosition(Math.min(q.progress.position ?? 0, q.items.length - 1));
-        setFinished(!!q.progress.finished);
-      })
+      .then((q) => !cancelled && load(q))
       .catch((err) => !cancelled && setLoadError(err instanceof Error ? err.message : "Couldn't open this quiz"));
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId, artifactId]);
 
   function save(next: { answers?: Record<string, number>; position?: number; finished?: boolean }) {
@@ -93,7 +107,7 @@ export default function QuizView({
 
   // ←/→ move between questions, 1–4 or A–D answer.
   useEffect(() => {
-    if (!quiz || finished) return;
+    if (!quiz || finished || compact) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLElement && e.target.closest("input, textarea")) return;
       if (e.key === "ArrowRight" && position < questions.length - 1) go(position + 1);
@@ -120,10 +134,12 @@ export default function QuizView({
     .slice(0, 5);
 
   return (
-    <section className="study-view">
-      <button className="back-link" onClick={onBack}>
-        ‹ Course home
-      </button>
+    <section className={compact ? "study-view compact" : "study-view"}>
+      {onBack && (
+        <button className="back-link" onClick={onBack}>
+          ‹ Course home
+        </button>
+      )}
       {loadError && <p className="qa-a-error">{loadError}</p>}
       {!quiz && !loadError && <p className="qa-thinking">Opening…</p>}
       {quiz && (
@@ -133,6 +149,11 @@ export default function QuizView({
             <span className="study-sub">
               Quiz · {quiz.options.difficulty[0].toUpperCase() + quiz.options.difficulty.slice(1)} · {questions.length} questions
             </span>
+            {onOpenFull && (
+              <button type="button" className="link-btn study-open-full" onClick={onOpenFull}>
+                Open full quiz
+              </button>
+            )}
           </div>
 
           {finished ? (
