@@ -1,6 +1,6 @@
 # Quiet Ledger UI Redesign Plan
 
-**Status:** Approved, ready to start at step 1. Decisions 1 to 4 are settled (see below).
+**Status:** Implemented as stacked PRs #41 to #47, one per step, each with its proof in the description. Decisions 1 to 4 were settled before starting (see below).
 
 **Goal:** Replace the current card-and-shadow UI with the "Quiet ledger" design: ink on a blue-grey ground, flat white cards, one near-black action, blue only on sources and countdowns, red only for what is late or failed.
 
