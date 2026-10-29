@@ -359,6 +359,9 @@ details.panel[open] summary{margin-bottom:10px}
 .explain-flag h3{margin:0}
 .explain-flag .cav{font-size:var(--t2);color:var(--muted)}
 .explain-list{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:8px;font-size:var(--t3);line-height:1.55}
+.cite{font-size:var(--t2);color:var(--text);background:var(--raised);padding:3px 8px;border-radius:var(--r-sm);text-align:left}
+.cite-link{border:none;cursor:pointer}
+.cite-link:hover{background:var(--active)}
 .panel .qa-notes button{background:var(--surface)}
 .panel .qa-notes button:hover,.panel .qa-notes li.lit button{background:var(--mark)}
 .markdown-body{font-size:var(--t3);line-height:1.65;color:var(--ink-2)}
