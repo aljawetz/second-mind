@@ -91,7 +91,7 @@ function GithubSignIn({ state }: { state: ProviderKeyState }) {
       } else if (result.status === "denied") {
         fail("Sign-in was cancelled on GitHub.");
       } else if (result.status === "expired") {
-        fail("The code expired — sign in again.");
+        fail("The code expired. Sign in again.");
       } else {
         fail(result.message ?? "GitHub sign-in failed");
       }
@@ -160,19 +160,33 @@ function GithubSignIn({ state }: { state: ProviderKeyState }) {
   );
 }
 
+const PROVIDER_NOTE: Record<LlmProvider, string> = {
+  openai: "Uses your OpenAI API key.",
+  deepseek: "Uses your DeepSeek API key.",
+  copilot: "Billed to your own Copilot plan.",
+};
+
 export default function ProviderKeyFields({ state }: { state: ProviderKeyState }) {
   return (
     <>
-      <div className="field">
-        <label htmlFor="llm-provider">Model provider</label>
-        <select id="llm-provider" value={state.provider} onChange={(e) => state.setProvider(e.target.value as LlmProvider)}>
-          {(Object.keys(LLM_PROVIDERS) as LlmProvider[]).map((id) => (
-            <option key={id} value={id}>
-              {LLM_PROVIDERS[id].name}
-            </option>
-          ))}
-        </select>
-      </div>
+      <fieldset className="field radio-rows">
+        <legend>Model provider</legend>
+        {(Object.keys(LLM_PROVIDERS) as LlmProvider[]).map((id) => (
+          <label className="radio-row" key={id}>
+            <input
+              type="radio"
+              name="llm-provider"
+              value={id}
+              checked={state.provider === id}
+              onChange={() => state.setProvider(id)}
+            />
+            <span className="radio-text">
+              <span className="radio-name">{LLM_PROVIDERS[id].name}</span>
+              <span className="radio-note">{PROVIDER_NOTE[id]}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
       {state.provider === "copilot" ? <GithubSignIn state={state} /> : <KeyField state={state} />}
     </>
   );

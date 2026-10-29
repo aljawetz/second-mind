@@ -418,11 +418,23 @@ details.panel[open] summary{margin-bottom:10px}
   border:none;border-radius:var(--r-sm);min-height:36px;padding:8px 12px;
   font-family:var(--f-body);font-size:var(--t3);color:var(--ink);background:var(--panel-2);
 }
-.field .hint{font-size:var(--t1);color:var(--ink-3)}
+.field .hint{font-size:var(--t2);color:var(--muted)}
+fieldset.field{border:none;margin:0;padding:0;min-width:0}
+fieldset.field legend{padding:0;margin-bottom:6px;font-size:var(--t3);font-weight:500;color:var(--text)}
+.radio-rows{gap:6px}
+.radio-row{
+  display:flex;align-items:flex-start;gap:12px;cursor:pointer;
+  background:var(--raised);border-radius:var(--r-sm);padding:12px 14px;
+}
+.radio-row:hover{background:var(--active)}
+.radio-row input{accent-color:var(--accent);width:16px;height:16px;margin:2px 0 0;flex:none}
+.radio-text{display:flex;flex-direction:column;min-width:0}
+.radio-name{font-size:var(--t3);font-weight:500;color:var(--text)}
+.radio-note{font-size:var(--t2);color:var(--muted)}
 .field .field-error{font-size:var(--t1);color:var(--late)}
 .field .btn-secondary{padding:9px 16px}
-.signin-code{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line-2);border-radius:var(--r-md);padding:12px}
-.signin-user-code{font-family:var(--f-mono);font-size:var(--t4);font-weight:500;letter-spacing:.12em;color:var(--ink);user-select:all}
+.signin-code{display:flex;flex-direction:column;gap:8px;background:var(--raised);border-radius:var(--r-sm);padding:14px 16px}
+.signin-user-code{font-size:1.875rem;font-weight:500;letter-spacing:.14em;color:var(--ink);user-select:all}
 .signin-actions{display:flex;gap:16px}
 
 /* ---------- manage courses / memories / model provider ---------- */
