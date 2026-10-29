@@ -385,7 +385,7 @@ details.panel[open] summary{margin-bottom:10px}
 .rec-dot.paused{background:var(--muted)}
 .rec-time{font-size:1.875rem;font-weight:400;letter-spacing:-.03em;line-height:1.1}
 .muted{color:var(--muted)}
-.recording-actions{display:flex;gap:10px}
+.recording-actions{display:flex;gap:10px;margin-bottom:16px}
 .recording-actions .btn-primary,.recording-actions .btn-secondary{width:auto;flex:1}
 
 /* ---------- buttons and form fields ---------- */
