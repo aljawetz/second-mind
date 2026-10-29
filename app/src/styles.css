@@ -1,49 +1,47 @@
-/* Second Mind's look: solid panels on a green-grey ground, pen-ink accent,
-   answers that cite their sources as footnotes. Every colour is a token here
-   and redefined once for dark mode; components only use the tokens. */
+/* Second Mind's look: Quiet ledger. Ink on a blue-grey ground, flat white cards,
+   one near-black action. Blue marks sources and countdowns, red marks what is
+   late or failed, and nothing else carries colour. Light only.
+   Every colour is a token here; components only use the tokens. The old names
+   (--bg, --panel, --ink, ...) are aliases and go away in the last redesign step. */
 :root{
   color-scheme:light;
-  --bg:#F3F4F0;          /* the ground the panels sit on: Notebook paper */
-  --panel:#FFFFFF;       /* sidebar, chat, assignments, every card */
-  --panel-2:#F3F4F0;     /* inside a panel: chat page, inputs, hovers */
-  --line:#D6DAD2;
-  --line-2:#C4C9C1;
-  --ink:#1A1F1E;
-  --ink-2:#434A48;
-  --ink-3:#5B6260;       /* faint text; still 4.5:1 on every surface */
-  --accent:#1C5A62;      /* petrol pen ink */
-  --accent-soft:#E0EBE9;
+  --ground:#F2F4F7;      /* the page */
+  --surface:#FFFFFF;     /* cards */
+  --raised:#ECEEF2;      /* inset fields, hovers, question bubbles */
+  --active:#E4E7EC;      /* the selected nav item */
+  --text:#0A0A0A;
+  --muted:#6B6B6B;
+  --accent:#141414;      /* the one primary action */
   --on-accent:#FFFFFF;
-  --mark:#F2E6A2;        /* highlighter: links a footnote to its source */
-  --q-bg:#1A1F1E;
-  --q-fg:#F3F4F0;
-  --late:#A3301F; --late-soft:#F7E2DE;
-  --due:#8F5409;  --due-soft:#F6EBD8;
-  --done:#2B6B43; --done-soft:#E0EFE4;
-  --shadow:0 1px 2px rgba(26,31,30,.07),0 12px 30px -14px rgba(26,31,30,.28);
-  --shadow-pop:0 12px 32px -10px rgba(26,31,30,.3);
+  --blue:#1D5FBF;        /* source numbers and countdowns only */
+  --neg:#C4242A;
+  --pos:#2E7D32;
+  --warn:#92400E;
+
+  --bg:var(--ground);
+  --panel:var(--surface);
+  --panel-2:var(--raised);
+  --line:#E3E6EA;
+  --line-2:#D0D4DA;
+  --ink:var(--text);
+  --ink-2:#3D3D3D;
+  --ink-3:var(--muted);
+  --accent-soft:var(--raised);
+  --mark:#DDE8F8;        /* the highlight that links a footnote to its source */
+  --q-bg:var(--raised);
+  --q-fg:var(--text);
+  --late:var(--neg);   --late-soft:#F6E3E3;
+  --due:var(--warn);   --due-soft:#F5ECDF;
+  --done:var(--pos);   --done-soft:#E3EFE6;
+  --shadow:none;       /* resting things have no shadow; only menus and dialogs float */
+  --shadow-pop:0 12px 32px -10px rgba(10,10,10,.3);
 
   --f-head:'Geist Variable',ui-sans-serif,system-ui,-apple-system,sans-serif;
   --f-body:'Geist Variable',ui-sans-serif,system-ui,-apple-system,sans-serif;
   --f-mono:'Geist Variable',ui-sans-serif,system-ui,-apple-system,sans-serif;
   /* The whole type scale. */
   --t1:.6875rem; --t2:.8125rem; --t3:.9375rem; --t4:1.125rem;
-  --r:16px; --r-md:12px; --r-sm:8px;
-}
-@media (prefers-color-scheme: dark){
-  :root{
-    color-scheme:dark;
-    --bg:#0F1312; --panel:#1A1F1E; --panel-2:#141817;
-    --line:#2B3230; --line-2:#3A4240;
-    --ink:#E5E8E3; --ink-2:#B9BFBA; --ink-3:#939A96;
-    --accent:#7EC1C4; --accent-soft:#1E3335; --on-accent:#0D1A1B;
-    --mark:#4A4220; --q-bg:#E5E8E3; --q-fg:#141817;
-    --late:#EF8E81; --late-soft:#3B221F;
-    --due:#E3AB5C;  --due-soft:#382C1A;
-    --done:#8BC99F; --done-soft:#1E3226;
-    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px -14px rgba(0,0,0,.6);
-    --shadow-pop:0 12px 32px -10px rgba(0,0,0,.7);
-  }
+  --r:8px; --r-md:8px; --r-sm:6px;
 }
 
 *{box-sizing:border-box}
@@ -54,9 +52,10 @@ html,body,#root{height:100%}
 body{
   margin:0;background:var(--bg);color:var(--ink);
   font-family:var(--f-body);font-size:var(--t2);line-height:1.5;
+  font-variant-numeric:tabular-nums;
   -webkit-font-smoothing:antialiased;
 }
-h1,h2,h3{font-family:var(--f-head);font-weight:700;text-wrap:balance;margin:0}
+h1,h2,h3{font-family:var(--f-head);font-weight:500;text-wrap:balance;margin:0}
 .mono{font-family:var(--f-mono)}
 button{font:inherit;color:inherit}
 button:disabled{cursor:not-allowed}
