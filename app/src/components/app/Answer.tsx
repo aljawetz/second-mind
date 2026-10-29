@@ -139,7 +139,7 @@ export default function Answer({
       {course && <div className="qa-body">{markdown(course)}</div>}
       {general !== null && (
         <div className="qa-general">
-          <div className="qa-general-head">General knowledge · not from your course</div>
+          <div className="qa-general-head">General knowledge, not from your course</div>
           {general && <div className="qa-body">{markdown(general)}</div>}
         </div>
       )}
