@@ -80,7 +80,7 @@ export default function NewSessionView({
       setPaused(false);
       setPhase("recording");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't start recording — check microphone permission.");
+      setError(err instanceof Error ? err.message : "Couldn't start recording. Check microphone permission.");
       setPhase("error");
     }
   }
