@@ -12,7 +12,7 @@ export default function Topbar({
   courseName: string;
   overrideTitle?: string;
   // detail: the full per-item failure list, shown on hover — the label
-  // stays short enough for the pill.
+  // stays short enough for one line.
   syncStatus?: { label: string; detail?: string; error?: boolean; ok?: boolean };
   onManageMemories?: () => void;
 }) {

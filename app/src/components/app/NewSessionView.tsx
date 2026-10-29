@@ -144,7 +144,7 @@ export default function NewSessionView({
       {phase === "idle" && (
         <div className="panel">
           <button className="btn-primary" onClick={handleStart}>
-            ● Start recording
+            Start recording
           </button>
         </div>
       )}
@@ -157,13 +157,17 @@ export default function NewSessionView({
             <h3>Recording</h3>
             {phase === "recording" ? (
               <>
-                <p className="mono">{paused ? "‖ Paused" : "●"} {formatElapsed(elapsed)}</p>
+                <div className="rec">
+                  <span className={"rec-dot" + (paused ? " paused" : "")} aria-hidden="true"></span>
+                  <b className="rec-time">{formatElapsed(elapsed)}</b>
+                  {paused && <span className="muted">Paused</span>}
+                </div>
                 <div className="recording-actions">
                   <button className="btn-secondary" onClick={handlePauseResume}>
-                    {paused ? "▶ Resume" : "‖ Pause"}
+                    {paused ? "Resume" : "Pause"}
                   </button>
                   <button className="btn-primary" onClick={handleStop}>
-                    ■ Stop recording
+                    Stop recording
                   </button>
                 </div>
               </>
@@ -179,7 +183,7 @@ export default function NewSessionView({
             <h3>Notes</h3>
             <textarea
               className="notes-area"
-              placeholder="Jot down anything worth remembering — enhanced notes are generated from the recording afterward, separately from this."
+              placeholder="Jot down anything worth remembering. Enhanced notes are generated from the recording afterward, separately from this."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               onBlur={handleNotesBlur}

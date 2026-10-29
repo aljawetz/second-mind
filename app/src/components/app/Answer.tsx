@@ -12,7 +12,7 @@ const GENERAL_KNOWLEDGE_LABEL = "General knowledge (not from your course materia
 // sent after the answer. [1, 3] is two markers.
 const CITATION = /[ \t]?\[(\d+(?:\s*,\s*\d+)*)\]/g;
 
-const SOURCE_KIND: Record<Citation["source_type"], string> = {
+export const SOURCE_KIND: Record<Citation["source_type"], string> = {
   page: "Canvas page",
   file: "File",
   syllabus: "Syllabus",

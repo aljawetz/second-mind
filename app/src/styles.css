@@ -258,6 +258,8 @@ sup.fn{cursor:default}
 .qa-a-error{color:var(--late)}
 .qa-a.qa-a-error{background:var(--raised);border-radius:var(--r-sm);padding:10px 14px}
 .qa-empty{color:var(--ink-3);margin:0;padding:4px 2px}
+/* A failed request inside a view is one inset box with the message. */
+.view .qa-a-error{background:var(--raised);border-radius:var(--r-sm);padding:10px 14px}
 
 .chat-empty{
   flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;
@@ -319,41 +321,33 @@ sup.fn{cursor:default}
 }
 .assign-toggle:hover{color:var(--text)}
 
-/* ---------- pills ---------- */
-.pill{
-  display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
-  font-size:var(--t1);font-weight:600;padding:1px 8px;border-radius:99px;
-  background:var(--accent-soft);color:var(--accent);
-}
-.pill-ochre{background:var(--due-soft);color:var(--due)}
-.pill-green{background:var(--done-soft);color:var(--done)}
-.pill-red{background:var(--late-soft);color:var(--late)}
-.pill-neutral{background:var(--panel-2);color:var(--ink-3);border:1px solid var(--line);font-weight:500}
-
 /* ---------- inside other views ---------- */
 .back-link{
   align-self:flex-start;display:flex;align-items:center;gap:4px;cursor:pointer;
-  background:none;border:none;color:var(--ink-2);padding:2px 0;
+  background:none;border:none;color:var(--muted);padding:2px 0;
 }
-.back-link:hover{color:var(--accent)}
+.back-link:hover{color:var(--text)}
+.panel > .btn-primary{width:auto;align-self:flex-start}
 .section-label{font-size:var(--t1);font-weight:600;color:var(--ink-3);margin-bottom:10px}
 .home-block{display:flex;flex-direction:column}
 .home-block + .home-block{padding-top:24px;border-top:1px solid var(--line)}
 .panel{background:var(--panel-2);border-radius:var(--r);padding:16px 18px}
-.panel h3{font-size:var(--t2);color:var(--ink-2);margin-bottom:10px}
-details.panel summary{cursor:pointer;font-weight:600;color:var(--ink-2)}
+.panel h3{font-size:1rem;font-weight:500;color:var(--text);margin-bottom:10px}
+details.panel summary{cursor:pointer;font-weight:500;color:var(--text)}
 details.panel[open] summary{margin-bottom:10px}
 .split{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
 
 .assign-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.assign-head h2{font-size:var(--t4)}
+.assign-head h2{font-size:1.5rem;font-weight:500;letter-spacing:-.02em;line-height:1.25}
+.assign-meta{display:flex;gap:16px;flex-wrap:wrap;margin:-8px 0 0;color:var(--muted)}
+.assign-meta .late{color:var(--late)}
+.assign-meta .ok{color:var(--done)}
 .session-title-input{
-  font:inherit;font-family:var(--f-head);font-size:var(--t4);font-weight:700;color:var(--ink);
-  border:1px solid var(--line-2);border-radius:10px;padding:2px 8px;background:var(--panel);
+  font:inherit;font-family:var(--f-head);font-size:1.5rem;font-weight:500;letter-spacing:-.02em;color:var(--ink);
+  border:none;border-radius:var(--r-sm);padding:2px 10px;background:var(--raised);
 }
-.session-actions{margin-left:auto;flex:none;display:flex;align-items:center;gap:4px}
-.confirm-text{font-size:var(--t1);color:var(--ink-2)}
-.assign-pills{display:flex;gap:8px;flex-wrap:wrap}
+.session-actions{margin-left:auto;flex:none;display:flex;align-items:center;gap:16px}
+.confirm-text{font-size:var(--t2);color:var(--ink-2)}
 .assign-prompt{font-size:var(--t3);line-height:1.65;color:var(--ink-2);white-space:pre-wrap;overflow-wrap:anywhere}
 .explain-btn{
   align-self:flex-start;display:flex;align-items:center;gap:8px;cursor:pointer;
@@ -362,17 +356,15 @@ details.panel[open] summary{margin-bottom:10px}
 }
 .explain-btn:hover{background:#2b2b2b}
 .explain-panel{display:flex;flex-direction:column;gap:16px}
-.explain-flag{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px dashed var(--line-2)}
-.explain-flag .cav{font-size:var(--t1);color:var(--ink-3)}
+.explain-flag{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.explain-flag h3{margin:0}
+.explain-flag .cav{font-size:var(--t2);color:var(--muted)}
 .explain-list{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:8px;font-size:var(--t3);line-height:1.55}
-.explain-tips{display:flex;flex-direction:column;gap:8px}
-.explain-tip{display:flex;gap:10px;align-items:flex-start}
-.cite{
-  font-size:var(--t1);color:var(--accent);background:var(--accent-soft);
-  padding:2px 8px;border-radius:6px;text-align:left;
-}
+.cite{font-size:var(--t2);color:var(--text);background:var(--raised);padding:3px 8px;border-radius:var(--r-sm);text-align:left}
 .cite-link{border:none;cursor:pointer}
-.cite-link:hover{background:var(--accent);color:var(--on-accent)}
+.cite-link:hover{background:var(--active)}
+.panel .qa-notes button{background:var(--surface)}
+.panel .qa-notes button:hover,.panel .qa-notes li.lit button{background:var(--mark)}
 .markdown-body{font-size:var(--t3);line-height:1.65;color:var(--ink-2)}
 .markdown-body h1,.markdown-body h2,.markdown-body h3{color:var(--ink);font-size:var(--t3);margin:1em 0 .4em}
 .markdown-body > :first-child{margin-top:0}
@@ -387,8 +379,13 @@ details.panel[open] summary{margin-bottom:10px}
 .live-transcript{
   max-height:260px;overflow-y:auto;margin:0;font-size:var(--t3);line-height:1.6;color:var(--ink-2);
 }
-.indexed-tag{display:flex;align-items:center;gap:6px;font-size:var(--t1);color:var(--done);margin-top:10px}
-.recording-actions{display:flex;gap:10px}
+.indexed-tag{display:flex;align-items:center;gap:6px;font-size:var(--t2);color:var(--done);margin-top:10px}
+.rec{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+.rec-dot{width:10px;height:10px;border-radius:50%;background:var(--neg);flex:none}
+.rec-dot.paused{background:var(--muted)}
+.rec-time{font-size:1.875rem;font-weight:400;letter-spacing:-.03em;line-height:1.1}
+.muted{color:var(--muted)}
+.recording-actions{display:flex;gap:10px;margin-bottom:16px}
 .recording-actions .btn-primary,.recording-actions .btn-secondary{width:auto;flex:1}
 
 /* ---------- buttons and form fields ---------- */
