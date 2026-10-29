@@ -6,27 +6,6 @@ import StudyCustomize from "./StudyCustomize";
 // generates with the default options, a pencil on each for choosing them,
 // and everything generated so far, newest first.
 
-export const QuizIcon = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M9 6h11M9 12h11M9 18h11" />
-    <path d="m3.5 6 1.5 1.5L7.5 4.5M3.5 12l1.5 1.5 2.5-3" />
-    <circle cx="5" cy="18" r="1.4" />
-  </svg>
-);
-
-export const CardsIcon = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <rect x="3" y="7" width="14" height="13" rx="2" />
-    <path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-2" />
-  </svg>
-);
-
-const PencilIcon = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-  </svg>
-);
-
 const KIND_LABEL: Record<StudyKind, string> = { quiz: "Quiz", flashcards: "Flashcards" };
 
 function describe(a: StudySummary): string {
@@ -90,21 +69,20 @@ export default function StudyPanel({
       <div className="assign-top">
         <h2>Study</h2>
       </div>
-      <div className="study-tiles">
+      <div className="study-kinds">
         {(["quiz", "flashcards"] as StudyKind[]).map((kind) => (
-          <div className="study-tile" key={kind}>
-            <button type="button" className="study-tile-main" onClick={() => void create(kind, DEFAULT_STUDY_OPTIONS)}>
-              {kind === "quiz" ? <QuizIcon /> : <CardsIcon />}
-              {KIND_LABEL[kind]}
-            </button>
+          <div className="study-kind-row" key={kind}>
+            <span className="ttl">{KIND_LABEL[kind]}</span>
             <button
               type="button"
-              className="study-tile-edit"
-              title={`Customize ${KIND_LABEL[kind].toLowerCase()}`}
+              className="text-btn"
               aria-label={`Customize ${KIND_LABEL[kind].toLowerCase()}`}
               onClick={() => setCustomizing(kind)}
             >
-              <PencilIcon />
+              Customize
+            </button>
+            <button type="button" className="btn-secondary btn-small" onClick={() => void create(kind, DEFAULT_STUDY_OPTIONS)}>
+              Create
             </button>
           </div>
         ))}
@@ -138,7 +116,6 @@ export default function StudyPanel({
                 disabled={a.status !== "done"}
                 onClick={() => onOpen(a.id)}
               >
-                <span className="study-kind">{a.kind === "quiz" ? <QuizIcon /> : <CardsIcon />}</span>
                 <span className="body">
                   <span className="ttl">{a.title}</span>
                   <span className="meta">
