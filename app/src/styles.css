@@ -260,17 +260,17 @@ sup.fn{cursor:default}
 .qa-empty{color:var(--ink-3);margin:0;padding:4px 2px}
 
 .chat-empty{
-  flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:16px;padding:32px 20px;text-align:center;background:var(--panel-2);
+  flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;
+  gap:12px;padding:24px;text-align:left;
 }
-.chat-empty h2{font-size:var(--t4)}
-.chat-empty p{margin:0;color:var(--ink-3);max-width:34rem}
-.suggest{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:38rem}
+.chat-empty h2{font-size:1.5rem;font-weight:500;letter-spacing:-.02em;line-height:1.25}
+.chat-empty p{margin:0;color:var(--muted);max-width:30rem}
+.suggest{display:flex;flex-direction:column;gap:8px;width:100%;max-width:34rem;margin-top:4px}
 .suggest button{
-  cursor:pointer;border:1px solid var(--line-2);background:var(--panel);border-radius:99px;
-  padding:6px 14px;color:var(--ink-2);
+  cursor:pointer;border:none;background:var(--raised);border-radius:var(--r-sm);
+  padding:11px 14px;color:var(--text);text-align:left;width:100%;
 }
-.suggest button:hover{border-color:var(--accent);color:var(--accent)}
+.suggest button:hover{background:var(--active)}
 
 .composer{flex:none;padding:8px 24px 20px;background:var(--panel)}
 .ask-box{
