@@ -32,6 +32,8 @@ answer here, and forget_memory only accepts labels shown in this turn.
 import datetime
 import json
 import re
+import sys
+import traceback
 from typing import Callable, Iterator
 
 from llama_index.core.schema import NodeWithScore
@@ -343,6 +345,20 @@ def answer(
             return run_forget(call.arguments.get("labels"))
         return "Unknown tool or empty query."
 
+    # A tool the model calls runs after the answer may have started
+    # streaming, so a failure here (a search, a memory lookup, later a Canvas
+    # call) would cut the answer off mid-sentence. The model gets the error
+    # as the tool's result instead and can answer without it.
+    def safe_run_tool(call: ToolCall) -> str:
+        try:
+            return run_tool(call)
+        except Exception as e:
+            traceback.print_exc(file=sys.stderr)
+            return (
+                f"The {call.name} tool failed ({type(e).__name__}: {str(e)[:200]}). Answer without it, and tell "
+                "the student what you couldn't look up."
+            )
+
     prompt = SYSTEM_PROMPT.format(
         course_name=course_name,
         label=GENERAL_KNOWLEDGE_LABEL,
@@ -409,7 +425,7 @@ def answer(
             }
         )
         for call in end.tool_calls:
-            messages.append({"role": "tool", "tool_call_id": call.id, "content": run_tool(call)})
+            messages.append({"role": "tool", "tool_call_id": call.id, "content": safe_run_tool(call)})
 
     tail = renumberer.flush()
     if tail:
