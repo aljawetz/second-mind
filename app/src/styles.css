@@ -627,7 +627,7 @@ fieldset.field legend{padding:0;margin-bottom:6px;font-size:var(--t3);font-weigh
 
 /* ---------- narrower windows ---------- */
 @media (max-width:1100px){
-  #view-home{grid-template-columns:1fr;height:auto}
+  #view-home{grid-template-columns:minmax(0,1fr);height:auto}
   .view.view-home{overflow-y:auto}
   .view.view-home .view-inner{height:auto}
   .chat-card{height:min(46rem,calc(100vh - 8rem))}
@@ -635,7 +635,7 @@ fieldset.field legend{padding:0;margin-bottom:6px;font-size:var(--t3);font-weigh
   .study-panel{max-height:none}
 }
 @media (max-width:760px){
-  .app{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);padding:0 16px 16px}
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);padding:0 16px 16px}
   .sidebar{flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px;padding:10px;overflow:visible}
   .sidebar nav{flex:1 1 100%;min-width:0}
   .nav-label,.course-sub,.canvas-status{display:none}
