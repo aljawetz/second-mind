@@ -140,6 +140,25 @@ def list_assignments(course_id: int) -> list[dict]:
         return _get_all(client, f"/courses/{course_id}/assignments", params={"per_page": 50, "include[]": "submission"})
 
 
+def assignment_summary(a: dict) -> dict:
+    """One list_assignments row as the app and chat's deadlines card use it,
+    without the description (HTML, often long)."""
+    submission = a.get("submission") or {}
+    return {
+        "id": a["id"],
+        "name": a.get("name", ""),
+        "due_at": a.get("due_at"),
+        "points_possible": a.get("points_possible"),
+        # Real Canvas submission status (list_assignments's
+        # include[]=submission), not guessed from due date — a
+        # workflow_state of "unsubmitted" (or no submission object
+        # at all, e.g. a not-for-credit assignment) means not done.
+        "submitted": submission.get("workflow_state") not in (None, "unsubmitted"),
+        "late": bool(submission.get("late")),
+        "missing": bool(submission.get("missing")),
+    }
+
+
 def get_assignment(course_id: int, assignment_id: int) -> dict | None:
     with _client() as client:
         r = _get(client, f"/courses/{course_id}/assignments/{assignment_id}")
