@@ -34,6 +34,8 @@ export default function HomeView({
   onConversationSaved,
   onOpenAssignment,
   onOpenSession,
+  onOpenStudy,
+  onStudyStarted,
 }: {
   courseId: number;
   courseName: string;
@@ -48,6 +50,8 @@ export default function HomeView({
   onConversationSaved: (conversationId: string) => void;
   onOpenAssignment: (id: number) => void;
   onOpenSession: (sessionId: string) => void;
+  onOpenStudy: (id: string) => void;
+  onStudyStarted: () => void;
 }) {
   const { upcoming, past } = splitAssignments(assignments);
   // Upcoming work is what needs attention; past work is there to check.
@@ -94,6 +98,8 @@ export default function HomeView({
         onOpenCitation={(c: Citation) => void openCitation(canvasBaseUrl, courseId, c, onOpenSession)}
         assignments={assignments}
         onOpenAssignment={onOpenAssignment}
+        onOpenStudy={onOpenStudy}
+        onStudyStarted={onStudyStarted}
       />
 
       <div className="home-side">
