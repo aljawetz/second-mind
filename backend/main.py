@@ -872,6 +872,16 @@ class Handler(BaseHTTPRequestHandler):
                     # model says it couldn't find anything, same as a real miss.
                     index = None
                 provider = llm.current_provider()
+
+                def start_quiz(options: dict) -> dict | None:
+                    import study
+
+                    # No index, no quiz: saying so beats a card that only
+                    # ever shows study.start's "nothing indexed" error.
+                    if not indexing.index_exists(SM_HOME / "index.lancedb", f"course_{course_id}"):
+                        return None
+                    return self._start_study(int(course_id), "quiz", study.check_options("quiz", options), provider)
+
                 memory = _memory_service(int(course_id), provider, conversation_id=cid) if memory_on else None
                 events = chat.answer(
                     question,
@@ -882,6 +892,7 @@ class Handler(BaseHTTPRequestHandler):
                     memory=memory,
                     summary=summary,
                     assignments=lambda: [canvas.assignment_summary(a) for a in canvas.list_assignments(int(course_id))],
+                    start_quiz=start_quiz,
                 )
                 first = next(events)
             except OnnxModelFileMissing:
@@ -1107,6 +1118,13 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(*self._llm_error(e))
             return
 
+        self._send_json(202, self._start_study(int(course_id), kind, options, model))
+
+    def _start_study(self, course_id: int, kind: str, options: dict, model) -> dict:
+        """study.start with the app's embedding model and error wording. Used
+        by the Study panel's create route and by chat's show_quiz tool."""
+        import study
+
         def embed(text: str) -> list[float]:
             from embeddings import OnnxBgeEmbedding
 
@@ -1118,10 +1136,9 @@ class Handler(BaseHTTPRequestHandler):
             traceback.print_exc()
             return "Something went wrong while writing this. Try again."
 
-        summary = study.start(
-            SM_HOME, SM_HOME / "index.lancedb", int(course_id), kind, options, llm=model, embed=embed, describe_error=describe
+        return study.start(
+            SM_HOME, SM_HOME / "index.lancedb", course_id, kind, options, llm=model, embed=embed, describe_error=describe
         )
-        self._send_json(202, summary)
 
     def _handle_study_progress(self, course_id: str, artifact_id: str):
         import study

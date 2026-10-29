@@ -339,3 +339,66 @@ def test_canvas_failing_shows_no_card_and_tells_the_model():
     )
     assert not any("ui" in e for e in events)
     assert "show_deadlines tool failed" in provider.calls[1]["messages"][-1]["content"]
+
+
+def _run_with_quiz(replies, start_quiz):
+    provider = FakeProvider(replies)
+    events = list(chat.answer("Quiz me", [], "Test Course", lambda q: [], provider, start_quiz=start_quiz))
+    return events, provider
+
+
+def test_quiz_tool_starts_a_study_quiz_and_shows_its_card():
+    started = []
+
+    def start_quiz(options):
+        started.append(options)
+        return {"id": "quiz-abc", "status": "generating"}
+
+    events, provider = _run_with_quiz(
+        [
+            ([], [ToolCall(id="q1", name="show_quiz", arguments={"topic": "user stories"})]),
+            (["Here's a 5-question quiz on user stories."], []),
+        ],
+        start_quiz,
+    )
+    assert [t["function"]["name"] for t in provider.calls[0]["tools"]] == ["search_course", "show_quiz"]
+    assert started == [{"count": "fewer", "difficulty": "medium", "topic": "user stories"}]
+    assert events[0] == {"ui": {"id": "ui-1", "component": "quiz", "props": {"artifact_id": "quiz-abc", "topic": "user stories"}}}
+    assert "Don't write any questions yourself" in provider.calls[1]["messages"][-1]["content"]
+
+
+def test_no_indexed_material_means_no_quiz_card():
+    events, provider = _run_with_quiz(
+        [([], [ToolCall(id="q1", name="show_quiz", arguments={"topic": "x"})]), (["Sync first."], [])],
+        lambda options: None,
+    )
+    assert not any("ui" in e for e in events)
+    assert "nothing indexed" in provider.calls[1]["messages"][-1]["content"]
+
+
+def test_one_quiz_per_answer():
+    started = []
+    events, provider = _run_with_quiz(
+        [
+            ([], [ToolCall(id="q1", name="show_quiz", arguments={"topic": "a"}), ToolCall(id="q2", name="show_quiz", arguments={"topic": "b"})]),
+            (["Done."], []),
+        ],
+        lambda options: started.append(options) or {"id": f"quiz-{len(started)}"},
+    )
+    assert len(started) == 1
+    assert sum("ui" in e for e in events) == 1
+    assert "already shown" in provider.calls[1]["messages"][-1]["content"]
+
+
+def test_deadlines_and_quiz_can_share_an_answer():
+    provider = FakeProvider(
+        [
+            ([], [ToolCall(id="d1", name="show_deadlines", arguments={}), ToolCall(id="q1", name="show_quiz", arguments={"topic": "lab 3"})]),
+            (["Here you go."], []),
+        ]
+    )
+    events = list(
+        chat.answer("What's due, and quiz me on lab 3", [], "C", lambda q: [], provider, assignments=lambda: [], start_quiz=lambda o: {"id": "quiz-1"})
+    )
+    assert [e["ui"]["component"] for e in events if "ui" in e] == ["deadlines", "quiz"]
+    assert [e["ui"]["id"] for e in events if "ui" in e] == ["ui-1", "ui-2"]
