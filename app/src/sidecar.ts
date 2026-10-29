@@ -118,18 +118,23 @@ export async function listCourses(): Promise<CanvasCourse[]> {
   return data.courses;
 }
 
-export interface CanvasAssignment {
+// canvas.assignment_summary: what the assignments list and chat's
+// deadlines card both show.
+export interface AssignmentSummary {
   id: number;
   name: string;
   due_at: string | null;
   points_possible: number | null;
-  description: string;
   // Real Canvas submission status (main.py's /courses/{id}/assignments,
   // include[]=submission) — not derived from due_at, so a late-but-turned-in
   // assignment or a not-yet-due one both come through correctly.
   submitted: boolean;
   late: boolean;
   missing: boolean;
+}
+
+export interface CanvasAssignment extends AssignmentSummary {
+  description: string;
 }
 
 export async function listAssignments(courseId: number): Promise<CanvasAssignment[]> {
@@ -170,12 +175,25 @@ export interface MemoryUsed {
   text: string;
 }
 
+// A card the model chose to show below its answer (backend display_tools.py,
+// docs/plans/2026-10-28-chat-generative-ui.md). The backend builds props from
+// real data; the app renders only the components it knows.
+export interface DeadlinesProps {
+  as_of: string;
+  days: number;
+  assignments: AssignmentSummary[];
+}
+
+export type UiBlock = { id: string; component: "deadlines"; props: DeadlinesProps };
+
 export interface AskEvent {
   conversation_id?: string;
   delta?: string;
   citations?: Citation[];
   grounded?: boolean;
   memories_used?: MemoryUsed[];
+  // Sent when the model shows a card, before or between deltas.
+  ui?: UiBlock;
   error?: string;
   done?: boolean;
 }
@@ -230,6 +248,7 @@ export interface SavedTurn {
   citations: Citation[];
   grounded: boolean;
   asked_at: string;
+  ui?: UiBlock[];
 }
 
 export async function listConversations(courseId: number): Promise<ConversationSummary[]> {

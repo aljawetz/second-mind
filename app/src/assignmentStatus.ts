@@ -1,4 +1,4 @@
-import type { CanvasAssignment } from "./sidecar";
+import type { AssignmentSummary, CanvasAssignment } from "./sidecar";
 
 export function formatDue(dueAt: string | null): string {
   if (!dueAt) return "No due date";
@@ -9,7 +9,7 @@ export function formatDue(dueAt: string | null): string {
 // status (not a guess from due date — a submitted assignment counts even
 // if turned in early) and, for anything not yet submitted, whether its due
 // date has already passed.
-export function isPastOrCompleted(a: CanvasAssignment, now: number): boolean {
+export function isPastOrCompleted(a: AssignmentSummary, now: number): boolean {
   if (a.submitted) return true;
   return !!a.due_at && new Date(a.due_at).getTime() < now;
 }
@@ -50,7 +50,7 @@ export type StatusTone = "late" | "ok" | "normal";
 
 // The same facts as statusPill, as plain text for the assignments list. Red is
 // only for what is missing or due within a day; a few days out reads as a count.
-export function statusText(a: CanvasAssignment): { text: string; tone: StatusTone } {
+export function statusText(a: AssignmentSummary): { text: string; tone: StatusTone } {
   const pts = a.points_possible != null ? ` · ${a.points_possible} pts` : "";
   if (a.missing) return { text: `Missing${pts}`, tone: "late" };
   if (a.submitted) return { text: `${a.late ? "Submitted late" : "Submitted"}${pts}`, tone: a.late ? "late" : "ok" };
@@ -73,7 +73,7 @@ export function dueParts(dueAt: string | null): { day: string; dow: string } {
 }
 
 // How full the countdown bar is: empty a week out, full when it is due.
-export function countdownPercent(a: CanvasAssignment): number | null {
+export function countdownPercent(a: AssignmentSummary): number | null {
   if (a.submitted || a.missing || !a.due_at) return null;
   const days = daysUntil(a.due_at);
   if (days < 0 || days > 7) return null;
