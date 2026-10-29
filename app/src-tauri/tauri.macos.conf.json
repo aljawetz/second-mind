@@ -8,6 +8,7 @@
         "height": 780,
         "minWidth": 480,
         "minHeight": 420,
+        "theme": "Light",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true
       }
