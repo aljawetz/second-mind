@@ -11,13 +11,13 @@
   --control:#D0D4DA;     /* the outline of a small control, like a progress circle */
   --text:#0A0A0A;
   --text-2:#3D3D3D;
-  --muted:#6B6B6B;
+  --muted:#666666;
   --accent:#141414;      /* the one primary action */
   --on-accent:#FFFFFF;
   --blue:#1D5FBF;        /* source numbers and countdowns only */
   --mark:#DDE8F8;        /* the highlight that links a footnote to its source */
   --neg:#C4242A;   --neg-soft:#F6E3E3;
-  --pos:#2E7D32;   --pos-soft:#E3EFE6;
+  --pos:#2A7330;   --pos-soft:#E3EFE6;
   --warn:#92400E;
   --shadow-pop:0 12px 32px -10px rgba(10,10,10,.3);  /* only menus and dialogs float */
 
@@ -498,7 +498,7 @@ fieldset.field legend{padding:0;margin-bottom:6px;font-size:var(--t3);font-weigh
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion: reduce){
   .index-row.busy .stat,.session-status-dot{animation:none}
-  .side-toggle svg,.assign-toggle svg{transition:none}
+  .side-toggle svg,.assign-toggle svg,.study-progress .bar div{transition:none}
 }
 
 /* ---------- study: quizzes and flashcards ---------- */
