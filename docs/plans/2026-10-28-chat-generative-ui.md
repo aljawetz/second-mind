@@ -64,7 +64,7 @@ Proof: test output.
 ### 2. Backend: `ui` events and the `show_deadlines` tool
 
 - Move the assignment normalization out of `main.py:_handle_list_assignments` into `canvas.py` (`normalized_assignments(course_id)`), so the route and the tool share it. The route behaves the same.
-- `chat.py`: `DEADLINES_TOOL` with args `{"days": int (1 to 60, default 14), "include_submitted": bool}`. In code: fetch, filter to the window, sort by `due_at`, cap at 12. Undated assignments go last, like `splitAssignments`.
+- `chat.py`: `DEADLINES_TOOL` with args `{"days": int (1 to 60, default 14), "include_submitted": bool}`. In code: fetch, filter to the window, sort by `due_at`, cap at 12. Unsubmitted work up to 7 days past due stays in, marked past due. Undated assignments are left out: they can't be due soon.
 - `answer()` gets a `canvas_assignments: Callable[[], list[dict]] | None` argument (injected like `memory`, so tests don't touch Canvas). When it's `None` the tool isn't offered.
 - Emit `{"ui": {"id", "component": "deadlines", "props": {"as_of", "days", "assignments": [...]}}}`. Tool result for the model: one line per assignment (name, due date, status) so it can add advice ("start the essay first, it's worth the most").
 - Prompt: a short "Display tools" section with decision 4's rules.

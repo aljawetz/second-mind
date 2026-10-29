@@ -38,6 +38,7 @@ from typing import Callable, Iterator
 
 from llama_index.core.schema import NodeWithScore
 
+import display_tools
 import generation
 from llm import LLMProvider, ToolCall, TurnEnd
 from memory.compress import summary_block
@@ -278,6 +279,7 @@ def answer(
     memory=None,
     summary: str = "",
     today: datetime.date | None = None,
+    assignments: Callable[[], list[dict]] | None = None,
 ) -> Iterator[dict]:
     """Yields /ask's stream events: {"delta"} text pieces, then one
     {"citations", "grounded"}, then {"done": True}. With `memory` (a
@@ -286,6 +288,11 @@ def answer(
     can show what the answer drew on. The profile isn't listed: it's there
     on every question. `summary` is the conversation's running summary when
     `history` is only its last few turns (memory.compress).
+
+    With `assignments` (the course's canvas.assignment_summary rows, fetched
+    only if the model asks), the model can show a deadlines card: a
+    {"ui": {id, component, props}} event the app renders below the answer
+    (display_tools.py).
 
     Nothing is yielded until the model starts writing its answer, so errors
     from searching or the first model calls surface before the caller has
@@ -296,6 +303,8 @@ def answer(
     today = today or datetime.date.today()
     used: dict[str, str] = {}  # memory id -> text, in the order first shown
     forgotten: set[str] = set()
+    ui_blocks: list[dict] = []
+    pending_ui: list[dict] = []
 
     def run_search(query: str) -> str:
         parts = []
@@ -334,7 +343,23 @@ def answer(
             )
         return " ".join(parts) or "Nothing to forget."
 
+    def show_card(component: str, props: dict) -> None:
+        block = {"id": f"ui-{len(ui_blocks) + 1}", "component": component, "props": props}
+        ui_blocks.append(block)
+        pending_ui.append({"ui": block})
+
+    def run_deadlines(args: dict) -> str:
+        # Once per answer, enforced here: the prompt alone didn't hold for
+        # the forced-search rule, so this one doesn't rely on it.
+        if any(b["component"] == "deadlines" for b in ui_blocks):
+            return "The deadlines card is already shown below your answer. Don't call show_deadlines again."
+        props, text = display_tools.deadlines(assignments(), args)
+        show_card("deadlines", props)
+        return text
+
     def run_tool(call: ToolCall) -> str:
+        if assignments is not None and call.name == "show_deadlines":
+            return run_deadlines(call.arguments)
         query = call.arguments.get("query")
         has_query = isinstance(query, str) and query.strip()
         if call.name == "search_course" and has_query:
@@ -371,6 +396,9 @@ def answer(
         profile = memory.profile_block()
         if profile:
             prompt += "\n\n" + profile
+    if assignments is not None:
+        tools = [*tools, display_tools.DEADLINES_TOOL]
+        prompt += display_tools.RULES
     if summary:
         prompt += "\n\n" + summary_block(summary)
     messages = [{"role": "system", "content": prompt}, *_history_messages(history), {"role": "user", "content": question}]
@@ -393,6 +421,10 @@ def answer(
     # rather than reported as zero, so callers that cost a call (the
     # ask-modes evaluation) can tell "not tracked" from "free".
     usage_total: dict | None = None
+    # Cards wait until the answer's first words: until then nothing is
+    # yielded, so a failed model call still fails before any response
+    # bytes (see above). After that they go out as soon as they're made.
+    started = False
     for round_num in range(MAX_TOOL_ROUNDS + 1):
         round_tools = tools if round_num < MAX_TOOL_ROUNDS else None
         # In a follow-up ("And the final?") the student's exact words rarely
@@ -414,6 +446,9 @@ def answer(
             round_text += item
             out = renumberer.feed(item)
             if out:
+                yield from pending_ui
+                pending_ui.clear()
+                started = True
                 yield {"delta": out}
         if not end.tool_calls:
             break
@@ -426,7 +461,11 @@ def answer(
         )
         for call in end.tool_calls:
             messages.append({"role": "tool", "tool_call_id": call.id, "content": safe_run_tool(call)})
+        if started:
+            yield from pending_ui
+            pending_ui.clear()
 
+    yield from pending_ui
     tail = renumberer.flush()
     if tail:
         yield {"delta": tail}
