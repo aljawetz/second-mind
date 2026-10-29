@@ -28,7 +28,7 @@
   --ink-3:var(--muted);
   --accent-soft:var(--raised);
   --mark:#DDE8F8;        /* the highlight that links a footnote to its source */
-  --q-bg:var(--raised);
+  --q-bg:var(--active);
   --q-fg:var(--text);
   --late:var(--neg);   --late-soft:#F6E3E3;
   --due:var(--warn);   --due-soft:#F5ECDF;
