@@ -158,20 +158,14 @@ export default function FlashcardsView({
               Flashcards · {deck.options.difficulty[0].toUpperCase() + deck.options.difficulty.slice(1)} · {order.length} cards
             </span>
             <div className="study-tools">
-              <button type="button" className="icon-btn" title="Shuffle" aria-label="Shuffle" disabled={atEnd} onClick={() => update({ order: shuffled(order), position: 0 })}>
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
-                </svg>
+              <button type="button" className="text-btn" disabled={atEnd} onClick={() => update({ order: shuffled(order), position: 0 })}>
+                Shuffle
               </button>
-              <button type="button" className="icon-btn" title="Download as CSV" aria-label="Download as CSV" onClick={() => void download()}>
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
-                </svg>
+              <button type="button" className="text-btn" onClick={() => void download()}>
+                Download CSV
               </button>
-              <button type="button" className="icon-btn icon-btn-danger" title="Delete this card" aria-label="Delete this card" disabled={atEnd || !card} onClick={removeCard}>
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                </svg>
+              <button type="button" className="text-btn danger" disabled={atEnd || !card} onClick={removeCard}>
+                Delete this card
               </button>
             </div>
           </div>
@@ -233,19 +227,19 @@ export default function FlashcardsView({
               </div>
               <div className="study-actions">
                 <button type="button" className="btn-secondary" disabled={position === 0} onClick={() => go(position - 1)}>
-                  ‹ Previous
+                  Previous
                 </button>
                 <button type="button" className="btn-secondary mark-missed" onClick={() => mark("missed")}>
-                  ✗ Missed it
+                  Missed it
                 </button>
                 <button type="button" className="btn-secondary explain" onClick={() => onExplain(explainCardPrompt(card))}>
-                  ✦ Explain
+                  Explain
                 </button>
                 <button type="button" className="btn-secondary mark-got" onClick={() => mark("got")}>
-                  ✓ Got it
+                  Got it
                 </button>
                 <button type="button" className="btn-primary" onClick={() => go(position + 1)}>
-                  Next ›
+                  Next
                 </button>
               </div>
             </>
