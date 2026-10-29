@@ -31,14 +31,9 @@ export default function Topbar({
 
   const pill = syncStatus && (
     <span
-      className={"sync-pill" + (syncStatus.error ? " error" : syncStatus.ok ? " ok" : "")}
+      className={"sync" + (syncStatus.error ? " error" : syncStatus.ok ? " ok" : "")}
       title={syncStatus.detail || syncStatus.label}
     >
-      {syncStatus.ok && (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M20 6 9 17l-5-5" />
-        </svg>
-      )}
       <span className="label">{syncStatus.label}</span>
     </span>
   );
@@ -48,18 +43,12 @@ export default function Topbar({
     !overrideTitle && (
       <div className="settings-anchor" ref={menuRef}>
         <button
-          className="icon-btn"
-          title="Course options"
-          aria-label="Course options"
+          className="text-btn"
           aria-expanded={menuOpen}
           aria-haspopup="menu"
           onClick={() => setMenuOpen((o) => !o)}
         >
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <circle cx="12" cy="5" r="1.75"></circle>
-            <circle cx="12" cy="12" r="1.75"></circle>
-            <circle cx="12" cy="19" r="1.75"></circle>
-          </svg>
+          Course options
         </button>
         {menuOpen && (
           <div className="settings-menu" role="menu">

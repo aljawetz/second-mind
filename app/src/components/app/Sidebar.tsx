@@ -82,9 +82,6 @@ export default function Sidebar({
       </div>
 
       <button className="new-chat" type="button" onClick={onNewChat}>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
         New chat
       </button>
 
@@ -102,7 +99,6 @@ export default function Sidebar({
                   title={c.name}
                   onClick={() => onCourseChange(c.id)}
                 >
-                  <span className="code">{c.code}</span>
                   <span className="cn">{c.name}</span>
                 </button>
                 {active && (
@@ -181,25 +177,18 @@ export default function Sidebar({
                               {s.title}
                             </button>
                             {(s.status === "recording" || s.status === "processing") && (
-                              <span className="session-status-dot" title="Processing…"></span>
+                              <span className="side-dot" role="img" aria-label="Processing" title="Processing…"></span>
                             )}
                             {s.status === "interrupted" && (
-                              <span className="side-warn" title="Interrupted, can be finished">
-                                !
-                              </span>
+                              <span className="side-dot" role="img" aria-label="Interrupted" title="Interrupted, can be finished"></span>
                             )}
                             {s.status === "error" && (
-                              <span className="side-warn" title="Couldn't be processed">
-                                !
-                              </span>
+                              <span className="side-dot bad" role="img" aria-label="Failed" title="Couldn't be processed"></span>
                             )}
                           </div>
                         ))}
                         <button type="button" className="side-add" onClick={onNewSession}>
-                          <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 5v14M5 12h14" />
-                          </svg>
-                          Record a session
+                          New session
                         </button>
                       </>
                     )}
