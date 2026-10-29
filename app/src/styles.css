@@ -412,7 +412,8 @@ details.panel[open] summary{margin-bottom:10px}
 .link-btn:hover{text-decoration:underline}
 .form-ok{font-size:var(--t1);color:var(--done)}
 .field{display:flex;flex-direction:column;gap:6px}
-.field label{font-size:var(--t1);font-weight:600;color:var(--ink)}
+.field label{font-size:var(--t3);font-weight:500;color:var(--text)}
+.field .source-option{font-size:var(--t3);font-weight:400}
 .field input,.field select{
   border:none;border-radius:var(--r-sm);min-height:36px;padding:8px 12px;
   font-family:var(--f-body);font-size:var(--t3);color:var(--ink);background:var(--panel-2);
