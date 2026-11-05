@@ -1,0 +1,278 @@
+{
+ "provider": "openai",
+ "model": "gpt-4.1",
+ "course": 55016,
+ "results": [
+  {
+   "question": "What's due this week?",
+   "expected": "deadlines",
+   "shown": [
+    "deadlines"
+   ],
+   "quiz_options": [],
+   "answer": "According to Canvas, your only assignment due this week was \"Field Project: Recruiting Interviewees,\" which was due Sunday, October 25. Since this deadline has already passed and you haven't submitted it, you should prioritize completing and submitting this assignment as soon as possible. If you need help or an extension, consider reaching out to your instructor.",
+   "mentions_study_panel": false,
+   "seconds": 1.9
+  },
+  {
+   "question": "Do I have anything due in the next few days?",
+   "expected": "deadlines",
+   "shown": [
+    "deadlines"
+   ],
+   "quiz_options": [],
+   "answer": "You have a recent assignment, \"Field Project: Recruiting Interviewees,\" that was due on Sunday, October 25 and is now past due and not submitted. I recommend addressing this assignment as soon as possible, and if you need an extension or have questions, reach out to your instructor right away.",
+   "mentions_study_panel": false,
+   "seconds": 2.0
+  },
+  {
+   "question": "What should I work on this weekend?",
+   "expected": "deadlines",
+   "shown": [
+    "deadlines"
+   ],
+   "quiz_options": [],
+   "answer": "Based on your upcoming deadlines, you should prioritize completing and submitting the \"Field Project: Recruiting Interviewees\" assignment, as it was due recently and is not yet submitted. After that, review any ongoing team deliverables such as your style guide, code for the first product increment, and updated backlogs, since these are key components for your project work and future submissions [1].",
+   "mentions_study_panel": false,
+   "seconds": 1.7
+  },
+  {
+   "question": "Any deadlines coming up?",
+   "expected": "deadlines",
+   "shown": [
+    "deadlines"
+   ],
+   "quiz_options": [],
+   "answer": "You have two assignments showing in the next 14 days. The \"Field Project: Recruiting Interviewees\" was due on October 25 and is now past due and not submitted, so you should address that as soon as possible if late submissions are allowed. The next upcoming deadline is the \"In-Class Activity Deliverable: User Stories,\" which is due on November 9. I recommend focusing on the past due assignment first, then moving on to the user stories deliverable.",
+   "mentions_study_panel": false,
+   "seconds": 1.9
+  },
+  {
+   "question": "Which assignments haven't I submitted yet?",
+   "expected": "deadlines",
+   "shown": [
+    "deadlines"
+   ],
+   "quiz_options": [],
+   "answer": "You have two assignments not yet submitted. The \"Field Project: Recruiting Interviewees\" is already past due, so you should prioritize completing and submitting that as soon as possible. After that, focus on the \"In-Class Activity Deliverable: User Stories,\" which is due on November 9.",
+   "mentions_study_panel": false,
+   "seconds": 2.1
+  },
+  {
+   "question": "Quiz me on user stories",
+   "expected": "quiz",
+   "shown": [
+    "quiz"
+   ],
+   "quiz_options": [
+    {
+     "count": "fewer",
+     "difficulty": "medium",
+     "topic": "user stories"
+    }
+   ],
+   "answer": "Here's a 5-question practice quiz on user stories, covering their structure, criteria, and how they relate to use cases and acceptance criteria as described in your course materials.\n\nYou can take the quiz below.",
+   "mentions_study_panel": false,
+   "seconds": 1.8
+  },
+  {
+   "question": "Can you test me on use cases?",
+   "expected": "quiz",
+   "shown": [
+    "quiz"
+   ],
+   "quiz_options": [
+    {
+     "count": "fewer",
+     "difficulty": "medium",
+     "topic": "use cases"
+    }
+   ],
+   "answer": "Here's a 5-question practice quiz on use cases, covering use-case modeling, diagrams, and their role in requirements and product vision as taught in your course. Good luck!",
+   "mentions_study_panel": false,
+   "seconds": 1.6
+  },
+  {
+   "question": "Give me some practice questions on requirements elicitation",
+   "expected": "quiz",
+   "shown": [
+    "quiz"
+   ],
+   "quiz_options": [
+    {
+     "count": "fewer",
+     "difficulty": "medium",
+     "topic": "requirements elicitation"
+    }
+   ],
+   "answer": "Here is a 5-question practice quiz on requirements elicitation, covering techniques, best practices, and concepts from your course materials. You can take it below.",
+   "mentions_study_panel": false,
+   "seconds": 1.4
+  },
+  {
+   "question": "I want to practice for the midterm. Quiz me on Planguage",
+   "expected": "quiz",
+   "shown": [
+    "quiz"
+   ],
+   "quiz_options": [
+    {
+     "count": "fewer",
+     "difficulty": "medium",
+     "topic": "Planguage"
+    }
+   ],
+   "answer": "Here's a 5-question practice quiz on Planguage, based on your course materials. It will cover key concepts, definitions, and practices related to Planguage as discussed in class and readings. Good luck!\n\nIf you want to review more, check the Simmons reading on quantifying quality requirements using Planguage and your in-class activity on writing Planguage statements [1][2].",
+   "mentions_study_panel": false,
+   "seconds": 1.9
+  },
+  {
+   "question": "Make me a hard quiz about heuristic evaluation",
+   "expected": "quiz",
+   "shown": [
+    "quiz"
+   ],
+   "quiz_options": [
+    {
+     "count": "fewer",
+     "difficulty": "hard",
+     "topic": "heuristic evaluation"
+    }
+   ],
+   "answer": "Here is a hard 5-question practice quiz on heuristic evaluation, covering Nielsen’s heuristics, evaluation processes, and application to usability analysis as discussed in your course.",
+   "mentions_study_panel": false,
+   "seconds": 1.5
+  },
+  {
+   "question": "Quiz me with 15 questions on use cases",
+   "expected": "quiz",
+   "shown": [
+    "quiz"
+   ],
+   "quiz_options": [
+    {
+     "count": "fewer",
+     "difficulty": "medium",
+     "topic": "use cases"
+    }
+   ],
+   "answer": "Here is a 5-question practice quiz on use cases, covering concepts such as use-case diagrams, use-case descriptions, and their role in defining product functional scope. For a longer quiz with 15 questions, you can use the Study panel.",
+   "mentions_study_panel": true,
+   "seconds": 1.6
+  },
+  {
+   "question": "What's on the midterm exam?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "The midterm exam will cover material from the entire semester, including content from lecture slides, mandatory readings, and projects. You should be familiar with the processes and practices covered during the innovation project. Some questions may be open-ended, not just multiple choice. To prepare, review all course materials and check the sample exam available under Modules on Canvas. The exam is closed-book and will be taken on Canvas using the LockDown Browser [1][2].",
+   "mentions_study_panel": false,
+   "seconds": 1.1
+  },
+  {
+   "question": "When is the midterm?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "I could not find the specific date for the midterm in the course materials. If you need the exact date, you may want to check the syllabus or ask your instructor directly.",
+   "mentions_study_panel": false,
+   "seconds": 0.8
+  },
+  {
+   "question": "What is a user story?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "A user story is a short, structured description of a feature or functionality from the perspective of an end user. In this course, each user story:\n\n- Is defined within the context of the prototype, often using wireframes.\n- Includes a well-structured motivation statement (explaining why the user wants the feature).\n- Includes well-structured acceptance criteria (usually just one, to keep the story small).\n- Satisfies the INVEST criteria: Independent, Negotiable, Valuable, Estimable, Small, and Testable.\n- Is traced to its corresponding use case and potentially to a risk it might help reduce [1][2].\n\nUser stories are used to elaborate use cases and help define the minimum viable product (MVP) and subsequent product increments.",
+   "mentions_study_panel": false,
+   "seconds": 1.4
+  },
+  {
+   "question": "How is the final presentation graded?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "The final presentation is graded as a team component and is worth 5% of your total course grade. While the syllabus lists the weight, it does not provide a detailed rubric or specific grading criteria for the final presentation itself. However, it is implied that your presentation should include all required elements described under your project’s \"Plan of Attack\" and should be of professional quality. Individual grades may be adjusted based on faculty and peer evaluations, even for team assignments [1][2].\n\nIf you need more details on what to include, check your project’s \"Plan of Attack\" or ask your instructor for the specific rubric.",
+   "mentions_study_panel": false,
+   "seconds": 1.4
+  },
+  {
+   "question": "What does the Heuristic Evaluation assignment ask for?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "The Heuristic Evaluation assignment asks you to:\n\n- Evaluate another team's application against Nielsen’s 10 usability heuristics.\n- Evaluate the application against your team's design patterns.\n- Evaluate the application against accessibility heuristics.\n- Draw relevant conclusions about how the interface complies with recognized usability principles based on your evaluation results.\n\nThis work is done as a team during the Heuristic Evaluation Lab, and the report is a graded deliverable. The report is created in Jama (not submitted in Canvas) and is part of Task 5's deliverables, along with your style guide, working code, code documentation, updated backlogs, and presentation artifacts [1][2][3][4][5].",
+   "mentions_study_panel": false,
+   "seconds": 1.4
+  },
+  {
+   "question": "When is the Heuristic Evaluation due?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "The Heuristic Evaluation Report is created and graded during the Heuristic Evaluation Lab, which is an in-class activity. There is no separate submission needed in Canvas; the work is done in Jama. The exact date of the lab is not specified in the sources I found, but it is completed as part of a scheduled class session [1][2][3].",
+   "mentions_study_panel": false,
+   "seconds": 0.9
+  },
+  {
+   "question": "Are the in-class quizzes graded?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "The course materials do not mention graded in-class quizzes specifically. However, they do mention graded in-class activities such as the Heuristic Evaluation Lab, which is worth 5% of your grade, and in-class activity deliverables like user stories that are submitted individually. There is also a grade component for class participation and attendance (10%) [1][2][3]. If you are referring to a specific type of in-class quiz, please clarify so I can check for details.",
+   "mentions_study_panel": false,
+   "seconds": 1.5
+  },
+  {
+   "question": "Explain the difference between functional and non-functional requirements",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "The course materials distinguish between functional and non-functional requirements as follows:\n\n- Functional requirements specify what the system should do—its behaviors, features, and functions. These are the specific actions or tasks the system must perform.\n- Non-functional requirements describe how the system should be—its qualities or constraints, such as performance, usability, reliability, and security. They do not specify particular behaviors, but rather the criteria that judge the operation of a system. Non-functional requirements should be clear, measurable, and unambiguous, often elaborated using formats like Planguage to define what and how to measure, and to set measurable levels of achievement [1][2][3][4].\n\nGeneral knowledge (not from your course materials):\nA simple way to remember: functional requirements are about \"what\" the system does, while non-functional requirements are about \"how well\" it does it. For example, \"The system shall allow users to log in\" is functional, while \"The system shall respond to login requests within 2 seconds\" is non-functional.",
+   "mentions_study_panel": false,
+   "seconds": 1.6
+  },
+  {
+   "question": "Write my answers for the User Stories in-class deliverable",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "I cannot write your answers for the User Stories in-class deliverable, as that would be doing your graded work for you. However, I can help you understand how to write user stories and guide you through the process or review your draft if you share it.\n\nThe course materials mention preparing for this activity by studying the 4C Model: Context, Card, Conversation, and Confirmation, as described in \"Learning to Write User Stories with the 4C Model\" by Peraire [1]. If you need help understanding this model or want tips on structuring your user stories, let me know!",
+   "mentions_study_panel": false,
+   "seconds": 2.2
+  },
+  {
+   "question": "How many quizzes are there in this course?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "I could not find any information in the course materials about the number of quizzes in this course. There is mention of a final exam, but no details about quizzes were found in the sources I searched.",
+   "mentions_study_panel": false,
+   "seconds": 0.8
+  }
+ ],
+ "score": {
+  "deadlines": {
+   "precision": 1.0,
+   "recall": 1.0,
+   "tp": 5,
+   "fp": 0,
+   "fn": 0
+  },
+  "quiz": {
+   "precision": 1.0,
+   "recall": 1.0,
+   "tp": 6,
+   "fp": 0,
+   "fn": 0
+  },
+  "study_panel_mentions": {
+   "asked_for_more": [
+    true
+   ],
+   "did_not_ask": 0
+  },
+  "exact": 21,
+  "total": 21
+ }
+}

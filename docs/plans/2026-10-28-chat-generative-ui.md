@@ -1,6 +1,6 @@
 # Generative UI in Course Chat
 
-**Status:** Proposed. Decisions 1 to 4 below need a yes before step 1 starts.
+**Status:** Implemented as stacked PRs #49 to #54, one per step. Decisions 1 to 4 were agreed before starting. Eval: docs/evaluations/2026-10-28-display-tools/report.md.
 
 **Goal:** Let the chat answer with interactive components, not only text. A student who asks "quiz me on lecture 5" gets a working quiz inside the answer. One who asks "what's due this week?" gets a deadlines card with countdowns and links to each assignment. Text answers stay exactly as they are.
 

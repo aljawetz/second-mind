@@ -1,0 +1,278 @@
+{
+ "provider": "openai",
+ "model": "gpt-4o-mini",
+ "course": 55016,
+ "results": [
+  {
+   "question": "What's due this week?",
+   "expected": "deadlines",
+   "shown": [
+    "deadlines"
+   ],
+   "quiz_options": [],
+   "answer": "This week, the only assignment due is the \"Field Project: Recruiting Interviewees,\" which was due on Sunday, October 25, 2026, and is currently past due and not submitted. It's important to prioritize completing this assignment as soon as possible to avoid further penalties.",
+   "mentions_study_panel": false,
+   "seconds": 2.5
+  },
+  {
+   "question": "Do I have anything due in the next few days?",
+   "expected": "deadlines",
+   "shown": [
+    "deadlines"
+   ],
+   "quiz_options": [],
+   "answer": "You have one assignment due soon: the \"Field Project: Recruiting Interviewees,\" which was due on Sunday, October 25, at 11:59 PM PDT and is currently past due and not submitted. It's important to prioritize this assignment to avoid further penalties and to stay on track with your course requirements.",
+   "mentions_study_panel": false,
+   "seconds": 1.8
+  },
+  {
+   "question": "What should I work on this weekend?",
+   "expected": "deadlines",
+   "shown": [
+    "deadlines"
+   ],
+   "quiz_options": [],
+   "answer": "This weekend, you should focus on completing the \"Field Project: Recruiting Interviewees\" assignment, which is due on Sunday, October 25, at 11:59 PM PDT. Since it's already past due and not submitted, prioritizing this task will help you catch up.",
+   "mentions_study_panel": false,
+   "seconds": 1.8
+  },
+  {
+   "question": "Any deadlines coming up?",
+   "expected": "deadlines",
+   "shown": [
+    "deadlines"
+   ],
+   "quiz_options": [],
+   "answer": "You have one assignment due soon: \"Field Project: Recruiting Interviewees,\" which was due on Sunday, October 25, at 11:59 PM PDT and is currently past due. It's important to address this assignment first to avoid further penalties and to stay on track with your project.",
+   "mentions_study_panel": false,
+   "seconds": 2.4
+  },
+  {
+   "question": "Which assignments haven't I submitted yet?",
+   "expected": "deadlines",
+   "shown": [
+    "deadlines"
+   ],
+   "quiz_options": [],
+   "answer": "You have two assignments that haven't been submitted yet: \"Field Project: Recruiting Interviewees,\" which is past due, and \"In-Class Activity Deliverable: User Stories,\" which is due on Monday, November 9. I recommend starting with the past due assignment first to avoid any penalties and then focus on the upcoming one.",
+   "mentions_study_panel": false,
+   "seconds": 1.9
+  },
+  {
+   "question": "Quiz me on user stories",
+   "expected": "quiz",
+   "shown": [
+    "quiz"
+   ],
+   "quiz_options": [
+    {
+     "count": "fewer",
+     "difficulty": "medium",
+     "topic": "user stories"
+    }
+   ],
+   "answer": "I've created a 5-question practice quiz on user stories based on your course material. You can take it below.",
+   "mentions_study_panel": false,
+   "seconds": 1.8
+  },
+  {
+   "question": "Can you test me on use cases?",
+   "expected": "quiz",
+   "shown": [
+    "quiz"
+   ],
+   "quiz_options": [
+    {
+     "count": "fewer",
+     "difficulty": "medium",
+     "topic": "use cases"
+    }
+   ],
+   "answer": "I've prepared a 5-question practice quiz on use cases for you. You can take it below!",
+   "mentions_study_panel": false,
+   "seconds": 2.1
+  },
+  {
+   "question": "Give me some practice questions on requirements elicitation",
+   "expected": "quiz",
+   "shown": [
+    "quiz"
+   ],
+   "quiz_options": [
+    {
+     "count": "fewer",
+     "difficulty": "medium",
+     "topic": "requirements elicitation"
+    }
+   ],
+   "answer": "Here is a practice quiz covering requirements elicitation based on your course material. You can take it below.",
+   "mentions_study_panel": false,
+   "seconds": 1.7
+  },
+  {
+   "question": "I want to practice for the midterm. Quiz me on Planguage",
+   "expected": "quiz",
+   "shown": [
+    "quiz"
+   ],
+   "quiz_options": [
+    {
+     "count": "fewer",
+     "difficulty": "medium",
+     "topic": "Planguage"
+    }
+   ],
+   "answer": "I've created a 5-question practice quiz on Planguage for you. You can take it below to test your knowledge!",
+   "mentions_study_panel": false,
+   "seconds": 1.7
+  },
+  {
+   "question": "Make me a hard quiz about heuristic evaluation",
+   "expected": "quiz",
+   "shown": [
+    "quiz"
+   ],
+   "quiz_options": [
+    {
+     "count": "fewer",
+     "difficulty": "hard",
+     "topic": "heuristic evaluation"
+    }
+   ],
+   "answer": "Here is a hard quiz covering heuristic evaluation based on your course material. You can take it below.",
+   "mentions_study_panel": false,
+   "seconds": 1.8
+  },
+  {
+   "question": "Quiz me with 15 questions on use cases",
+   "expected": "quiz",
+   "shown": [
+    "quiz"
+   ],
+   "quiz_options": [
+    {
+     "count": "fewer",
+     "difficulty": "medium",
+     "topic": "use cases"
+    }
+   ],
+   "answer": "I've created a 5-question practice quiz on use cases based on your course material. You can take it below.",
+   "mentions_study_panel": false,
+   "seconds": 2.0
+  },
+  {
+   "question": "What's on the midterm exam?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "The midterm exam will cover material from the entire semester, including content from lecture slides, mandatory readings, and projects. It will be a closed-book exam conducted on Canvas using the Respondus LockDown Browser. Some questions may be open-ended rather than multiple-choice. To prepare, you should review all relevant course materials and take the sample exam available in the course modules [1][2]. \n\nIf you have any specific topics or areas you want to focus on for your preparation, let me know!",
+   "mentions_study_panel": false,
+   "seconds": 1.5
+  },
+  {
+   "question": "When is the midterm?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "The midterm exam is scheduled for Friday, December 4, 2026. It will be a closed-book exam conducted on Canvas using the LockDown Browser, covering content from the entire semester [1].",
+   "mentions_study_panel": false,
+   "seconds": 1.8
+  },
+  {
+   "question": "What is a user story?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "A user story is a brief description of a feature from the perspective of the end user. It is defined within the context of a prototype and typically includes:\n\n- A well-structured motivation statement.\n- Acceptance criteria, which are often kept small and focused (usually one criterion).\n- Adherence to the \"INVEST\" criteria, which stands for Independent, Negotiable, Valuable, Estimable, Small, and Testable.\n\nUser stories are also traced to their corresponding use cases and may help reduce risks associated with the functionality being developed [1][2].",
+   "mentions_study_panel": false,
+   "seconds": 2.2
+  },
+  {
+   "question": "How is the final presentation graded?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "The final presentation is graded as part of the Innovation Project, specifically accounting for 5% of the overall course grade. This component is evaluated as a team performance, meaning that the grade reflects the collective effort of the team rather than individual contributions alone. However, individual grades may be adjusted based on peer evaluations and the instructor's assessment of each student's performance throughout the course [1]. \n\nIf you need more details about the grading criteria or how to prepare for the presentation, let me know!",
+   "mentions_study_panel": false,
+   "seconds": 1.8
+  },
+  {
+   "question": "What does the Heuristic Evaluation assignment ask for?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "The Heuristic Evaluation assignment requires you to evaluate another team's application based on Nielsen’s 10 heuristics, your team's design patterns, and accessibility heuristics. You will need to draw relevant conclusions about how the interface complies with recognized usability principles. This evaluation is conducted during the Heuristic Evaluation Lab in class and is graded as a team deliverable [1][2]. \n\nAdditionally, the deliverables for this task include a Heuristic Evaluation Report, which is created during the lab, along with other items like a Style Guide and Working Code for the First Product Increment [3][4].",
+   "mentions_study_panel": false,
+   "seconds": 1.5
+  },
+  {
+   "question": "When is the Heuristic Evaluation due?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "The Heuristic Evaluation is conducted in class during the Heuristic Evaluation Lab, and it is graded. However, there is no specific submission required in Canvas for this task, as the work is done in Jama [1][2]. \n\nIf you need more details about the deliverables or the process, let me know!",
+   "mentions_study_panel": false,
+   "seconds": 1.2
+  },
+  {
+   "question": "Are the in-class quizzes graded?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "Yes, the in-class quizzes are graded. Specifically, the Heuristic Evaluation Lab, which is an in-class activity, is graded as part of the course requirements [1][2].",
+   "mentions_study_panel": false,
+   "seconds": 1.0
+  },
+  {
+   "question": "Explain the difference between functional and non-functional requirements",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "The course materials do not provide a direct explanation of the difference between functional and non-functional requirements. \n\nGeneral knowledge (not from your course materials): Functional requirements specify what a system should do, detailing the specific behaviors, functions, or features that the system must support. Examples include user authentication, data processing, and reporting capabilities. Non-functional requirements, on the other hand, define how a system performs its functions, focusing on attributes such as performance, usability, reliability, and security. For instance, a non-functional requirement might state that the system should handle 1000 concurrent users or that it should load a page within 2 seconds.",
+   "mentions_study_panel": false,
+   "seconds": 1.7
+  },
+  {
+   "question": "Write my answers for the User Stories in-class deliverable",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "I can't provide answers for your User Stories in-class deliverable. However, I can help explain the concepts or guide you on how to write user stories based on the course materials. Would you like assistance with that?",
+   "mentions_study_panel": false,
+   "seconds": 1.1
+  },
+  {
+   "question": "How many quizzes are there in this course?",
+   "expected": null,
+   "shown": [],
+   "quiz_options": [],
+   "answer": "I couldn't find specific information about the number of quizzes in this course from the course materials. If you have any other questions or need further assistance, feel free to ask!",
+   "mentions_study_panel": false,
+   "seconds": 2.7
+  }
+ ],
+ "score": {
+  "deadlines": {
+   "precision": 1.0,
+   "recall": 1.0,
+   "tp": 5,
+   "fp": 0,
+   "fn": 0
+  },
+  "quiz": {
+   "precision": 1.0,
+   "recall": 1.0,
+   "tp": 6,
+   "fp": 0,
+   "fn": 0
+  },
+  "study_panel_mentions": {
+   "asked_for_more": [
+    false
+   ],
+   "did_not_ask": 0
+  },
+  "exact": 21,
+  "total": 21
+ }
+}
