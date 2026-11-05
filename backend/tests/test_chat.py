@@ -226,3 +226,24 @@ def test_system_prompt_refuses_graded_work_but_allows_due_date_questions():
     assert "not do their graded work" in system
     assert "due dates, rules, grading" in system
 
+
+
+def test_a_tool_that_fails_is_reported_to_the_model_and_the_answer_still_finishes():
+    def search(query):
+        if query == "broken":
+            raise RuntimeError("index is locked")
+        return []
+
+    provider = FakeProvider(
+        [
+            ([], [ToolCall(id="c1", name="search_course", arguments={"query": "broken"})]),
+            (["I couldn't search the course just now."], []),
+        ]
+    )
+    events = list(chat.answer("When is the final?", [], "Test Course", search, provider))
+    tool_result = provider.calls[1]["messages"][-1]
+    assert tool_result["tool_call_id"] == "c1"
+    assert "search_course tool failed" in tool_result["content"]
+    assert "index is locked" in tool_result["content"]
+    assert "".join(e["delta"] for e in events if "delta" in e) == "I couldn't search the course just now."
+    assert events[-1] == {"done": True}
