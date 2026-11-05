@@ -184,7 +184,14 @@ export interface DeadlinesProps {
   assignments: AssignmentSummary[];
 }
 
-export type UiBlock = { id: string; component: "deadlines"; props: DeadlinesProps };
+export interface QuizCardProps {
+  artifact_id: string;
+  topic: string;
+}
+
+export type UiBlock =
+  | { id: string; component: "deadlines"; props: DeadlinesProps }
+  | { id: string; component: "quiz"; props: QuizCardProps };
 
 export interface AskEvent {
   conversation_id?: string;
@@ -609,8 +616,12 @@ export async function startStudy(courseId: number, kind: StudyKind, options: Stu
   return studyJson<StudySummary>(res, "generating");
 }
 
+// A quiz a saved chat points at can be deleted from the Study panel since.
+export class StudyMissing extends Error {}
+
 export async function getStudy(courseId: number, id: string): Promise<StudyArtifact> {
   const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/study/${id}`);
+  if (res.status === 404) throw new StudyMissing("This quiz was deleted.");
   return studyJson<StudyArtifact>(res, "opening");
 }
 

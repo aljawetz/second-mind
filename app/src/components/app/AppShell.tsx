@@ -62,6 +62,9 @@ export default function AppShell({
   const [studyItems, setStudyItems] = useState<StudySummary[]>([]);
   const [studyError, setStudyError] = useState<string | null>(null);
   const [studyId, setStudyId] = useState<string | null>(null);
+  // A quiz opened from a chat card can be newer than the Study list (it
+  // refreshes every few seconds), so its kind comes with it.
+  const [studyKindHint, setStudyKindHint] = useState<StudyKind | null>(null);
   // Explain on a quiz question or flashcard: asked in a new chat on course home.
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
   const [pendingIndexCourse, setPendingIndexCourse] = useState<AvailableCourse | null>(null);
@@ -243,8 +246,9 @@ export default function AppShell({
     studyVersion.current++;
     setStudyItems((prev) => prev.filter((s) => s.id !== id));
   }
-  function openStudy(id: string) {
+  function openStudy(id: string, kind: StudyKind | null = null) {
     setStudyId(id);
+    setStudyKindHint(kind);
     setView("study");
   }
   function explainInChat(question: string) {
@@ -325,7 +329,8 @@ export default function AppShell({
   }
 
   const selectedAssignment = assignments.find((a) => a.id === assignmentId) ?? null;
-  const openStudyItem = studyItems.find((s) => s.id === studyId) ?? null;
+  const listedStudy = studyItems.find((s) => s.id === studyId);
+  const openStudyItem = listedStudy ?? (studyId && studyKindHint ? { id: studyId, kind: studyKindHint } : null);
 
   // Removing the last course leaves nothing to render here — App.tsx owns
   // the course list and would need to route back to onboarding for that
@@ -405,6 +410,8 @@ export default function AppShell({
                   onConversationSaved={handleConversationSaved}
                   onOpenAssignment={openAssignment}
                   onOpenSession={openSession}
+                  onOpenStudy={(id) => openStudy(id, "quiz")}
+                  onStudyStarted={refreshStudy}
                 />
               )}
               {view === "assignment" && selectedAssignment && (

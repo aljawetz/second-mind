@@ -25,6 +25,8 @@ export default function ChatPanel({
   onOpenCitation,
   assignments,
   onOpenAssignment,
+  onOpenStudy,
+  onStudyStarted,
 }: {
   courseId: number;
   courseName: string;
@@ -39,6 +41,10 @@ export default function ChatPanel({
   // For the deadlines card: live status, and opening a row.
   assignments: CanvasAssignment[];
   onOpenAssignment: (id: number) => void;
+  // For the quiz card: open it full page, and tell the Study panel a quiz
+  // it doesn't list yet has started.
+  onOpenStudy: (id: string) => void;
+  onStudyStarted: () => void;
 }) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [title, setTitle] = useState<string | null>(null);
@@ -160,6 +166,7 @@ export default function ChatPanel({
         }
         if (event.ui) {
           const block = event.ui;
+          if (block.component === "quiz") onStudyStarted();
           // A card can come before any text: show it instead of "Searching…".
           setTurns((prev) =>
             prev.map((t, i) => (i === turnIndex ? { ...t, ui: [...t.ui, block], status: "streaming" } : t))
@@ -247,7 +254,20 @@ export default function ChatPanel({
                         grounded={turn.grounded}
                         memoriesUsed={turn.memoriesUsed}
                         onOpenCitation={onOpenCitation}
-                        blocks={<UiBlocks blocks={turn.ui} ctx={{ assignments, onOpenAssignment }} />}
+                        blocks={
+                          <UiBlocks
+                            blocks={turn.ui}
+                            ctx={{
+                              courseId,
+                              assignments,
+                              onOpenAssignment,
+                              onOpenStudy,
+                              // Explain asks in this same chat, cited like any answer.
+                              onExplain: (prompt) => void send(prompt),
+                              onOpenCitation,
+                            }}
+                          />
+                        }
                         actions={
                           turn.status === "done" && (
                             <div className="qa-actions">

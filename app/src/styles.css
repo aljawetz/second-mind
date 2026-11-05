@@ -234,6 +234,15 @@ sup.fn{cursor:default}
 .qa-card-head{display:flex;align-items:baseline;gap:10px;padding:8px 8px 4px;font-weight:500}
 .qa-card-head .from{margin-left:auto;font-size:var(--t1);font-weight:400;color:var(--muted);white-space:nowrap}
 .qa-card-empty{margin:0;padding:6px 8px 8px;font-size:var(--t2);color:var(--muted)}
+.qa-card-pending{flex-direction:row;align-items:center;padding:14px 16px;font-size:var(--t2);color:var(--muted)}
+.qa-card-quiz{padding:16px 16px 18px}
+/* QuizView inside a chat answer: the chat column is the page, so no page
+   width or big title of its own. */
+.study-view.compact{max-width:none;gap:14px}
+.study-view.compact .study-head h2{font-size:var(--t3)}
+.study-view.compact .study-card{padding:18px 20px}
+.study-view.compact .quiz-q{font-size:var(--t4)}
+.study-open-full{margin-left:auto}
 .assign-row.stale{cursor:default}
 .assign-row.stale:hover{background:none}
 .qa-memories{display:flex;flex-direction:column;align-items:flex-start;gap:2px;font-size:var(--t2);color:var(--muted)}
