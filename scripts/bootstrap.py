@@ -72,6 +72,19 @@ step("Backend: building it for the app (PyInstaller, in its own .venv-build)",
      backend, "uv", "run", "--no-project", "python", "scripts/build_sidecar.py")
 step("Frontend: installing npm dependencies", app, "npm", "install")
 
+
+if sys.platform == "darwin":
+    # Dev builds are signed with this certificate so the Keychain's "Always
+    # Allow" survives rebuilds. Idempotent. Asks for the login password once.
+    print("==> macOS: one-time signing certificate for dev builds (asks for your login password once)", flush=True)
+    made = subprocess.run(["bash", str(repo_root / "scripts" / "make-signing-cert.sh")], cwd=repo_root)
+    if made.returncode != 0:
+        print(
+            "    Skipped. Run scripts/make-signing-cert.sh later. Until then macOS asks for your\n"
+            "    password again after every rebuild.",
+            file=sys.stderr,
+        )
+
 if is_windows:
     start = "    cd app\n    npm run tauri dev"
     note = "Rerun backend\\scripts\\build_sidecar.py after changing backend code you want to see in the app."
