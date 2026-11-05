@@ -72,3 +72,30 @@ def test_history_note_lists_what_a_card_showed():
     assert note.startswith("\n\n[Deadlines card shown: Lab (due 2026-10-30T12:00:00Z)")
     assert display_tools.history_note(None) == ""
     assert "nothing due" in display_tools.history_note([{"component": "deadlines", "props": {"assignments": []}}])
+
+
+def test_quiz_options_fall_back_to_defaults_instead_of_failing():
+    assert display_tools.quiz_options({"topic": "  user\n stories "}) == {"count": "fewer", "difficulty": "medium", "topic": "user stories"}
+    assert display_tools.quiz_options({"topic": "x", "count": "standard", "difficulty": "hard"}) == {"count": "fewer", "difficulty": "hard", "topic": "x"}
+    assert display_tools.quiz_options({"count": "more", "difficulty": "brutal", "topic": 3}) == {"count": "fewer", "difficulty": "medium", "topic": ""}
+    assert len(display_tools.quiz_options({"topic": "a" * 900})["topic"]) == 500
+
+
+def test_rules_cover_only_the_tools_on_offer():
+    assert display_tools.rules([]) == ""
+    deadlines_only = display_tools.rules(["show_deadlines"])
+    assert "show_deadlines" in deadlines_only and "show_quiz" not in deadlines_only
+    both = display_tools.rules(["show_deadlines", "show_quiz"])
+    assert "show_quiz" in both and "not graded work" in both
+
+
+def test_quiz_started_text_names_the_topic_when_there_is_one():
+    assert "practice quiz on user stories is being written" in display_tools.quiz_started("user stories")
+    assert "A 5-question practice quiz is being written" in display_tools.quiz_started("")
+
+
+def test_history_note_for_a_quiz_card():
+    assert display_tools.history_note([{"component": "quiz", "props": {"artifact_id": "quiz-1", "topic": "lecture 5"}}]) == (
+        "\n\n[Practice quiz shown, on lecture 5]"
+    )
+    assert "whole course" in display_tools.history_note([{"component": "quiz", "props": {"artifact_id": "q", "topic": ""}}])

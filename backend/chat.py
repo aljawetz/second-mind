@@ -280,6 +280,7 @@ def answer(
     summary: str = "",
     today: datetime.date | None = None,
     assignments: Callable[[], list[dict]] | None = None,
+    start_quiz: Callable[[dict], dict | None] | None = None,
 ) -> Iterator[dict]:
     """Yields /ask's stream events: {"delta"} text pieces, then one
     {"citations", "grounded"}, then {"done": True}. With `memory` (a
@@ -292,7 +293,10 @@ def answer(
     With `assignments` (the course's canvas.assignment_summary rows, fetched
     only if the model asks), the model can show a deadlines card: a
     {"ui": {id, component, props}} event the app renders below the answer
-    (display_tools.py).
+    (display_tools.py). With `start_quiz` (takes display_tools.quiz_options
+    output, starts a study artifact in the background and returns its
+    summary, or None when the course has nothing indexed), it can show a
+    practice quiz card the same way.
 
     Nothing is yielded until the model starts writing its answer, so errors
     from searching or the first model calls surface before the caller has
@@ -349,17 +353,32 @@ def answer(
         pending_ui.append({"ui": block})
 
     def run_deadlines(args: dict) -> str:
-        # Once per answer, enforced here: the prompt alone didn't hold for
-        # the forced-search rule, so this one doesn't rely on it.
-        if any(b["component"] == "deadlines" for b in ui_blocks):
-            return "The deadlines card is already shown below your answer. Don't call show_deadlines again."
         props, text = display_tools.deadlines(assignments(), args)
         show_card("deadlines", props)
         return text
 
+    def run_quiz(args: dict) -> str:
+        options = display_tools.quiz_options(args)
+        started = start_quiz(options)
+        if started is None:
+            return display_tools.NO_QUIZ_MATERIAL
+        show_card("quiz", {"artifact_id": started["id"], "topic": options["topic"]})
+        return display_tools.quiz_started(options["topic"])
+
+    display_runners = {}
+    if assignments is not None:
+        display_runners["show_deadlines"] = ("deadlines", run_deadlines)
+    if start_quiz is not None:
+        display_runners["show_quiz"] = ("quiz", run_quiz)
+
     def run_tool(call: ToolCall) -> str:
-        if assignments is not None and call.name == "show_deadlines":
-            return run_deadlines(call.arguments)
+        if call.name in display_runners:
+            component, run = display_runners[call.name]
+            # Once per answer, enforced here: the prompt alone didn't hold
+            # for the forced-search rule, so this one doesn't rely on it.
+            if any(b["component"] == component for b in ui_blocks):
+                return f"That card is already shown below your answer. Don't call {call.name} again."
+            return run(call.arguments)
         query = call.arguments.get("query")
         has_query = isinstance(query, str) and query.strip()
         if call.name == "search_course" and has_query:
@@ -396,9 +415,9 @@ def answer(
         profile = memory.profile_block()
         if profile:
             prompt += "\n\n" + profile
-    if assignments is not None:
-        tools = [*tools, display_tools.DEADLINES_TOOL]
-        prompt += display_tools.RULES
+    display_specs = {"show_deadlines": display_tools.DEADLINES_TOOL, "show_quiz": display_tools.QUIZ_TOOL}
+    tools = [*tools, *(display_specs[name] for name in display_runners)]
+    prompt += display_tools.rules(list(display_runners))
     if summary:
         prompt += "\n\n" + summary_block(summary)
     messages = [{"role": "system", "content": prompt}, *_history_messages(history), {"role": "user", "content": question}]

@@ -24,6 +24,7 @@ import llm
 import main
 import memory_jobs
 import canvas
+import study
 from llm import ToolCall, TurnEnd
 from memory import MemoryService
 
@@ -549,3 +550,38 @@ def test_assignments_route_keeps_its_shape_after_sharing_the_summary_with_chat(a
         {"id": 2, "name": "Ungraded", "due_at": None, "points_possible": 0,
          "description": "", "submitted": False, "late": False, "missing": False},
     ]
+
+
+def test_quiz_me_without_an_index_shows_no_card_and_writes_no_artifact(app):
+    config.write_config(app.home, {"selected_courses": [COURSE], "memory_enabled": False})
+    app.model.chat_replies.append([TurnEnd(tool_calls=[ToolCall(id="q1", name="show_quiz", arguments={"topic": "lab 3"})])])
+    app.model.chat_replies.append(["Sync the course first."])
+    status, events = _ask(app, "Quiz me on lab 3")
+    assert status == 200, events
+    assert not any("ui" in e for e in events)
+    assert "nothing indexed" in app.model.chat_calls[-1][-1]["content"]
+    assert study.list_artifacts(app.home, COURSE) == []
+
+
+def test_quiz_me_starts_a_study_quiz_saved_with_the_turn(app, monkeypatch):
+    config.write_config(app.home, {"selected_courses": [COURSE], "memory_enabled": False})
+    monkeypatch.setattr(indexing, "index_exists", lambda db_path, table: table == f"course_{COURSE}")
+    started = []
+
+    def fake_start(sm_home, db_path, course_id, kind, options, **kwargs):
+        started.append((course_id, kind, options))
+        return {"id": "quiz-0123456789ab", "kind": kind, "status": "generating"}
+
+    monkeypatch.setattr(study, "start", fake_start)
+    app.model.chat_replies.append(
+        [TurnEnd(tool_calls=[ToolCall(id="q1", name="show_quiz", arguments={"topic": "lab 3", "difficulty": "hard"})])]
+    )
+    app.model.chat_replies.append(["A hard quiz on lab 3 is on its way."])
+    status, events = _ask(app, "Give me a hard quiz on lab 3")
+    assert status == 200, events
+
+    assert started == [(COURSE, "quiz", {"count": "fewer", "difficulty": "hard", "topic": "lab 3", "item_ids": None})]
+    [card] = [e["ui"] for e in events if "ui" in e]
+    assert card == {"id": "ui-1", "component": "quiz", "props": {"artifact_id": "quiz-0123456789ab", "topic": "lab 3"}}
+    [turn] = conversations.get_conversation(app.home, COURSE, events[0]["conversation_id"])["turns"]
+    assert turn["ui"] == [card]

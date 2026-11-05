@@ -45,7 +45,7 @@ New NDJSON line, sent when the tool runs (before the text that talks about it):
 
 1. **Placement.** Blocks render **below the answer text, above Sources**, in the order the tools ran. Putting them inline at a marker in the text is possible later, but it complicates streaming and the citation renumberer. Recommended: below.
 2. **Saved deadlines: snapshot or live.** The block saves the assignments as they were when asked. Countdowns are computed from `due_at` at render time, so "due in 2 days" stays correct. The submitted/late status can go stale, though, so the saved block shows "as of <date>" and an Open action that goes to the live assignment view. Recommended: snapshot.
-3. **Quiz size in chat.** Default `fewer` (5 questions), `medium` difficulty, topic from the student's words. The model can pass `count` and `difficulty` only when the student asked for them. Generation takes 10 to 40 s (first live runs in the study plan), so the block shows a generating state and the text answer doesn't wait for it.
+3. **Quiz size in chat.** Always `fewer` (5 questions), `medium` difficulty unless the student asks for another, topic from the student's words. (The first version let the model pass a `count` "only if asked". In the first live run gpt-4o-mini asked for 10 on a plain "quiz me", so `count` was removed. A longer quiz is one click in the Study panel.) Generation takes 10 to 40 s (first live runs in the study plan), so the block shows a generating state and the text answer doesn't wait for it.
 4. **When the model may call a display tool.** Only when the student asks for practice, a quiz, deadlines or what's due, or asks a planning question ("what should I work on?"). Never on a plain content question. At most one call per display tool per turn, **enforced in code** (a second call gets "Already shown above."). Prompt alone didn't hold for the forced-search rule, so this one goes in code from the start.
 
 ## Steps
@@ -86,7 +86,7 @@ Proof: build; screenshots of the live answer streaming in, the finished card, a 
 
 ### 4. Backend: `show_quiz` tool
 
-- `QUIZ_TOOL` args: `{"topic": str, "count": "fewer"|"standard", "difficulty": ...}`. Validated with `study.check_options` (clamps and rejects like the Study panel).
+- `QUIZ_TOOL` args: `{"topic": str, "difficulty": ...}`. Bad values fall back to defaults (`display_tools.quiz_options`), then go through `study.check_options` like the Study panel's.
 - Calls `study.start(..., kind="quiz")` in the background and emits `{"ui": {"component": "quiz", "props": {"artifact_id", "topic", "count"}}}` right away. The text answer doesn't wait.
 - Tool result for the model: "A 5-question quiz on <topic> is being written from the course and will appear below your answer. Don't write the questions yourself. Say in one line what it covers."
 - If the course has no indexed material, it returns that to the model and emits no block.
