@@ -70,6 +70,7 @@ export default function Answer({
   grounded,
   memoriesUsed,
   onOpenCitation,
+  blocks,
   actions,
 }: {
   answer: string;
@@ -77,6 +78,8 @@ export default function Answer({
   grounded: boolean;
   memoriesUsed: MemoryUsed[];
   onOpenCitation: (c: Citation) => void;
+  // Cards the model showed (UiBlocks): below the text, above the sources.
+  blocks?: ReactNode;
   actions?: ReactNode;
 }) {
   // The footnote number and its source row light up together.
@@ -143,6 +146,7 @@ export default function Answer({
           {general && <div className="qa-body">{markdown(general)}</div>}
         </div>
       )}
+      {blocks}
       {sources.length > 0 && (
         <ol className="qa-notes" aria-label="Sources">
           {sources.map((c, i) => (

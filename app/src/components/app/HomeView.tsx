@@ -92,6 +92,8 @@ export default function HomeView({
         onInitialQuestionSent={onInitialQuestionSent}
         onConversationSaved={onConversationSaved}
         onOpenCitation={(c: Citation) => void openCitation(canvasBaseUrl, courseId, c, onOpenSession)}
+        assignments={assignments}
+        onOpenAssignment={onOpenAssignment}
       />
 
       <div className="home-side">
