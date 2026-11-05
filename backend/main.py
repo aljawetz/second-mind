@@ -395,25 +395,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(*self._canvas_error(e))
             return
 
-        assignments = []
-        for a in raw:
-            submission = a.get("submission") or {}
-            assignments.append(
-                {
-                    "id": a["id"],
-                    "name": a.get("name", ""),
-                    "due_at": a.get("due_at"),
-                    "points_possible": a.get("points_possible"),
-                    "description": explain.html_to_text(a.get("description") or ""),
-                    # Real Canvas submission status (canvas.list_assignments's
-                    # include[]=submission), not guessed from due date — a
-                    # workflow_state of "unsubmitted" (or no submission object
-                    # at all, e.g. a not-for-credit assignment) means not done.
-                    "submitted": submission.get("workflow_state") not in (None, "unsubmitted"),
-                    "late": bool(submission.get("late")),
-                    "missing": bool(submission.get("missing")),
-                }
-            )
+        assignments = [
+            {**canvas.assignment_summary(a), "description": explain.html_to_text(a.get("description") or "")} for a in raw
+        ]
         self._send_json(200, {"assignments": assignments})
 
     def _handle_list_sessions(self, course_id: str):
@@ -820,6 +804,7 @@ class Handler(BaseHTTPRequestHandler):
     def _handle_ask(self, course_id: str):
         import chat
         import conversations
+        import display_tools
         import indexing
         import llm
         from llama_index.vector_stores.lancedb.base import TableNotFoundError
@@ -860,7 +845,10 @@ class Handler(BaseHTTPRequestHandler):
             # The saved chat, not the app's copy of it, which can be stale. A
             # long one goes as its running summary plus its last few turns
             # (agent memory design spec §5.6).
-            turns = [{"question": t["question"], "answer": t["answer"]} for t in saved["turns"]]
+            turns = [
+                {"question": t["question"], "answer": t["answer"] + display_tools.history_note(t.get("ui"))}
+                for t in saved["turns"]
+            ]
             if memory_on:
                 compressed = compress.build_history(turns, saved["summary"], saved["memory_processed_upto"])
                 history, summary = compressed.turns, compressed.summary
@@ -893,6 +881,7 @@ class Handler(BaseHTTPRequestHandler):
                     provider,
                     memory=memory,
                     summary=summary,
+                    assignments=lambda: [canvas.assignment_summary(a) for a in canvas.list_assignments(int(course_id))],
                 )
                 first = next(events)
             except OnnxModelFileMissing:
@@ -943,11 +932,14 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         answer_parts: list[str] = []
+        ui_blocks: list[dict] = []
         final: dict = {}
         try:
             for event in itertools.chain([{**first, "conversation_id": cid}], events):
                 if "delta" in event:
                     answer_parts.append(event["delta"])
+                if "ui" in event:
+                    ui_blocks.append(event["ui"])
                 if "citations" in event:
                     final = event
                 if event.get("done"):
@@ -958,6 +950,8 @@ class Handler(BaseHTTPRequestHandler):
                         "grounded": final.get("grounded", False),
                         "asked_at": asked_at,
                     }
+                    if ui_blocks:
+                        turn["ui"] = ui_blocks
                     if conversations.append_turn(
                         SM_HOME, course_id, cid, turn, create_if_missing=create_if_missing
                     ):

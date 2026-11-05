@@ -23,7 +23,8 @@ import indexing
 import llm
 import main
 import memory_jobs
-from llm import TurnEnd
+import canvas
+from llm import ToolCall, TurnEnd
 from memory import MemoryService
 
 COURSE = 55710
@@ -54,6 +55,9 @@ class FakeModel:
         for piece in self.chat_replies.pop(0):
             if isinstance(piece, Exception):
                 raise piece
+            if isinstance(piece, TurnEnd):  # a scripted round that ends in tool calls
+                yield piece
+                return
             yield piece
         yield TurnEnd()
 
@@ -497,3 +501,51 @@ def test_forgetting_a_memory_clears_its_chats_running_summary(app):
 
     assert _json(app, "GET", f"/courses/{COURSE}/memories?include_inactive=1") == (200, {"memories": []})
     assert conversations.get_conversation(app.home, COURSE, cid)["summary"] == ""
+
+
+def test_a_deadlines_card_is_saved_with_its_turn_and_seen_by_the_next_question(app, monkeypatch):
+    due = (datetime.now(timezone.utc) + timedelta(days=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    raw = [{"id": 9, "name": "Lab 3", "due_at": due, "points_possible": 10, "submission": {"workflow_state": "unsubmitted"}}]
+    monkeypatch.setattr(canvas, "list_assignments", lambda course_id: raw)
+    config.write_config(app.home, {"selected_courses": [COURSE], "memory_enabled": False})
+    app.model.chat_replies.append([TurnEnd(tool_calls=[ToolCall(id="d1", name="show_deadlines", arguments={})])])
+    app.model.chat_replies.append(["Start with the lab."])
+    status, events = _ask(app, "What's due?")
+    assert status == 200, events
+
+    [card] = [e["ui"] for e in events if "ui" in e]
+    assert card["component"] == "deadlines"
+    assert [(a["id"], a["name"], a["submitted"]) for a in card["props"]["assignments"]] == [(9, "Lab 3", False)]
+    cid = events[0]["conversation_id"]
+    [turn] = conversations.get_conversation(app.home, COURSE, cid)["turns"]
+    assert turn["ui"] == [card]
+
+    app.model.chat_replies.append(["It's worth 10 points."])
+    status, _ = _ask(app, "How much is it worth?", conversation_id=cid)
+    assert status == 200
+    earlier_answer = app.model.chat_calls[-1][2]
+    assert earlier_answer["role"] == "assistant"
+    assert "[Deadlines card shown: Lab 3 (due " in earlier_answer["content"]
+
+
+def test_a_turn_without_cards_has_no_ui_field(app):
+    events = _say(app, "Hi", answer="Hello.")
+    [turn] = conversations.get_conversation(app.home, COURSE, events[0]["conversation_id"])["turns"]
+    assert "ui" not in turn
+
+
+def test_assignments_route_keeps_its_shape_after_sharing_the_summary_with_chat(app, monkeypatch):
+    raw = [
+        {"id": 1, "name": "Essay", "due_at": "2026-11-02T03:59:00Z", "points_possible": 20,
+         "description": "<p>Write <b>two</b> pages.</p>", "submission": {"workflow_state": "submitted", "late": True}},
+        {"id": 2, "name": "Ungraded", "due_at": None, "points_possible": 0},
+    ]
+    monkeypatch.setattr(canvas, "list_assignments", lambda course_id: raw)
+    status, data = _json(app, "GET", f"/courses/{COURSE}/assignments")
+    assert status == 200
+    assert data["assignments"] == [
+        {"id": 1, "name": "Essay", "due_at": "2026-11-02T03:59:00Z", "points_possible": 20,
+         "description": "Write two pages.", "submitted": True, "late": True, "missing": False},
+        {"id": 2, "name": "Ungraded", "due_at": None, "points_possible": 0,
+         "description": "", "submitted": False, "late": False, "missing": False},
+    ]

@@ -1,6 +1,8 @@
 """chat.py — the /ask tool loop, run against a scripted fake model and a fake
 search, so these tests make no network or index calls."""
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from llama_index.core.schema import NodeRelationship, NodeWithScore, RelatedNodeInfo, TextNode
 
@@ -247,3 +249,93 @@ def test_a_tool_that_fails_is_reported_to_the_model_and_the_answer_still_finishe
     assert "index is locked" in tool_result["content"]
     assert "".join(e["delta"] for e in events if "delta" in e) == "I couldn't search the course just now."
     assert events[-1] == {"done": True}
+
+
+def _soon(days):
+    return (datetime.now(timezone.utc) + timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+LAB = {"id": 7, "name": "Lab 3", "due_at": None, "points_possible": 10, "submitted": False, "late": False, "missing": False}
+
+
+def _run_with_assignments(replies, assignments):
+    provider = FakeProvider(replies)
+    events = list(chat.answer("What's due?", [], "Test Course", lambda q: [], provider, assignments=assignments))
+    return events, provider
+
+
+def test_deadlines_tool_is_offered_only_when_assignments_can_be_fetched():
+    _, without = _run_with_assignments([(["Hi."], [])], None)
+    _, with_ = _run_with_assignments([(["Hi."], [])], lambda: [])
+    assert [t["function"]["name"] for t in without.calls[0]["tools"]] == ["search_course"]
+    assert [t["function"]["name"] for t in with_.calls[0]["tools"]] == ["search_course", "show_deadlines"]
+    assert "show_deadlines" in with_.calls[0]["messages"][0]["content"]
+    assert "show_deadlines" not in without.calls[0]["messages"][0]["content"]
+
+
+def test_deadlines_card_goes_out_before_the_answer_and_the_model_sees_its_rows():
+    lab = {**LAB, "due_at": _soon(2)}
+    events, provider = _run_with_assignments(
+        [
+            ([], [ToolCall(id="d1", name="show_deadlines", arguments={"days": 7})]),
+            (["Start with the lab."], []),
+        ],
+        lambda: [lab],
+    )
+    kinds = [next(iter(e)) for e in events]
+    assert kinds == ["ui", "delta", "citations", "done"]
+    block = events[0]["ui"]
+    assert (block["id"], block["component"]) == ("ui-1", "deadlines")
+    assert [a["name"] for a in block["props"]["assignments"]] == ["Lab 3"]
+    assert "Lab 3: due" in provider.calls[1]["messages"][-1]["content"]
+
+
+def test_a_second_deadlines_call_in_one_answer_is_refused():
+    calls = []
+
+    def fetch():
+        calls.append(1)
+        return []
+
+    events, provider = _run_with_assignments(
+        [
+            ([], [ToolCall(id="d1", name="show_deadlines", arguments={})]),
+            ([], [ToolCall(id="d2", name="show_deadlines", arguments={"days": 30})]),
+            (["Nothing's due."], []),
+        ],
+        fetch,
+    )
+    assert len(calls) == 1
+    assert sum("ui" in e for e in events) == 1
+    assert "already shown" in provider.calls[2]["messages"][-1]["content"]
+
+
+def test_a_card_made_after_the_answer_started_goes_out_right_away():
+    events, _ = _run_with_assignments(
+        [
+            (["Let me check. "], [ToolCall(id="d1", name="show_deadlines", arguments={})]),
+            (["Here they are."], []),
+        ],
+        lambda: [],
+    )
+    assert [next(iter(e)) for e in events] == ["delta", "ui", "delta", "citations", "done"]
+
+
+def test_a_card_with_no_text_after_it_still_goes_out():
+    events, _ = _run_with_assignments(
+        [([], [ToolCall(id="d1", name="show_deadlines", arguments={})]), ([], [])],
+        lambda: [],
+    )
+    assert [next(iter(e)) for e in events] == ["ui", "citations", "done"]
+
+
+def test_canvas_failing_shows_no_card_and_tells_the_model():
+    def fetch():
+        raise ConnectionError("canvas unreachable")
+
+    events, provider = _run_with_assignments(
+        [([], [ToolCall(id="d1", name="show_deadlines", arguments={})]), (["Canvas is down."], [])],
+        fetch,
+    )
+    assert not any("ui" in e for e in events)
+    assert "show_deadlines tool failed" in provider.calls[1]["messages"][-1]["content"]
