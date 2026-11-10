@@ -14,12 +14,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from memory import consolidate, extract, forget, recall
+from memory import consolidate, extract, forget, past_chats, recall
 from memory.consolidate import Decision
 from memory.extract import JsonLLM
 from memory.forget import SweepReport
 from memory.recall import Hit
-from memory.store import Memory, MemoryStore
+from memory.store import Memory, MemoryStore, Turn
 
 
 @dataclass
@@ -161,6 +161,22 @@ class MemoryService:
         return forget.sweep(self._store, self._now())
 
     def forget_conversation(self, conversation_id: str) -> int:
-        """The student deleted a chat: forget what came only from it. A
-        memory also said in another chat stays."""
+        """The student deleted a chat: forget what came only from it, and
+        stop its turns being searchable. A memory also said in another chat
+        stays."""
+        self._store.delete_turns(conversation_id)
         return self.forget(self._store.memories_only_from(conversation_id), reason="chat deleted")
+
+    def index_turn(self, *, conversation_id: str, turn_index: int, title: str, at: datetime, question: str, answer: str) -> bool:
+        """Make a saved turn searchable from other chats. False when it was
+        passed over (grades or deadlines). No model call."""
+        return past_chats.index_turn(
+            self._store, self._embed, conversation_id=conversation_id, turn_index=turn_index, title=title, at=at,
+            question=question, answer=answer,
+        )
+
+    def search_past_chats(self, query: str, k: int = past_chats.TOP_K) -> list[Turn]:
+        """What was said in the student's other chats in this course."""
+        return past_chats.search(
+            query, store=self._store, embed=self._embed, now=self._now(), k=k, skip_conversation=self._conversation_id
+        )
