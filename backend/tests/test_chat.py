@@ -1,6 +1,8 @@
 """chat.py — the /ask tool loop, run against a scripted fake model and a fake
 search, so these tests make no network or index calls."""
 
+import json
+
 import pytest
 from llama_index.core.schema import NodeRelationship, NodeWithScore, RelatedNodeInfo, TextNode
 
@@ -15,11 +17,15 @@ def _node(node_id: str, source: str, text: str = "content") -> NodeWithScore:
 
 
 class FakeProvider:
-    """Plays back one scripted reply per model call and records what it was sent."""
+    """Plays back one scripted reply per model call and records what it was sent.
+    `rewrite` is what every complete_json call returns, or raises if it's an
+    exception: the follow-up rewrite's reply."""
 
-    def __init__(self, replies):
+    def __init__(self, replies, rewrite=None):
         self._replies = list(replies)
+        self._rewrite = rewrite
         self.calls = []
+        self.json_calls = []
 
     def stream_chat(self, messages, tools, require_tool=False):
         self.calls.append({"messages": [dict(m) for m in messages], "tools": tools, "require_tool": require_tool})
@@ -27,15 +33,21 @@ class FakeProvider:
         yield from text_pieces
         yield TurnEnd(tool_calls=tool_calls)
 
+    def complete_json(self, messages):
+        self.json_calls.append([dict(m) for m in messages])
+        if isinstance(self._rewrite, Exception):
+            raise self._rewrite
+        return self._rewrite
 
-def _run(question, replies, results, history=None):
+
+def _run(question, replies, results, history=None, rewrite=None):
     queries = []
 
     def search(query):
         queries.append(query)
         return results.get(query, [])
 
-    provider = FakeProvider(replies)
+    provider = FakeProvider(replies, rewrite)
     events = list(chat.answer(question, history or [], "Test Course", search, provider))
     text = "".join(e["delta"] for e in events if "delta" in e)
     final = next(e for e in events if "citations" in e)
@@ -132,7 +144,7 @@ def test_history_is_sent_without_old_citation_numbers():
     assert messages[3] == {"role": "user", "content": "Explain the second one."}
 
 
-def test_follow_up_must_search_in_its_own_words_first():
+def test_follow_up_must_search_in_its_own_words_when_the_rewrite_fails():
     history = [{"question": "When is the midterm?", "answer": "Oct 7."}]
     *_, queries, provider = _run(
         "And the final?",
@@ -143,6 +155,65 @@ def test_follow_up_must_search_in_its_own_words_first():
     assert provider.calls[0]["require_tool"] is True
     assert provider.calls[1]["require_tool"] is False
     assert queries == ["And the final?", "final exam date"]
+
+
+def test_follow_up_is_first_searched_as_a_question_that_stands_alone():
+    history = [{"question": "When is the midterm?", "answer": "Oct 7."}]
+    *_, queries, provider = _run(
+        "And the final?",
+        replies=[([], [ToolCall(id="c1", name="search_course", arguments={"query": "final exam date"})]), (["Dec 2."], [])],
+        results={},
+        history=history,
+        rewrite={"query": "When is the final exam?"},
+    )
+    assert queries == ["When is the final exam?", "final exam date"]
+    first_search = provider.calls[0]["messages"][-2]["tool_calls"][0]["function"]["arguments"]
+    assert json.loads(first_search) == {"query": "When is the final exam?"}
+
+
+def test_the_rewrite_sees_the_recent_chat_without_old_citation_numbers():
+    history = [{"question": "Which doubles exist?", "answer": "Stubs, fakes [1][2] and mocks [3]."}]
+    *_, provider = _run(
+        "Explain the second one.", replies=[(["ok"], [])], results={}, history=history, rewrite={"query": "What is a fake?"}
+    )
+    sent = "\n".join(m["content"] for m in provider.json_calls[0])
+    assert "Which doubles exist?" in sent
+    assert "Stubs, fakes and mocks." in sent
+    assert "Explain the second one." in sent
+
+
+def test_first_question_in_a_chat_is_searched_as_typed_with_no_rewrite():
+    *_, queries, provider = _run("When is the midterm?", replies=[(["Oct 7."], [])], results={}, rewrite={"query": "x"})
+    assert queries == ["When is the midterm?"]
+    assert provider.json_calls == []
+
+
+@pytest.mark.parametrize(
+    "rewrite", [None, {}, {"query": ""}, {"query": "   "}, {"query": 7}, ["When is the final?"], RuntimeError("model down")]
+)
+def test_a_rewrite_that_fails_falls_back_to_the_students_words(rewrite):
+    history = [{"question": "When is the midterm?", "answer": "Oct 7."}]
+    *_, queries, provider = _run("And the final?", replies=[(["Dec 2."], [])], results={}, history=history, rewrite=rewrite)
+    assert queries == ["And the final?"]
+    assert provider.calls[0]["require_tool"] is True
+
+
+def test_follow_up_may_answer_off_the_rewritten_search():
+    history = [{"question": "When is the midterm?", "answer": "Oct 7."}]
+    *_, queries, provider = _run(
+        "And the final?", replies=[(["Dec 2."], [])], results={}, history=history, rewrite={"query": "When is the final exam?"}
+    )
+    assert provider.calls[0]["require_tool"] is False
+    assert queries == ["When is the final exam?"]
+
+
+def test_the_forced_search_can_be_switched_back_on_for_every_follow_up(monkeypatch):
+    monkeypatch.setattr(chat, "FOLLOW_UP_MUST_SEARCH", True)
+    history = [{"question": "When is the midterm?", "answer": "Oct 7."}]
+    *_, provider = _run(
+        "And the final?", replies=[(["Dec 2."], [])], results={}, history=history, rewrite={"query": "When is the final exam?"}
+    )
+    assert provider.calls[0]["require_tool"] is True
 
 
 def test_first_question_in_a_chat_may_answer_straight_away():
