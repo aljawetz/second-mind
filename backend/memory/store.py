@@ -378,6 +378,37 @@ class MemoryStore:
             rows = self._conn.execute("SELECT * FROM turn ORDER BY at, conversation_id, turn_index").fetchall()
             return [self._to_turn(r) for r in rows]
 
+    def turn_vector_search(self, query: list[float], k: int, skip_conversation: str | None = None) -> list[tuple[Turn, float]]:
+        """Top k saved turns by cosine similarity, highest first. A full
+        scan, like vector_search: a semester is a few thousand turns."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM turn WHERE conversation_id IS NOT ?", (skip_conversation,)
+            ).fetchall()
+            if not rows:
+                return []
+            matrix = np.stack([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
+            q = np.asarray(query, dtype=np.float32)
+            norms = np.linalg.norm(matrix, axis=1) * np.linalg.norm(q)
+            scores = matrix @ q / np.where(norms == 0, 1.0, norms)
+            top = np.argsort(-scores, kind="stable")[:k]
+            return [(self._to_turn(rows[i]), float(scores[i])) for i in top]
+
+    def turn_keyword_search(self, query: str, k: int, skip_conversation: str | None = None) -> list[tuple[Turn, float]]:
+        """Top k saved turns by BM25, best first; use the rank, as with keyword_search."""
+        words = [w for w in _WORD.findall(query.lower()) if w not in _STOPWORDS]
+        if not words:
+            return []
+        match = " OR ".join(f'"{w}"' for w in words)
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT t.*, -bm25(turn_fts) AS score FROM turn_fts JOIN turn t"
+                " ON t.conversation_id = turn_fts.conversation_id AND t.turn_index = turn_fts.turn_index"
+                " WHERE turn_fts MATCH ? AND t.conversation_id IS NOT ? ORDER BY score DESC LIMIT ?",
+                (match, skip_conversation, k),
+            ).fetchall()
+            return [(self._to_turn(r), r["score"]) for r in rows]
+
     @staticmethod
     def _to_turn(row: sqlite3.Row) -> Turn:
         return Turn(row["conversation_id"], row["turn_index"], row["title"], _time(row["at"]), row["question"], row["answer"])
