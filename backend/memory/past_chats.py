@@ -41,11 +41,17 @@ def index_turn(
     answer: str,
 ) -> bool:
     """Make one saved turn searchable. False, with nothing kept for it, when
-    it mentions grades or deadlines: the memory database holds neither
-    (agent memory design §5.2), cautious on purpose."""
+    it mentions grades or deadlines (the memory database holds neither,
+    agent memory design §5.2, cautious on purpose), or when the student had
+    a memory from this turn forgotten: forgetting has to hold against this
+    search too, on every later indexing pass."""
     # Old [n] numbers pointed at that answer's own searches.
     answer = _CITATION.sub("", answer)
-    if mentions_grades_or_deadlines(question) or mentions_grades_or_deadlines(answer):
+    if (
+        store.is_turn_blocked(conversation_id, turn_index)
+        or mentions_grades_or_deadlines(question)
+        or mentions_grades_or_deadlines(answer)
+    ):
         store.delete_turn(conversation_id, turn_index)
         return False
     store.add_turn(

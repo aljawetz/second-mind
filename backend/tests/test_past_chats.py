@@ -72,6 +72,15 @@ def test_a_turn_that_becomes_a_grade_turn_is_removed_when_reindexed(store):
     assert store.list_turns() == []
 
 
+def test_a_turn_the_student_had_forgotten_is_never_indexed(store):
+    # forget_memory blocks the turns a forgotten memory came from; a later
+    # indexing pass (a restart, or catching up an old chat) must not bring them back.
+    store.block_forget_turn("c-1", 0)
+
+    assert _index(store, cid="c-1", turn=0) is False
+    assert store.list_turns() == []
+
+
 def test_deleting_a_chat_removes_only_its_turns(store):
     _index(store, cid="c-1", turn=0)
     _index(store, cid="c-1", turn=1, question="And for standing desks?")

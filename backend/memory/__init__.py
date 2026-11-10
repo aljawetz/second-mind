@@ -144,6 +144,9 @@ class MemoryService:
             return 0
         for cid, turn_index in {(cid, ti) for m in found for cid, ti in m.provenance}:
             self._store.block_forget_turn(cid, turn_index)
+            # The turn stays in the student's saved chat, but search_past_chats
+            # must not hand back what they asked to have forgotten.
+            self._store.delete_turn(cid, turn_index)
         chats = sorted({cid for m in found for cid, _ in m.provenance} | {m.conversation_id for m in found if m.conversation_id})
         doomed = {m.id for m in found}
         doomed |= {

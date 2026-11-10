@@ -1,6 +1,6 @@
 # Search over past chats — design
 
-**Status:** approved by Yongjie on 2026-11-10 with the three recommendations in §7. Step 1 in progress.
+**Status:** approved by Yongjie on 2026-11-10 with the three recommendations in §7. Steps 1 to 5 built; step 6 (measurement) is next.
 **Owner:** Yongjie
 **Builds on:** [agent memory design](2026-09-25-agent-memory-design.md), [memory evaluation](2026-09-25-agent-memory-evaluation-design.md)
 
@@ -62,7 +62,7 @@ The same recipe as memory recall and course search, so there is one way of ranki
 
 - **Deleting a chat** removes its turns from the index. The hook exists already (`forget_conversation`).
 - **Delete all data** removes `memory.db`, so the index goes with it.
-- **"Forget that"** still only removes memories. The reply already says the words remain in the saved chat; they will also remain searchable until that chat is deleted. The reply will say so.
+- **"Forget that"** removes the memory and also takes the turns it came from out of this index, for good: a later indexing pass skips them. The words stay in the student's saved chat for them to read, but the assistant can no longer search them. (Changed while building step 5. The first draft left those turns searchable, which would have let the assistant find again what it was just asked to forget.)
 - **Grades and deadlines.** Memory never stores them (design spec §5.2). Raw turns can contain them. See decision 1.
 - **Other courses** are never searched: the index is per course, like memory.
 

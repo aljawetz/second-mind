@@ -181,6 +181,7 @@ def test_forget_deletes_a_memory_shown_this_turn(memory):
     assert memory.service.list(include_inactive=True) == []
     result = _tool_result(provider, "f1", call=1)
     assert "The student is auditing the course." in result and "saved chat" in result
+    assert "can no longer search" in result
     assert final["memories_used"] == []  # the app must not show forgotten text
 
 

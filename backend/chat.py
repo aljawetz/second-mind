@@ -408,7 +408,8 @@ def answer(
             forgotten.update(ids)
             parts.append(
                 "Forgotten, deleted from memory: " + "; ".join(used[i] for i in ids) + " If the student said it in a "
-                "saved chat, it's still in that chat; deleting that chat removes it completely."
+                "saved chat, it's still there for them to read, but you can no longer search that part of it; "
+                "deleting that chat removes it completely."
             )
         if unknown:
             parts.append(
