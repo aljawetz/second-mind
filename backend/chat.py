@@ -16,7 +16,8 @@ the prompt, because the prompt alone didn't hold:
   full sentence and fell under the similarity cutoff on smaller courses. In a
   follow-up, that first search uses the question rewritten to stand alone
   (standalone_query): "and the final?" alone finds little.
-- In a follow-up, the model must search in its own words before answering.
+- In a follow-up, the model must search in its own words before answering,
+  but only when that rewrite failed: with it, one search finds as much.
 - Citations are checked and renumbered here. The model's [n] numbers span
   every search it made; only numbers that match a real search result survive,
   renumbered 1..k in the order the answer uses them.
@@ -146,6 +147,13 @@ FORGET_TOOL = {
 }
 
 MAX_TOOL_ROUNDS = 4
+# True forces the model's first move in every follow-up to be a search in
+# its own words, as it was before the rewrite existed. Off since the Sprint 9
+# chat set (26 follow-up turns): with the rewrite as the first search, the
+# fact was found on 25 turns without the forced search and 24 with it, in
+# 2.8 s a turn against 4.0 s. Still forced when the rewrite fails (see
+# require_tool in answer). The eval turns it on to reproduce the old chat.
+FOLLOW_UP_MUST_SEARCH = False
 # Whole chunks, not a preview: indexing.py's chunks top out around 3,800
 # characters, and answers often sit past the first 1,500 (the Requirements
 # course's final exam date is at character ~2,470 of its page). An earlier
@@ -199,10 +207,10 @@ def parse_history(raw) -> list[dict]:
     return turns
 
 
-def standalone_query(question: str, history: list[dict], provider: LLMProvider) -> str:
+def standalone_query(question: str, history: list[dict], provider: LLMProvider) -> str | None:
     """The follow-up `question` rewritten to stand alone, for the first
-    search. The student's own words if the rewrite fails or comes back the
-    wrong shape: it only improves a search, so it must never stop an answer."""
+    search. None if the rewrite fails or comes back the wrong shape: it only
+    improves a search, so it must never stop an answer."""
     chat_text = "\n\n".join(
         f"Student: {turn['question']}\nAssistant: {_CITATION.sub('', turn['answer'])[:REWRITE_ANSWER_CHARS]}"
         for turn in history[-REWRITE_TURNS:]
@@ -215,10 +223,10 @@ def standalone_query(question: str, history: list[dict], provider: LLMProvider) 
         reply = provider.complete_json(messages)
     except Exception:
         traceback.print_exc(file=sys.stderr)
-        return question
+        return None
     query = reply.get("query") if isinstance(reply, dict) else None
     if not isinstance(query, str) or not query.strip():
-        return question
+        return None
     return query.strip()[:REWRITE_MAX_CHARS]
 
 
@@ -420,8 +428,9 @@ def answer(
     messages = [{"role": "system", "content": prompt}, *_history_messages(history), {"role": "user", "content": question}]
     # The first search is made here, in the model's name, so it always
     # happens: with the student's exact words, or in a follow-up with them
-    # rewritten to stand alone.
-    first_query = standalone_query(question, history, provider) if history else question
+    # rewritten to stand alone (their exact words again if the rewrite fails).
+    rewritten = standalone_query(question, history, provider) if history else None
+    first_query = rewritten or question
     messages.append({"role": "assistant", "content": None, "tool_calls": [_call("search-0", "search_course", {"query": first_query})]})
     messages.append({"role": "tool", "tool_call_id": "search-0", "content": run_search(first_query)})
     # Memory too, for the same reason: left to the model, it would often not
@@ -444,9 +453,10 @@ def answer(
         # In a follow-up ("And the final?") the student's exact words rarely
         # find anything useful, and the prompt alone didn't stop the model
         # from answering "couldn't find it" off that one weak search (seen
-        # live). So its first move in a follow-up must be a search in its own
-        # words, written with the chat in view.
-        require_tool = round_num == 0 and bool(history)
+        # live). The rewrite fixes that search. When it failed, the model's
+        # first move must be a search in its own words, written with the
+        # chat in view.
+        require_tool = round_num == 0 and bool(history) and (FOLLOW_UP_MUST_SEARCH or rewritten is None)
         round_text = ""
         end = TurnEnd()
         for item in provider.stream_chat(messages, round_tools, require_tool=require_tool):

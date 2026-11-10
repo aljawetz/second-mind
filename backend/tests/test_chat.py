@@ -144,7 +144,7 @@ def test_history_is_sent_without_old_citation_numbers():
     assert messages[3] == {"role": "user", "content": "Explain the second one."}
 
 
-def test_follow_up_must_search_in_its_own_words_first():
+def test_follow_up_must_search_in_its_own_words_when_the_rewrite_fails():
     history = [{"question": "When is the midterm?", "answer": "Oct 7."}]
     *_, queries, provider = _run(
         "And the final?",
@@ -193,8 +193,27 @@ def test_first_question_in_a_chat_is_searched_as_typed_with_no_rewrite():
 )
 def test_a_rewrite_that_fails_falls_back_to_the_students_words(rewrite):
     history = [{"question": "When is the midterm?", "answer": "Oct 7."}]
-    *_, queries, _ = _run("And the final?", replies=[(["Dec 2."], [])], results={}, history=history, rewrite=rewrite)
+    *_, queries, provider = _run("And the final?", replies=[(["Dec 2."], [])], results={}, history=history, rewrite=rewrite)
     assert queries == ["And the final?"]
+    assert provider.calls[0]["require_tool"] is True
+
+
+def test_follow_up_may_answer_off_the_rewritten_search():
+    history = [{"question": "When is the midterm?", "answer": "Oct 7."}]
+    *_, queries, provider = _run(
+        "And the final?", replies=[(["Dec 2."], [])], results={}, history=history, rewrite={"query": "When is the final exam?"}
+    )
+    assert provider.calls[0]["require_tool"] is False
+    assert queries == ["When is the final exam?"]
+
+
+def test_the_forced_search_can_be_switched_back_on_for_every_follow_up(monkeypatch):
+    monkeypatch.setattr(chat, "FOLLOW_UP_MUST_SEARCH", True)
+    history = [{"question": "When is the midterm?", "answer": "Oct 7."}]
+    *_, provider = _run(
+        "And the final?", replies=[(["Dec 2."], [])], results={}, history=history, rewrite={"query": "When is the final exam?"}
+    )
+    assert provider.calls[0]["require_tool"] is True
 
 
 def test_first_question_in_a_chat_may_answer_straight_away():

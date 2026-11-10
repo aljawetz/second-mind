@@ -25,7 +25,7 @@ Not a pytest test: the answering modes make real, billed OpenAI calls against
 the real local index (~/.secondmind/index.lancedb). --retrieval-only does
 not. Run from backend/:
 
-    uv run python3 scripts/ask_modes_eval.py [--set first|heldout|sprint7|sprint8|sprint8-test|sprint8-chat|sprint8-user|sample] [--only A,B,C,D] [--out PATH]
+    uv run python3 scripts/ask_modes_eval.py [--set first|heldout|sprint7|sprint8|sprint8-test|sprint8-chat|sprint8-user|sprint9-chat|sample] [--only A,B,C,D] [--out PATH]
     uv run python3 scripts/ask_modes_eval.py --set sprint7 --retrieval-only --out PATH
     uv run python3 scripts/make_sample_index.py --out /tmp/sample.lancedb
     uv run python3 scripts/ask_modes_eval.py --set sample --retrieval-only --index /tmp/sample.lancedb --out PATH
@@ -1600,6 +1600,86 @@ SPRINT8_USER_CASES = [
 ]
 
 
+# Sprint 9 chat set: follow-up chats for the two courses indexed on the
+# team's own machines (18-658 and Advanced AI), written on 2026-11-09 because
+# the Sprint 8 chat set leans on 18-654, which nobody on the team can sync
+# any more. Same shape and rules as SPRINT8_CHAT_CASES: each turn is (typed,
+# rewrite, facts), every fact was checked word for word against the index
+# text by reading the chunks, not by searching, and the set is frozen: run
+# once per design, tune nothing on it. Topics avoid the ones the Sprint 8
+# chat set and the held-out set already ask about.
+SPRINT9_CHAT_CASES = [
+    _chat_case("N1", REQ, "Task 4 Think-Aloud: protocol, about five sessions, start with the TA", [
+        ("how do we test the prototype in task 4?", None, ["leveraging the Think-Aloud protocol"]),
+        ("how many sessions?", "how many think-aloud sessions do we run in task 4?", ["Conduct about five Think-Aloud sessions"]),
+        ("who should we start with?", "who should we start the task 4 think-aloud sessions with?", ["Start with your TA"]),
+    ]),
+    _chat_case("N2", REQ, "Task 5 presentation: 12 minutes, philanthropist audience, 6-minute demo", [
+        ("how long is the final presentation for task 5?", None, ["You have 12 minutes to present"]),
+        ("who's the audience supposed to be?", "who is the audience for the task 5 final presentation?", ["a group of philanthropists, each ready to donate $30K"]),
+        ("how long is the demo part?", "how long is the product demonstration part of the task 5 presentation?", ["(6 min)"]),
+    ]),
+    _chat_case("N3", REQ, "Task 4 interaction framework: form factor etc., at least 4 patterns, no login in the prototype", [
+        ("what goes into the interaction framework?", None, ["form factor, posture, input/output methods"]),
+        ("how many design patterns do we need?", "how many design patterns does the task 4 interaction framework need?", ["design patterns (at least 4"]),
+        ("should the prototype have a login?", "should the task 4 prototype include login functionality?", ["Please do not include any login functionality in your prototype"]),
+    ]),
+    _chat_case("N4", REQ, "Task 4 NFRs: the 3 highest priority ones in Planguage, each based on a reference paper", [
+        ("how many non-functional requirements do we elaborate in task 4?", None, ["Elaborate your 3 highest priority non-functional requirements using Planguage"]),
+        ("what do they need to be based on?", "what does each task 4 Planguage statement need to be based on?", ["being based on a reference paper"]),
+    ]),
+    _chat_case("N5", REQ, "Syllabus: About Face 4th ed., co-requisite 18-652, 12 units", [
+        ("what's the required textbook?", None, ["About Face: The Essentials of Interaction Design, Fourth Edition"]),
+        ("is there a co-requisite?", None, ["18-652 Foundations of Software Engineering"]),
+        ("how many units is it?", "how many units is this course?", ["Units - 12"]),
+    ]),
+    _chat_case("N6", REQ, "Task 1 interviews: 60 minutes, in triplets, 20 debrief notes per member", [
+        ("how long should task 1 interviews be?", None, ["Allocate at least 60 minutes per interview"]),
+        ("how many people from the team go?", "how many team members conduct each task 1 interview?", ["Conduct the interviews in triplets"]),
+        ("how many debrief notes after?", "how many debrief notes should we write after each task 1 interview?", ["minimum of 20 notes per team member"]),
+    ]),
+    _chat_case("N7", REQ, "Field project: 10-minute presentation, two practitioners, one team per company", [
+        ("how long is the field project presentation?", None, ["Prepare a 10-minute presentation"]),
+        ("how many people do we interview for it?", "how many practitioners do we interview for the field project?", ["interview two practitioners"]),
+        ("can two teams pick the same company?", "can two teams pick the same company for the field project?", ["only one team per company or organization"]),
+    ]),
+    _chat_case("N8", REQ, "Task 2: 70 post-its, one storyboard per student, peer reviewed by a teammate", [
+        ("how many post-its do we need for the design studio?", None, ["minimum of 70 post-its"]),
+        ("and storyboards, how many?", "how many storyboards does the team need in task 2?", ["one Storyboard per student"]),
+        ("do they get peer reviewed?", "are task 2 storyboards peer reviewed?", ["peer reviewed by at least one teammate"]),
+    ]),
+    _chat_case("N9", AI, "Off-campus interview: by Oct 31, 3-5 core questions, one submission per group", [
+        ("when do we need to finish the off-campus stakeholder interview?", None, ["Interviews must be completed by October 31, 2026"]),
+        ("how many questions should we prepare?", "how many core questions should we prepare for the off-campus stakeholder interview?", ["3–5 core questions"]),
+        ("does everyone submit?", "does every group member submit the off-campus interview details?", ["Only one submission per group is required"]),
+    ]),
+    _chat_case("N10", AI, "Project peer review: partner team, 1 to 5 per criterion, six criteria", [
+        ("how does the project peer review work?", None, ["partner with another team to review each other"]),
+        ("what score scale?", "what score scale does the project peer review use?", ["A score from 1 to 5 for each criterion"]),
+        ("how many criteria?", "how many criteria are in the project peer review rubric?", ["Review the six criteria"]),
+    ]),
+    _chat_case("N11", AI, "Final: deliverables include a <=60 s demo video; Technical and Impact Evidence is 30%", [
+        ("what are the final deliverables for the project?", None, ["short demo video (<=60 seconds)"]),
+        ("how much is the evidence part worth?", "how much is Technical and Impact Evidence worth in the final project grade?", ["Clearly distinguish demonstrated results from claims or future work. | 30%"]),
+    ]),
+    _chat_case("N12", AI, "NVIDIA certificate: required, upload a screenshot, andrew email", [
+        ("do i have to do the nvidia certificate?", None, ["Each student needs to finish this Nvidia certificate"]),
+        ("what do i upload when i'm done?", "what do I upload for the NVIDIA LLM certificate completion assignment?", ["upload a screenshot of your certificate with your name on it"]),
+        ("which email do i sign up with?", "which email do I use to create the NVIDIA Deep Learning Institute account?", ["using your @andrew.cmu.edu email"]),
+    ]),
+    _chat_case("N13", AI, "BrainEEG: 88 people, weekly meetings, J-BHI and TNSRE", [
+        ("how many people are in the brainEEG dataset?", None, ["88 people, 36 with Alzheimer's, 23 with frontotemporal dementia, 29 healthy"]),
+        ("how often does the team meet?", "how often does the BrainEEG project team meet?", ["We meet once a week"]),
+        ("what journals are they aiming for?", "which journals is the BrainEEG project aiming for?", ["J-BHI and TNSRE"]),
+    ]),
+    _chat_case("N14", AI, "Zotero: Chrome extension, Add/edit bibliography, Chrome browser", [
+        ("what do i install for zotero?", None, ["Zotero Chrome extension"]),
+        ("how do i add a bibliography?", "how do I auto-generate a bibliography with Zotero in Google Docs?", ["select Zotero menu item -> Add/edit bibliography"]),
+        ("which browser?", "which browser do I need for Zotero citations in Google Docs?", ["Make sure that you use chrome browser"]),
+    ]),
+]
+
+
 def cases_for(name: str) -> list[dict]:
     if name == "heldout":
         return HELDOUT_CASES
@@ -1607,6 +1687,8 @@ def cases_for(name: str) -> list[dict]:
         return SPRINT8_USER_CASES
     if name == "sprint8-chat":
         return SPRINT8_CHAT_CASES
+    if name == "sprint9-chat":
+        return SPRINT9_CHAT_CASES
     if name == "sprint8-test":
         return SPRINT8_TEST_CASES
     if name == "sprint8":
@@ -2119,7 +2201,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", default="A,B,C")
     parser.add_argument("--cases", default="", help="comma-separated case ids; default all")
-    parser.add_argument("--set", default="first", choices=["first", "heldout", "sprint7", "sprint8", "sprint8-test", "sprint8-chat", "sprint8-user", "sample"])
+    parser.add_argument("--set", default="first", choices=["first", "heldout", "sprint7", "sprint8", "sprint8-test", "sprint8-chat", "sprint8-user", "sprint9-chat", "sample"])
     parser.add_argument(
         "--retrieval-only",
         action="store_true",
