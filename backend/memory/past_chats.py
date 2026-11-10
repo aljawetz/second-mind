@@ -15,13 +15,14 @@ from typing import Callable
 
 from memory.extract import _CITATION, mentions_grades_or_deadlines
 from memory.recall import KEYWORD_CANDIDATES, RECENCY_DAYS, RRF_K, VECTOR_CANDIDATES
-from memory.store import MemoryStore, Turn
+from memory.store import _STOPWORDS, _WORD, MemoryStore, Turn
 
 # Starting values (design §4, §7 decision 3), to be tuned on the memory
 # evaluation's development sample.
 TURN_SIMILARITY_CUTOFF = 0.5
 TOP_K = 5
 ANSWER_CHARS = 600
+EXCERPT_STEP = 100  # how far the window over a long answer moves each time
 NO_PAST_CHATS = "Nothing about this in the student's earlier chats."
 
 
@@ -96,13 +97,36 @@ def search(
     return [by_key[key] for key in sorted(by_key, key=lambda key: -score(key))[:k]]
 
 
-def format_turns(turns: list[Turn], first_label: int = 1) -> str:
+def excerpt(answer: str, query: str) -> str:
+    """At most ANSWER_CHARS of a past answer: the stretch holding the most of
+    the query's words, or its start when none match. The first 600
+    characters alone hid what was asked about: in the memory evaluation the
+    right chat came back 11 times in 12, and in 4 of the misses the detail
+    sat further into a long answer (a name at character 1,165, an item deep
+    in a list)."""
+    if len(answer) <= ANSWER_CHARS:
+        return answer
+    words = {w for w in _WORD.findall(query.lower()) if w not in _STOPWORDS}
+    lowered = answer.lower()
+    last = len(answer) - ANSWER_CHARS
+    best_start, best_score = 0, 0
+    for start in [*range(0, last, EXCERPT_STEP), last]:
+        window = lowered[start : start + ANSWER_CHARS]
+        score = sum(w in window for w in words)
+        if score > best_score:  # ties keep the earlier stretch
+            best_start, best_score = start, score
+    end = best_start + ANSWER_CHARS
+    return ("…" if best_start else "") + answer[best_start:end] + ("…" if end < len(answer) else "")
+
+
+def format_turns(turns: list[Turn], first_label: int = 1, query: str = "") -> str:
     """Search results as the model sees them. [P…] labels are never
-    citations: chat strips them from the answer, as it does memory's [M…]."""
+    citations: chat strips them from the answer, as it does memory's [M…].
+    query: what was searched for, which decides the part of a long answer shown."""
     if not turns:
         return NO_PAST_CHATS
     parts = []
     for label, turn in enumerate(turns, start=first_label):
-        answer = turn.answer if len(turn.answer) <= ANSWER_CHARS else turn.answer[:ANSWER_CHARS] + "…"
+        answer = excerpt(turn.answer, query)
         parts.append(f'[P{label}] "{turn.title}", {turn.at.date()}\nStudent: {turn.question}\nAssistant: {answer}')
     return "\n\n".join(parts)

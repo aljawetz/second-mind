@@ -433,7 +433,7 @@ def answer(
             past_shown[0] += len(turns)
             for turn in turns:
                 past_used.setdefault(turn.conversation_id, turn.title)
-            return format_turns(turns, first_label=first)
+            return format_turns(turns, first_label=first, query=query)
         return "Unknown tool or empty query."
 
     # A tool the model calls runs after the answer may have started

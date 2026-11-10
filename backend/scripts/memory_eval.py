@@ -417,7 +417,7 @@ def answer_s3(llm: CountingLLM, question: dict, sessions: list[Session], embed, 
                         result = "Empty query."
                     elif call.function.name == "search_past_chats" and past_chats:
                         found = memory.search_past_chats(query)
-                        result = format_turns(found, first_label=len(past_sessions) + 1)
+                        result = format_turns(found, first_label=len(past_sessions) + 1, query=query)
                         past_calls += 1
                         past_sessions += [t.conversation_id for t in found]
                     else:

@@ -174,3 +174,41 @@ def test_a_long_past_answer_is_cut_and_labels_continue_across_searches(store):
 
 def test_no_results_says_so(store):
     assert past_chats.format_turns([]) == past_chats.NO_PAST_CHATS
+
+
+# --- which part of a long past answer is shown -----------------------------------
+# The memory evaluation found the right chat 11 times in 12 and still missed:
+# the detail asked about sat past the first 600 characters of the answer.
+
+LONG_ANSWER = (
+    "Here are some designers. " + "Filler about rings and settings. " * 40
+    + "Jessica Poole Jewellery works with unusual gemstones, Instagram @jessicapoolejewellery. "
+    + "More filler about polishing. " * 40
+)
+
+
+def test_a_long_answer_is_shown_around_the_words_asked_about(store):
+    _add(store, "c-1", 0, "Any posture videos?", LONG_ANSWER)
+
+    text = past_chats.format_turns(_search(store, "posture"), query="Instagram handle designer unusual gemstones")
+
+    assert "@jessicapoolejewellery" in text
+    shown = text.split("Assistant: ", 1)[1]
+    assert shown.startswith("…") and shown.endswith("…")
+    assert len(shown) <= past_chats.ANSWER_CHARS + 2
+
+
+def test_a_long_answer_with_nothing_matching_shows_its_start(store):
+    _add(store, "c-1", 0, "Any posture videos?", LONG_ANSWER)
+
+    shown = past_chats.format_turns(_search(store, "posture"), query="kubernetes").split("Assistant: ", 1)[1]
+
+    assert shown == LONG_ANSWER[: past_chats.ANSWER_CHARS] + "…"
+
+
+def test_a_short_answer_is_shown_whole_whatever_was_asked(store):
+    _add(store, "c-1", 0, "Any posture videos?", "Try the Mayo Clinic one.")
+
+    text = past_chats.format_turns(_search(store, "posture"), query="Mayo Clinic")
+
+    assert text.endswith("Assistant: Try the Mayo Clinic one.")
