@@ -12,6 +12,9 @@ with the same neutral prompt and the same model:
   S3  the memory layer: sessions replayed through MemoryService.observe at
       their real dates, a sweep at question time, then the profile, one
       automatic recall, and up to 2 recall_memory calls.
+  S4  S3 plus search over past chats (docs/specs/2026-11-10-past-chat-
+      search-design.md): the sessions' turns are indexed as the app's
+      worker indexes saved chats, and search_past_chats is offered too.
 
 Answers are graded by gpt-4o with LongMemEval's own judge prompts.
 
@@ -57,6 +60,11 @@ S2_TOP_K = 10
 S3_RECALL_ROUNDS = 2
 # $ per 1M tokens (input, output), the same figures as ask_modes_eval.py.
 PRICES = {"gpt-4o-mini": (0.15, 0.60), "gpt-4o": (2.50, 10.00)}
+
+PAST_CHATS_NOTE = (
+    "\n\nsearch_past_chats looks through what you and the user said in those conversations, word for word. "
+    "Use it when what you remember doesn't hold the answer, or the question is about something you said."
+)
 
 ANSWER_PROMPT = """You are a helpful assistant with memory of past conversations with this user. Today is {today}.
 Answer the user's question from what they told you in those conversations. Work out dates and counts from \
@@ -131,6 +139,18 @@ def _pairs(sessions: list[Session]) -> list[tuple[Session, str, str]]:
 
 def _pair_text(user: str, assistant: str) -> str:
     return f"User: {user}\nAssistant: {assistant}"
+
+
+def turns_to_index(session: Session) -> list[dict]:
+    """One session as the app would put it in the past-chat index
+    (memory_jobs.index_conversation): a row per question and answer, titled
+    by the chat's first question the way conversations.append_turn titles it."""
+    pairs = _pairs([session])
+    title = " ".join(pairs[0][1].split())[:60] if pairs else ""
+    return [
+        {"conversation_id": session.session_id, "turn_index": i, "title": title, "at": session.at, "question": user, "answer": assistant}
+        for i, (_, user, assistant) in enumerate(pairs)
+    ]
 
 
 def context_s0(sessions: list[Session]) -> str:
@@ -319,9 +339,11 @@ def answer_from_context(llm: CountingLLM, question: dict, context: str) -> dict:
     return {"answer": message.content or "", "prompt_tokens": prompt_tokens}
 
 
-def answer_s3(llm: CountingLLM, question: dict, sessions: list[Session], embed) -> dict:
+def answer_s3(llm: CountingLLM, question: dict, sessions: list[Session], embed, past_chats: bool = False) -> dict:
     """Replay the history into a fresh memory store, then answer the way
-    chat.answer uses memory: profile, one automatic recall, recall_memory."""
+    chat.answer uses memory: profile, one automatic recall, recall_memory.
+    past_chats (S4): the sessions' turns are also indexed, as the worker
+    does in the app, and search_past_chats is offered beside recall_memory."""
     import chat
     from memory import MemoryService
     from memory.recall import format_hits
@@ -341,6 +363,18 @@ def answer_s3(llm: CountingLLM, question: dict, sessions: list[Session], embed) 
                 dropped += len(seen.dropped)
             memory.sweep()
             write_seconds = time.perf_counter() - write_start
+            turns_indexed = turns_skipped = 0
+            if past_chats:
+                from memory.past_chats import format_turns
+
+                for session in sessions:
+                    for turn in turns_to_index(session):
+                        if memory.index_turn(**turn):
+                            turns_indexed += 1
+                        else:
+                            turns_skipped += 1  # the grades-and-deadlines filter
+            past_calls = 0
+            past_sessions: list[str] = []
             write_after = llm.usage.get(("write", llm.write_model), {"calls": 0, "prompt_tokens": 0})
             llm.stage = "answer"
 
@@ -357,12 +391,17 @@ def answer_s3(llm: CountingLLM, question: dict, sessions: list[Session], embed) 
             profile = memory.profile_block()
             context = profile + "\n\nRecalled for this question:\n" + show(memory.recall(question["question"]))
             messages = [
-                {"role": "system", "content": _system_prompt(question, "What you remember about this user:", context.strip())},
+                {
+                    "role": "system",
+                    "content": _system_prompt(question, "What you remember about this user:", context.strip())
+                    + (PAST_CHATS_NOTE if past_chats else ""),
+                },
                 {"role": "user", "content": question["question"]},
             ]
             prompt_tokens = 0
             for round_num in range(S3_RECALL_ROUNDS + 1):
-                tools = [chat.RECALL_TOOL] if round_num < S3_RECALL_ROUNDS else None
+                offered = [chat.RECALL_TOOL, chat.PAST_CHATS_TOOL] if past_chats else [chat.RECALL_TOOL]
+                tools = offered if round_num < S3_RECALL_ROUNDS else None
                 message, used = llm.chat(messages, tools)
                 prompt_tokens += used
                 if not message.tool_calls:
@@ -374,11 +413,15 @@ def answer_s3(llm: CountingLLM, question: dict, sessions: list[Session], embed) 
                     except json.JSONDecodeError:
                         args = {}
                     query = args.get("query")
-                    result = (
-                        show(memory.recall(query, include_history=args.get("include_history") is True))
-                        if isinstance(query, str) and query.strip()
-                        else "Empty query."
-                    )
+                    if not (isinstance(query, str) and query.strip()):
+                        result = "Empty query."
+                    elif call.function.name == "search_past_chats" and past_chats:
+                        found = memory.search_past_chats(query)
+                        result = format_turns(found, first_label=len(past_sessions) + 1)
+                        past_calls += 1
+                        past_sessions += [t.conversation_id for t in found]
+                    else:
+                        result = show(memory.recall(query, include_history=args.get("include_history") is True))
                     messages.append({"role": "tool", "tool_call_id": call.id, "content": result})
             return {
                 "answer": message.content or "",
@@ -402,6 +445,10 @@ def answer_s3(llm: CountingLLM, question: dict, sessions: list[Session], embed) 
                 "profile": profile,
                 "recalled": [hit.memory.text for hit in recalled],
                 "recalled_sessions": [sid for hit in recalled for sid, _ in hit.memory.provenance],
+                "past_chat_calls": past_calls,
+                "past_chat_sessions": past_sessions,
+                "turns_indexed": turns_indexed,
+                "turns_skipped": turns_skipped,
                 "write_seconds": round(write_seconds, 2),
                 "write_calls": write_after["calls"] - write_before["calls"],
                 "write_prompt_tokens": write_after["prompt_tokens"] - write_before["prompt_tokens"],
@@ -421,6 +468,8 @@ def run_system(system: str, llm: CountingLLM, question: dict, embed) -> dict:
         out["recalled_sessions"] = session_ids
     elif system == "S3":
         out = answer_s3(llm, question, sessions, embed)
+    elif system == "S4":
+        out = answer_s3(llm, question, sessions, embed, past_chats=True)
     else:
         raise ValueError(f"unknown system {system!r}")
     # Answer time only. S3's replay is the background write in the app,
@@ -457,10 +506,12 @@ def print_report(rows: list[dict], llm: CountingLLM | None = None) -> None:
             + " | ".join(cells)
             + f" | {s['mean_prompt_tokens']:.0f} | {s['median_seconds']:.1f} |"
         )
-    s3 = [r for r in rows if r["system"] == "S3"]
-    if s3:
+    for system in ("S3", "S4"):
+        s3 = [r for r in rows if r["system"] == system]
+        if not s3:
+            continue
         print(
-            f"\nS3 per question: {statistics.mean(r['memories'] for r in s3):.1f} memories stored, "
+            f"\n{system} per question: {statistics.mean(r['memories'] for r in s3):.1f} memories stored, "
             f"{statistics.mean(r['write_calls'] for r in s3):.1f} write calls, "
             f"{statistics.mean(r['write_prompt_tokens'] for r in s3):.0f} write prompt tokens, "
             f"{statistics.median(r['write_seconds'] for r in s3):.1f} s median to write (background in the app)."

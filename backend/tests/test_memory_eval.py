@@ -136,3 +136,27 @@ def test_summary_reports_answerable_and_abstention_apart(ev):
     assert summary["S3"]["by_type"]["multi-session"] == {"correct": 1, "n": 2}
     assert summary["S3"]["mean_prompt_tokens"] == pytest.approx(500 / 3)
     assert summary["S0"]["answerable"] == {"correct": 0, "n": 1}
+
+
+def test_a_session_is_indexed_turn_by_turn_under_its_first_question_as_title(ev):
+    session = ev.sessions_in_order(
+        _question(
+            "q", "multi-session",
+            sessions=[[
+                {"role": "user", "content": "Any posture   videos? " + "x" * 80},
+                {"role": "assistant", "content": "Try the Mayo Clinic one."},
+                {"role": "user", "content": "And for standing desks?"},
+                {"role": "assistant", "content": "Raise it to elbow height."},
+            ]],
+        )
+    )[0]
+
+    turns = ev.turns_to_index(session)
+
+    assert [(t["turn_index"], t["question"][:10], t["answer"]) for t in turns] == [
+        (0, "Any postur", "Try the Mayo Clinic one."),
+        (1, "And for st", "Raise it to elbow height."),
+    ]
+    # Titled the way the app titles a chat: its first question, spaces squeezed, 60 characters.
+    assert {t["title"] for t in turns} == {("Any posture videos? " + "x" * 80)[:60]}
+    assert all(t["conversation_id"] == "s0" and t["at"] == session.at for t in turns)
