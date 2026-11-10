@@ -269,6 +269,7 @@ class CountingLLM:
 
     client: object
     stage: str = "answer"
+    write_model: str = ANSWER_MODEL  # memory extraction and consolidation
     usage: dict = field(default_factory=dict)
 
     def _count(self, model: str, response) -> None:
@@ -279,9 +280,9 @@ class CountingLLM:
 
     def complete_json(self, messages: list[dict]) -> object:
         response = self.client.chat.completions.create(
-            model=ANSWER_MODEL, messages=messages, temperature=0, response_format={"type": "json_object"}
+            model=self.write_model, messages=messages, temperature=0, response_format={"type": "json_object"}
         )
-        self._count(ANSWER_MODEL, response)
+        self._count(self.write_model, response)
         try:
             return json.loads(response.choices[0].message.content or "")
         except json.JSONDecodeError:
@@ -296,6 +297,8 @@ class CountingLLM:
     def dollars(self) -> float:
         total = 0.0
         for (_, model), slot in self.usage.items():
+            if model not in PRICES:  # no price on file: its tokens are listed, not costed
+                continue
             price_in, price_out = PRICES[model]
             total += (slot["prompt_tokens"] * price_in + slot["completion_tokens"] * price_out) / 1_000_000
         return total
@@ -328,7 +331,7 @@ def answer_s3(llm: CountingLLM, question: dict, sessions: list[Session], embed) 
         with MemoryService(Path(home), 1, llm=llm, embed=embed, now=lambda: today) as memory:
             llm.stage = "write"
             write_start = time.perf_counter()
-            write_before = dict(llm.usage.get(("write", ANSWER_MODEL), {"calls": 0, "prompt_tokens": 0}))
+            write_before = dict(llm.usage.get(("write", llm.write_model), {"calls": 0, "prompt_tokens": 0}))
             ops: dict[str, int] = {}
             dropped = 0
             for session in sessions:
@@ -338,7 +341,7 @@ def answer_s3(llm: CountingLLM, question: dict, sessions: list[Session], embed) 
                 dropped += len(seen.dropped)
             memory.sweep()
             write_seconds = time.perf_counter() - write_start
-            write_after = llm.usage.get(("write", ANSWER_MODEL), {"calls": 0, "prompt_tokens": 0})
+            write_after = llm.usage.get(("write", llm.write_model), {"calls": 0, "prompt_tokens": 0})
             llm.stage = "answer"
 
             recalled: list = []
@@ -463,7 +466,9 @@ def print_report(rows: list[dict], llm: CountingLLM | None = None) -> None:
             f"{statistics.median(r['write_seconds'] for r in s3):.1f} s median to write (background in the app)."
         )
     if llm is not None and llm.usage:
-        print(f"\nThis run's model calls (not counting answers reused from a previous run): ${llm.dollars():.2f}")
+        unpriced = sorted({model for _, model in llm.usage if model not in PRICES})
+        note = f", not counting {', '.join(unpriced)} (no price on file)" if unpriced else ""
+        print(f"\nThis run's model calls (not counting answers reused from a previous run): ${llm.dollars():.2f}{note}")
         for (stage, model), slot in sorted(llm.usage.items()):
             print(f"  {stage:7s} {model:12s} {slot['calls']:5d} calls  {slot['prompt_tokens']:9d} in  {slot['completion_tokens']:7d} out")
 
@@ -474,11 +479,18 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--systems", default="S0,S1,S2,S3")
     parser.add_argument("--out", required=True, help="directory for answers.jsonl and sample_ids.json")
+    parser.add_argument(
+        "--write-model", default=ANSWER_MODEL,
+        help="model for S3's memory writes (extraction and consolidation); answers always use " + ANSWER_MODEL,
+    )
     parser.add_argument("--no-judge", action="store_true", help="answer only; correct is left unset")
     args = parser.parse_args()
 
     import memory_jobs
     import providers
+    from eval_key import use_eval_key
+
+    print("OpenAI key: " + ("the evaluation key" if use_eval_key() else "the app's (no evaluation key stored)"), flush=True)
 
     if not ORACLE_FILE.exists():
         sys.exit(f"{ORACLE_FILE} is missing. Download longmemeval_oracle.json from the xiaowu0162/longmemeval-cleaned dataset.")
@@ -490,7 +502,7 @@ def main() -> None:
     rows = [json.loads(line) for line in answers_path.read_text().splitlines()] if answers_path.exists() else []
     done = {(r["question_id"], r["system"]) for r in rows}
 
-    llm = CountingLLM(providers.openai_client(providers.OPENAI))
+    llm = CountingLLM(providers.openai_client(providers.OPENAI), write_model=args.write_model)
     with answers_path.open("a") as answers:
         for question in questions:
             for system in args.systems.split(","):

@@ -2224,6 +2224,9 @@ def main():
         # Search the local index and stop. No judge, no API key, no chat mode.
         run_retrieval_only(args)
         return
+    from eval_key import use_eval_key
+
+    print("OpenAI key: " + ("the evaluation key" if use_eval_key() else "the app's (no evaluation key stored)"), flush=True)
     modes = args.only.split(",")
     wanted = set(filter(None, args.cases.split(",")))
     judge_client = None if args.no_judge else providers.openai_client(providers.OPENAI)

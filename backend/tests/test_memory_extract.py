@@ -231,3 +231,11 @@ def test_a_summary_that_is_all_grades_keeps_the_previous_one():
 
 def test_the_prompt_rules_grades_out_of_the_summary_as_well():
     assert "grades, scores or deadlines, in memories or the summary" in extract.SYSTEM_PROMPT
+
+
+def test_the_prompt_asks_for_dated_events_and_the_students_specifics():
+    # Both found by the memory evaluation: "I read the March 15th issue
+    # today" was stored with no date, and three cocktail recipes kept only
+    # one of their citrus fruits.
+    assert "did or that happened" in extract.SYSTEM_PROMPT
+    assert "names, numbers, places" in extract.SYSTEM_PROMPT

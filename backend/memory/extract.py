@@ -52,6 +52,11 @@ explanations are not facts about the student.
 - Each memory is one sentence in the third person that makes sense on its own. Replace "it", \
 "that one" and relative dates with what they mean; use the conversation's date to turn \
 "yesterday" or "last Tuesday" into a date.
+- Something the student did or that happened ("I read it today", "we met on Friday", "I just \
+bought one") is an event: put its date in the sentence and in event_time. Don't turn it into an \
+undated fact.
+- Keep the specifics the student gave: names, numbers, places, and what something is now when \
+it has changed.
 - Skip facts about the course itself (dates, grading, policies, content): the course materials \
 already hold those. Skip small talk and anything the summary already records.
 - Never write down grades, scores or deadlines, in memories or the summary.
