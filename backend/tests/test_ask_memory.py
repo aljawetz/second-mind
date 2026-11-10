@@ -17,6 +17,7 @@ from types import SimpleNamespace
 import pytest
 from llama_index.vector_stores.lancedb.base import TableNotFoundError
 
+import chat
 import config
 import conversations
 import indexing
@@ -43,11 +44,13 @@ def _extraction(text, kind="fact", summary=""):  # no summary memory unless a te
 
 class FakeModel:
     """Stands in for llm.current_provider(): scripted streamed replies for /ask,
-    scripted JSON replies for the memory worker."""
+    scripted JSON replies for the memory worker. /ask's follow-up rewrite
+    (chat.standalone_query) also calls complete_json; it gets "no rewrite"
+    and is kept apart, so json_calls and json_replies stay the worker's."""
 
     def __init__(self):
         self.chat_replies, self.json_replies = [], []
-        self.chat_calls, self.json_calls = [], []
+        self.chat_calls, self.json_calls, self.rewrite_calls = [], [], []
 
     def stream_chat(self, messages, tools, require_tool=False):
         self.chat_calls.append([dict(m) for m in messages])
@@ -58,6 +61,9 @@ class FakeModel:
         yield TurnEnd()
 
     def complete_json(self, messages):
+        if messages[0]["content"] == chat.REWRITE_PROMPT:
+            self.rewrite_calls.append(messages)
+            return None
         self.json_calls.append(messages)
         reply = self.json_replies.pop(0)
         if isinstance(reply, Exception):

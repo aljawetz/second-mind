@@ -46,6 +46,10 @@ class LLMProvider(Protocol):
         require_tool: the model must call one of `tools` instead of answering."""
         ...
 
+    def complete_json(self, messages: list[dict]) -> object:
+        """One non-streaming reply in JSON, parsed; None if it isn't JSON."""
+        ...
+
 
 def current_provider() -> LLMProvider:
     """The provider the student chose at onboarding (providers.current())."""
