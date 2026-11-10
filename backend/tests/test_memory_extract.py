@@ -122,6 +122,10 @@ def test_entities_are_kept_only_as_non_empty_strings():
         "The student's GPA is 3.8.",
         "The student lost 10 points on Assignment 2.",
         "The student scored 18/20 on Lab 1.",
+        "The student got 85% in the course.",
+        "The student received 18/20.",
+        "The student earned 9 out of 10.",
+        "The student got an 88 for the final project.",
         "The student was graded harshly on the essay.",
         "Assignment 3 is due Friday.",
         "The student's deadline for the project is December 5.",
@@ -145,6 +149,12 @@ def test_grades_scores_and_deadlines_are_never_kept(text):
         "The student got a B-tree question wrong in the quiz.",
         "The student missed Class #5.",
         "The student wants examples in Java 21.",
+        # A number after "got" or "lost" is a grade only when it reads like
+        # one. Found by the memory evaluation: "lost 10 pounds" was dropped.
+        "The student has lost 10 pounds since joining the gym 3 months ago.",
+        "The student's team lost 2 members last week.",
+        "The student got 3 hours of sleep before the exam.",
+        "The student received 4 emails from the TA about A3.",
     ],
 )
 def test_ordinary_memories_get_past_the_grades_filter(text):
