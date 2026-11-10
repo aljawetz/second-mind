@@ -101,6 +101,14 @@ _GRADES_OR_DEADLINES = [
     ),
     re.compile(r"\b(due|overdue|deadlines?)\b", re.IGNORECASE),
 ]
+
+
+def mentions_grades_or_deadlines(text: str) -> bool:
+    """The rule above, for other things kept in the memory database (saved
+    chat turns, memory/past_chats.py)."""
+    return any(p.search(text) for p in _GRADES_OR_DEADLINES)
+
+
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
 _SPEAKERS = {"user": "Student", "assistant": "Assistant"}
