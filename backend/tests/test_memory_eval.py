@@ -160,3 +160,33 @@ def test_a_session_is_indexed_turn_by_turn_under_its_first_question_as_title(ev)
     # Titled the way the app titles a chat: its first question, spaces squeezed, 60 characters.
     assert {t["title"] for t in turns} == {("Any posture videos? " + "x" * 80)[:60]}
     assert all(t["conversation_id"] == "s0" and t["at"] == session.at for t in turns)
+
+
+# --- faster runs: written memories are reused, questions run side by side ------
+
+
+def test_the_same_question_model_and_prompts_reuse_one_set_of_written_memories(ev):
+    q = _question("q1", "multi-session")
+    key = ev.write_cache_key(q, "gpt-4o-mini", prompts="extract-v1|consolidate-v1")
+
+    assert key == ev.write_cache_key(q, "gpt-4o-mini", prompts="extract-v1|consolidate-v1")
+    assert key != ev.write_cache_key(_question("q2", "multi-session"), "gpt-4o-mini", prompts="extract-v1|consolidate-v1")
+    assert key != ev.write_cache_key(q, "gpt-5.4-mini", prompts="extract-v1|consolidate-v1")
+    # A changed extraction or consolidation prompt must write its memories afresh.
+    assert key != ev.write_cache_key(q, "gpt-4o-mini", prompts="extract-v2|consolidate-v1")
+
+
+def test_token_counts_from_questions_run_side_by_side_add_up(ev):
+    total = ev.CountingLLM(client=None)
+    a, b = ev.CountingLLM(client=None), ev.CountingLLM(client=None)
+    a.usage = {("answer", "gpt-4o-mini"): {"calls": 1, "prompt_tokens": 100, "completion_tokens": 10}}
+    b.usage = {
+        ("answer", "gpt-4o-mini"): {"calls": 2, "prompt_tokens": 50, "completion_tokens": 5},
+        ("judge", "gpt-4o"): {"calls": 1, "prompt_tokens": 7, "completion_tokens": 1},
+    }
+
+    total.add(a)
+    total.add(b)
+
+    assert total.usage[("answer", "gpt-4o-mini")] == {"calls": 3, "prompt_tokens": 150, "completion_tokens": 15}
+    assert total.usage[("judge", "gpt-4o")] == {"calls": 1, "prompt_tokens": 7, "completion_tokens": 1}

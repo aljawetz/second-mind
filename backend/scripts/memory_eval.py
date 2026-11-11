@@ -15,6 +15,8 @@ with the same neutral prompt and the same model:
   S4  S3 plus search over past chats (docs/specs/2026-11-10-past-chat-
       search-design.md): the sessions' turns are indexed as the app's
       worker indexes saved chats, and search_past_chats is offered too.
+  S5  S4 plus one automatic past-chat search for the question, shown up
+      front when anything matched. An experiment: not in the app.
 
 Answers are graded by gpt-4o with LongMemEval's own judge prompts.
 
@@ -31,16 +33,24 @@ Not a pytest test: it makes real, billed OpenAI calls. Run from backend/:
     uv run python3 scripts/memory_eval.py --per-type 1 --systems S0,S3 --no-judge --out /tmp/smoke
 
 The run resumes: an answer already in <out>/answers.jsonl is not asked again.
+Questions run 8 at a time (--workers). A question's memories are written
+once per write model and prompts and kept under .cache/memory_eval/writes,
+so runs that only change how memories are read reuse them (--no-write-cache
+to write afresh). Answer times are measured under that load, so compare
+them within a run, not with the app.
 """
 
 import argparse
+import hashlib
 import json
 import math
 import random
+import shutil
 import statistics
 import sys
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -49,6 +59,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 CACHE_DIR = Path(__file__).parent.parent / ".cache" / "longmemeval"
 ORACLE_FILE = CACHE_DIR / "longmemeval_oracle.json"
+# One question's memories, written once and reused by every run that only
+# changes how they are read (recall limit, tools, answering). Writing them
+# is most of a run's time and cost.
+WRITE_CACHE = CACHE_DIR.parent / "memory_eval" / "writes"
 
 ANSWER_MODEL = "gpt-4o-mini"
 # A stronger model than the one under test, and the one the LongMemEval paper reports.
@@ -58,6 +72,7 @@ S0_PAIRS = 6  # chat.HISTORY_TURNS
 S0_ANSWER_CHARS = 1500  # chat.HISTORY_ANSWER_CHARS
 S2_TOP_K = 10
 S3_RECALL_ROUNDS = 2
+RECALL_K = 5  # memories per recall, the app's (MemoryService.recall); --recall-k tries others
 # $ per 1M tokens (input, output), the same figures as ask_modes_eval.py.
 PRICES = {"gpt-4o-mini": (0.15, 0.60), "gpt-4o": (2.50, 10.00)}
 
@@ -314,6 +329,13 @@ class CountingLLM:
         self._count(model, response)
         return response.choices[0].message, response.usage.prompt_tokens
 
+    def add(self, other: "CountingLLM") -> None:
+        """Fold in the calls of a question that ran on its own counter."""
+        for key, slot in other.usage.items():
+            mine = self.usage.setdefault(key, {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0})
+            for field_name in mine:
+                mine[field_name] += slot[field_name]
+
     def dollars(self) -> float:
         total = 0.0
         for (_, model), slot in self.usage.items():
@@ -339,30 +361,81 @@ def answer_from_context(llm: CountingLLM, question: dict, context: str) -> dict:
     return {"answer": message.content or "", "prompt_tokens": prompt_tokens}
 
 
-def answer_s3(llm: CountingLLM, question: dict, sessions: list[Session], embed, past_chats: bool = False) -> dict:
-    """Replay the history into a fresh memory store, then answer the way
-    chat.answer uses memory: profile, one automatic recall, recall_memory.
-    past_chats (S4): the sessions' turns are also indexed, as the worker
-    does in the app, and search_past_chats is offered beside recall_memory."""
-    import chat
+def write_cache_key(question: dict, write_model: str, prompts: str | None = None) -> str:
+    """Names one question's written memories. The model and both write
+    prompts are part of it, so changing any of them writes afresh."""
+    if prompts is None:
+        from memory import consolidate, extract
+
+        prompts = extract.SYSTEM_PROMPT + "|" + consolidate.SYSTEM_PROMPT
+    payload = json.dumps([question["question_id"], write_model, prompts])
+    return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
+
+def written_memories(llm: CountingLLM, question: dict, sessions: list[Session], embed, use_cache: bool) -> tuple[Path, dict]:
+    """The memory.db left after replaying this question's history, and what
+    writing it took. Replayed through MemoryService.observe at the sessions'
+    real dates, then swept at the question's date. Written once per
+    (question, write model, prompts) and kept under WRITE_CACHE."""
     from memory import MemoryService
-    from memory.recall import format_hits
+
+    folder = WRITE_CACHE / write_cache_key(question, llm.write_model)
+    db, stats_file = folder / "memory.db", folder / "stats.json"
+    if use_cache and db.exists() and stats_file.exists():
+        return db, {**json.loads(stats_file.read_text()), "write_reused": True}
 
     today = parse_date(question["question_date"])
+    llm.stage = "write"
+    start = time.perf_counter()
+    before = dict(llm.usage.get(("write", llm.write_model), {"calls": 0, "prompt_tokens": 0}))
+    ops: dict[str, int] = {}
+    dropped = 0
     with tempfile.TemporaryDirectory() as home:
         with MemoryService(Path(home), 1, llm=llm, embed=embed, now=lambda: today) as memory:
-            llm.stage = "write"
-            write_start = time.perf_counter()
-            write_before = dict(llm.usage.get(("write", llm.write_model), {"calls": 0, "prompt_tokens": 0}))
-            ops: dict[str, int] = {}
-            dropped = 0
             for session in sessions:
                 seen = memory.observe(session.turns, conversation_id=session.session_id, turn_index=0, at=session.at)
                 for decision in seen.decisions:
                     ops[decision.action] = ops.get(decision.action, 0) + 1
                 dropped += len(seen.dropped)
             memory.sweep()
-            write_seconds = time.perf_counter() - write_start
+        # Closed, so the file is whole (no WAL left behind) and safe to copy.
+        after = llm.usage.get(("write", llm.write_model), {"calls": 0, "prompt_tokens": 0})
+        stats = {
+            "write_seconds": round(time.perf_counter() - start, 2),
+            "write_calls": after["calls"] - before["calls"],
+            "write_prompt_tokens": after["prompt_tokens"] - before["prompt_tokens"],
+            "ops": ops,
+            "dropped": dropped,
+        }
+        folder.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(Path(home) / "courses" / "1" / "memory.db", db)
+        stats_file.write_text(json.dumps(stats))
+    llm.stage = "answer"
+    return db, {**stats, "write_reused": False}
+
+
+def answer_s3(
+    llm: CountingLLM, question: dict, sessions: list[Session], embed, past_chats: bool = False, auto_past: bool = False,
+    use_cache: bool = True,
+) -> dict:
+    """Replay the history into a fresh memory store, then answer the way
+    chat.answer uses memory: profile, one automatic recall, recall_memory.
+    past_chats (S4): the sessions' turns are also indexed, as the worker
+    does in the app, and search_past_chats is offered beside recall_memory.
+    auto_past (S5): the question is also searched in past chats up front,
+    as it already is in memory, and shown when anything matched."""
+    import chat
+    from memory import MemoryService
+    from memory.recall import format_hits
+
+    today = parse_date(question["question_date"])
+    written_db, written = written_memories(llm, question, sessions, embed, use_cache)
+    with tempfile.TemporaryDirectory() as home:
+        # A private copy: answering marks memories as used and indexes turns.
+        target = Path(home) / "courses" / "1" / "memory.db"
+        target.parent.mkdir(parents=True)
+        shutil.copyfile(written_db, target)
+        with MemoryService(Path(home), 1, llm=llm, embed=embed, now=lambda: today) as memory:
             turns_indexed = turns_skipped = 0
             if past_chats:
                 from memory.past_chats import format_turns
@@ -375,7 +448,6 @@ def answer_s3(llm: CountingLLM, question: dict, sessions: list[Session], embed, 
                             turns_skipped += 1  # the grades-and-deadlines filter
             past_calls = 0
             past_sessions: list[str] = []
-            write_after = llm.usage.get(("write", llm.write_model), {"calls": 0, "prompt_tokens": 0})
             llm.stage = "answer"
 
             recalled: list = []
@@ -389,7 +461,13 @@ def answer_s3(llm: CountingLLM, question: dict, sessions: list[Session], embed, 
                 return text
 
             profile = memory.profile_block()
-            context = profile + "\n\nRecalled for this question:\n" + show(memory.recall(question["question"]))
+            context = profile + "\n\nRecalled for this question:\n" + show(memory.recall(question["question"], k=RECALL_K))
+            auto_turns = memory.search_past_chats(question["question"]) if auto_past else []
+            if auto_turns:
+                past_sessions += [t.conversation_id for t in auto_turns]
+                context += "\n\nFound in earlier conversations for this question:\n" + format_turns(
+                    auto_turns, query=question["question"]
+                )
             messages = [
                 {
                     "role": "system",
@@ -421,7 +499,7 @@ def answer_s3(llm: CountingLLM, question: dict, sessions: list[Session], embed, 
                         past_calls += 1
                         past_sessions += [t.conversation_id for t in found]
                     else:
-                        result = show(memory.recall(query, include_history=args.get("include_history") is True))
+                        result = show(memory.recall(query, k=RECALL_K, include_history=args.get("include_history") is True))
                     messages.append({"role": "tool", "tool_call_id": call.id, "content": result})
             return {
                 "answer": message.content or "",
@@ -440,22 +518,25 @@ def answer_s3(llm: CountingLLM, question: dict, sessions: list[Session], embed, 
                     }
                     for m in memory.list(include_inactive=True)
                 ],
-                "ops": ops,
-                "dropped": dropped,
+                "ops": written["ops"],
+                "dropped": written["dropped"],
                 "profile": profile,
                 "recalled": [hit.memory.text for hit in recalled],
                 "recalled_sessions": [sid for hit in recalled for sid, _ in hit.memory.provenance],
                 "past_chat_calls": past_calls,
+                "auto_past_turns": len(auto_turns),
                 "past_chat_sessions": past_sessions,
                 "turns_indexed": turns_indexed,
                 "turns_skipped": turns_skipped,
-                "write_seconds": round(write_seconds, 2),
-                "write_calls": write_after["calls"] - write_before["calls"],
-                "write_prompt_tokens": write_after["prompt_tokens"] - write_before["prompt_tokens"],
+                # What writing took when it was done, also when reused from the cache.
+                "write_seconds": written["write_seconds"],
+                "write_calls": written["write_calls"],
+                "write_prompt_tokens": written["write_prompt_tokens"],
+                "write_reused": written["write_reused"],
             }
 
 
-def run_system(system: str, llm: CountingLLM, question: dict, embed) -> dict:
+def run_system(system: str, llm: CountingLLM, question: dict, embed, use_cache: bool = True) -> dict:
     sessions = sessions_in_order(question)
     start = time.perf_counter()
     if system == "S0":
@@ -467,14 +548,16 @@ def run_system(system: str, llm: CountingLLM, question: dict, embed) -> dict:
         out = answer_from_context(llm, question, context)
         out["recalled_sessions"] = session_ids
     elif system == "S3":
-        out = answer_s3(llm, question, sessions, embed)
+        out = answer_s3(llm, question, sessions, embed, use_cache=use_cache)
     elif system == "S4":
-        out = answer_s3(llm, question, sessions, embed, past_chats=True)
+        out = answer_s3(llm, question, sessions, embed, past_chats=True, use_cache=use_cache)
+    elif system == "S5":
+        out = answer_s3(llm, question, sessions, embed, past_chats=True, auto_past=True, use_cache=use_cache)
     else:
         raise ValueError(f"unknown system {system!r}")
     # Answer time only. S3's replay is the background write in the app,
     # so it is reported apart (write_seconds).
-    out["seconds"] = round(time.perf_counter() - start - out.get("write_seconds", 0), 2)
+    out["seconds"] = round(time.perf_counter() - start - (0 if out.get("write_reused", True) else out["write_seconds"]), 2)
     return out
 
 
@@ -506,7 +589,7 @@ def print_report(rows: list[dict], llm: CountingLLM | None = None) -> None:
             + " | ".join(cells)
             + f" | {s['mean_prompt_tokens']:.0f} | {s['median_seconds']:.1f} |"
         )
-    for system in ("S3", "S4"):
+    for system in ("S3", "S4", "S5"):
         s3 = [r for r in rows if r["system"] == system]
         if not s3:
             continue
@@ -525,14 +608,22 @@ def print_report(rows: list[dict], llm: CountingLLM | None = None) -> None:
 
 
 def main() -> None:
+    global RECALL_K
     parser = argparse.ArgumentParser()
     parser.add_argument("--per-type", type=int, default=5, help="questions sampled per question type")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--recall-k", type=int, default=RECALL_K, help="memories returned per recall (S3 to S5)")
+    parser.add_argument("--types", default="", help="comma-separated question types to keep; default all")
     parser.add_argument("--systems", default="S0,S1,S2,S3")
     parser.add_argument("--out", required=True, help="directory for answers.jsonl and sample_ids.json")
     parser.add_argument(
         "--write-model", default=ANSWER_MODEL,
         help="model for S3's memory writes (extraction and consolidation); answers always use " + ANSWER_MODEL,
+    )
+    parser.add_argument("--workers", type=int, default=8, help="questions run at the same time")
+    parser.add_argument(
+        "--no-write-cache", action="store_true",
+        help="write every question's memories afresh (for repeated runs that measure run-to-run variation)",
     )
     parser.add_argument("--no-judge", action="store_true", help="answer only; correct is left unset")
     args = parser.parse_args()
@@ -545,7 +636,10 @@ def main() -> None:
 
     if not ORACLE_FILE.exists():
         sys.exit(f"{ORACLE_FILE} is missing. Download longmemeval_oracle.json from the xiaowu0162/longmemeval-cleaned dataset.")
-    questions = sample_questions(json.loads(ORACLE_FILE.read_text()), args.per_type, args.seed)
+    RECALL_K = args.recall_k
+    wanted_types = set(filter(None, args.types.split(",")))
+    pool = [q for q in json.loads(ORACLE_FILE.read_text()) if not wanted_types or q["question_type"] in wanted_types]
+    questions = sample_questions(pool, args.per_type, args.seed)
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "sample_ids.json").write_text(json.dumps([q["question_id"] for q in questions], indent=2))
@@ -553,34 +647,50 @@ def main() -> None:
     rows = [json.loads(line) for line in answers_path.read_text().splitlines()] if answers_path.exists() else []
     done = {(r["question_id"], r["system"]) for r in rows}
 
-    llm = CountingLLM(providers.openai_client(providers.OPENAI), write_model=args.write_model)
-    with answers_path.open("a") as answers:
-        for question in questions:
-            for system in args.systems.split(","):
-                if (question["question_id"], system) in done:
-                    continue
-                try:
-                    out = run_system(system, llm, question, memory_jobs.embed)
-                except Exception as e:  # one failed question must not lose the run
-                    print(f"[{question['question_id']} {system}] failed: {type(e).__name__}: {e}", flush=True)
-                    continue
-                row = {
-                    "question_id": question["question_id"],
-                    "question_type": question["question_type"],
-                    "abstention": is_abstention(question),
-                    "system": system,
-                    "question": question["question"],
-                    "gold": question["answer"],
-                    "evidence_sessions": question["answer_session_ids"],
-                    "correct": None,
-                    **out,
-                }
-                if not args.no_judge:
-                    row["correct"], row["judge_reply"] = judge(llm, question, row["answer"])
+    client = providers.openai_client(providers.OPENAI)
+    llm = CountingLLM(client, write_model=args.write_model)  # the run's total
+    systems = args.systems.split(",")
+
+    def run_question(question: dict) -> tuple[list[dict], CountingLLM]:
+        """Every wanted system for one question, on a counter of its own:
+        questions run side by side, and a shared counter's stage would mix."""
+        mine = CountingLLM(client, write_model=args.write_model)
+        out_rows = []
+        for system in systems:
+            if (question["question_id"], system) in done:
+                continue
+            try:
+                out = run_system(system, mine, question, memory_jobs.embed, use_cache=not args.no_write_cache)
+            except Exception as e:  # one failed question must not lose the run
+                print(f"[{question['question_id']} {system}] failed: {type(e).__name__}: {e}", flush=True)
+                continue
+            row = {
+                "question_id": question["question_id"],
+                "question_type": question["question_type"],
+                "abstention": is_abstention(question),
+                "system": system,
+                "question": question["question"],
+                "gold": question["answer"],
+                "evidence_sessions": question["answer_session_ids"],
+                "correct": None,
+                **out,
+            }
+            if not args.no_judge:
+                row["correct"], row["judge_reply"] = judge(mine, question, row["answer"])
+            out_rows.append(row)
+        return out_rows, mine
+
+    # Systems of one question stay in order on one worker, so its memories
+    # are written once and then reused, not written twice at the same time.
+    with answers_path.open("a") as answers, ThreadPoolExecutor(max_workers=args.workers) as pool:
+        for future in as_completed([pool.submit(run_question, q) for q in questions]):
+            new_rows, used = future.result()
+            llm.add(used)
+            for row in new_rows:
                 answers.write(json.dumps(row) + "\n")
-                answers.flush()
                 rows.append(row)
-                print(f"[{row['question_id']} {system}] {row['seconds']}s correct={row['correct']}", flush=True)
+                print(f"[{row['question_id']} {row['system']}] {row['seconds']}s correct={row['correct']}", flush=True)
+            answers.flush()
 
     wanted = {q["question_id"] for q in questions}
     judged = [r for r in rows if r["question_id"] in wanted and r["correct"] is not None]
