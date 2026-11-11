@@ -1,6 +1,6 @@
 # RAG Gaps from the "Building RAG Agents with LLMs" Course
 
-**Status:** Task 1 built and measured on a new 26-turn set (branch `query-rewrite-follow-ups`); PR not opened yet. Tasks 2 to 8 not started.
+**Status:** Task 1 merged in PR #55. Task 2 built and verified on branch `chat-answer-feedback`; see its [implementation and evidence](2026-11-10-answer-feedback.md). Tasks 3 to 8 not started.
 
 **Goal:** Close the eight gaps found by comparing Second Mind with NVIDIA's "Building RAG Agents with LLMs" notebooks (`docs/RAG with LLMs/`, gitignored). Most of what the course teaches is already here and often goes further (hybrid search with rank fusion, a cross-encoder reranker, the memory layer, the ask-modes eval). These eight are what's missing or unfinished.
 
@@ -47,11 +47,13 @@
 - **Left:** open the PR. N7.2 goes to task 3 as a search miss.
 - **Proof:** the before/after table, and the PR.
 
-### 2. Thumbs up/down on chat answers (beta)
+### 2. Thumbs up/down on chat answers (beta) — built, verified
 
 - **Why:** the course's release advice is to collect feedback before rollout. The app has no way to flag an answer. Sprint 9's outside tester can flag bad answers during the test, which feeds the independent-test report and task 6.
 - **Build:** up and down buttons under each finished answer, with an optional short note. Stored on the saved turn in the local conversation file, so nothing leaves the computer. Add a route to list flagged turns for a course.
 - **Proof:** tests for saving and listing; screenshots of an answer with each state.
+- **Built (2026-11-10):** Helpful / Not helpful buttons, removable ratings, and optional notes up to 500 characters. Feedback stays on the saved turn locally and is restored when reopening the chat. `GET /courses/{course_id}/feedback` lists thumbs-down turns for review. The final stream event identifies the saved turn, so failed answers cannot shift feedback onto another answer.
+- **Verified:** 593 backend tests passed (9 skipped), 5 frontend interaction tests passed, production build passed. [Screenshots and verification scope](../evaluations/answer-feedback/README.md).
 
 ### 3. Keep graded exam and quiz text out of the index, and drop junk chunks (beta)
 

@@ -133,7 +133,7 @@ def test_a_new_chat_gets_an_id_and_its_turn_is_saved(app):
 
     cid = events[0]["conversation_id"]
     assert re.fullmatch(r"c-[0-9a-f]{12}", cid)
-    assert events[-1] == {"done": True}
+    assert events[-1] == {"done": True, "turn_index": 0}
     [turn] = conversations.get_conversation(app.home, COURSE, cid)["turns"]
     assert (turn["question"], turn["answer"], turn["citations"], turn["grounded"]) == (
         "When is the midterm?",
@@ -408,7 +408,7 @@ def test_a_memory_failure_never_reaches_the_answer(app):
 
     status, events = _ask(app, "I'm on team 4.")
 
-    assert status == 200 and events[-1] == {"done": True} and not any("error" in e for e in events)
+    assert status == 200 and events[-1] == {"done": True, "turn_index": 0} and not any("error" in e for e in events)
     assert main.MEMORY_WORKER.wait_idle(10)
     c = conversations.get_conversation(app.home, COURSE, events[0]["conversation_id"])
     assert c["memory_processed_upto"] == 0  # read again after the next restart
@@ -503,3 +503,79 @@ def test_forgetting_a_memory_clears_its_chats_running_summary(app):
 
     assert _json(app, "GET", f"/courses/{COURSE}/memories?include_inactive=1") == (200, {"memories": []})
     assert conversations.get_conversation(app.home, COURSE, cid)["summary"] == ""
+
+
+def _feedback_path(cid, index=0, course=COURSE):
+    return f"/courses/{course}/conversations/{cid}/turns/{index}/feedback"
+
+
+def test_feedback_http_save_reload_replace_clear_and_no_model_calls(app):
+    cid = _say(app, "Question", answer="Answer")[0]["conversation_id"]
+    model_calls = (len(app.model.chat_calls), len(app.model.json_calls))
+    status, body = _json(app, "POST", _feedback_path(cid), {"rating": "up", "note": "x" * 500})
+    assert status == 200
+    feedback = body["feedback"]
+    assert feedback["rating"] == "up" and feedback["note"] == "x" * 500
+    status, saved = _json(app, "GET", f"/courses/{COURSE}/conversations/{cid}")
+    assert status == 200 and saved["turns"][0]["feedback"] == feedback
+    assert _json(app, "GET", f"/courses/{COURSE}/feedback") == (200, {"turns": []})
+    status, body = _json(app, "POST", _feedback_path(cid), {"rating": "down"})
+    assert status == 200 and body["feedback"]["note"] == ""
+    status, review = _json(app, "GET", f"/courses/{COURSE}/feedback")
+    assert status == 200
+    assert review["turns"] == [{**saved["turns"][0], "feedback": body["feedback"], "conversation_id": cid, "title": "Question", "turn_index": 0}]
+    assert _json(app, "POST", _feedback_path(cid), {"rating": None}) == (200, {"feedback": None})
+    assert "feedback" not in _json(app, "GET", f"/courses/{COURSE}/conversations/{cid}")[1]["turns"][0]
+    assert _json(app, "GET", f"/courses/{COURSE}/feedback") == (200, {"turns": []})
+    assert (len(app.model.chat_calls), len(app.model.json_calls)) == model_calls
+
+
+@pytest.mark.parametrize("body", [[], "down", 1, {}, {"note": "missing rating"}, {"rating": "other"}, {"rating": True}, {"rating": []}, {"rating": {}}, {"rating": "up", "note": None}, {"rating": "up", "note": 4}, {"rating": "down", "note": "x" * 501}, {"rating": "up", "extra": True}])
+def test_feedback_http_rejects_invalid_bodies_without_writing(app, body):
+    conversations.append_turn(app.home, COURSE, "c-test", {"question": "Q", "answer": "A", "asked_at": "2026-11-10T00:00:00Z", "citations": [], "grounded": False})
+    status, response = _json(app, "POST", _feedback_path("c-test"), body)
+    assert status == 400 and response["error"]["code"] == "bad_request"
+    assert "feedback" not in conversations.get_conversation(app.home, COURSE, "c-test")["turns"][0]
+
+
+@pytest.mark.parametrize("raw", ["null", "{", ""])
+def test_feedback_http_rejects_invalid_or_missing_json(app, raw):
+    conn = http.client.HTTPConnection("127.0.0.1", app.port, timeout=10)
+    conn.request("POST", _feedback_path("c-test"), raw)
+    response = conn.getresponse()
+    assert response.status == 400
+    assert json.loads(response.read())["error"]["code"] == "bad_request"
+    conn.close()
+
+
+@pytest.mark.parametrize("course,cid,index", [(COURSE + 1, "c-test", 0), (COURSE, "c-missing", 0), (COURSE, "c-test", 1), (COURSE, "c-test", -1)])
+def test_feedback_http_missing_targets_return_404(app, course, cid, index):
+    conversations.append_turn(app.home, COURSE, "c-test", {"question": "Q", "answer": "A", "asked_at": "2026-11-10T00:00:00Z"})
+    status, body = _json(app, "POST", _feedback_path(cid, index, course), {"rating": "down"})
+    assert status == 404 and body["error"]["code"] == "not_found"
+    assert _json(app, "GET", f"/courses/{COURSE + 1}/feedback")[0] == 404
+
+
+def test_stream_indices_count_saved_turns_and_exclude_failed_answers(app):
+    events = _say(app, "First")
+    cid = events[0]["conversation_id"]
+    assert events[-1] == {"done": True, "turn_index": 0}
+    assert all("turn_index" not in e for e in events[:-1])
+    app.model.chat_replies.append(["Partial", ConnectionError("dropped")])
+    _, failed = _ask(app, "Failed", conversation_id=cid)
+    assert failed[-1] == {"done": True}
+    assert all("turn_index" not in e for e in failed)
+    events = _say(app, "Third", conversation_id=cid)
+    assert events[-1] == {"done": True, "turn_index": 1}
+    assert [t["question"] for t in conversations.get_conversation(app.home, COURSE, cid)["turns"]] == ["First", "Third"]
+
+
+def test_saved_feedback_is_not_sent_to_chat_or_memory_models(app):
+    cid = _say(app, "First", answer="Answer")[0]["conversation_id"]
+    assert _json(app, "POST", _feedback_path(cid), {"rating": "down", "note": "PRIVATE FEEDBACK NOTE"})[0] == 200
+    conversations.set_memory_progress(app.home, COURSE, cid, processed_upto=0, summary="")
+    app.model.json_replies.append({"memories": [], "summary": ""})
+    _say(app, "Next", conversation_id=cid)
+    sent = json.dumps([app.model.chat_calls, app.model.json_calls, app.model.rewrite_calls])
+    assert "PRIVATE FEEDBACK NOTE" not in sent
+    assert '"feedback"' not in sent

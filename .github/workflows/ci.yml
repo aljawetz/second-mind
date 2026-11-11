@@ -113,6 +113,10 @@ jobs:
         working-directory: app
         run: npx tsc --noEmit
 
+      - name: Test answer feedback
+        working-directory: app
+        run: npm test
+
       - name: Build
         working-directory: app
         run: npm run build

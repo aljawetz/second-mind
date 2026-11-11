@@ -15,6 +15,7 @@ import json
 import os
 import threading
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 TITLE_CHARS = 60
@@ -51,18 +52,19 @@ def exists(sm_home: Path, course_id: int, cid: str) -> bool:
     return _path(sm_home, course_id, cid).exists()
 
 
-def append_turn(sm_home: Path, course_id: int, cid: str, turn: dict, *, create_if_missing: bool = True) -> bool:
+def append_turn(sm_home: Path, course_id: int, cid: str, turn: dict, *, create_if_missing: bool = True) -> int | None:
     """turn: {question, answer, citations, grounded, asked_at}. The first
     turn creates the conversation, titled by its question.
 
     When create_if_missing is False, a missing file means the chat was deleted
-    mid-request and the turn is dropped (same rule as set_memory_progress)."""
+    mid-request and the turn is dropped (same rule as set_memory_progress).
+    Returns the saved zero-based index, or None when dropped."""
     path = _path(sm_home, course_id, cid)
     with _lock:
         if path.exists():
             data = json.loads(path.read_text(encoding="utf-8"))
         elif not create_if_missing:
-            return False
+            return None
         else:
             data = {
                 "conversation_id": cid,
@@ -72,10 +74,63 @@ def append_turn(sm_home: Path, course_id: int, cid: str, turn: dict, *, create_i
                 "summary": "",
                 "turns": [],
             }
+        turn_index = len(data["turns"])
         data["turns"].append(turn)
         data["updated_at"] = turn["asked_at"]
         _write(path, data)
-    return True
+    return turn_index
+
+
+def set_feedback(
+    sm_home: Path, course_id: int, cid: str, turn_index: int,
+    rating: str | None, note: str = "",
+) -> dict | None:
+    """Replace or clear a saved turn's feedback without changing chat recency.
+
+    Missing chats/turns raise KeyError; invalid feedback raises ValueError.
+    Shares the append/memory lock so none of those writes lose one another.
+    """
+    if rating not in ("up", "down", None):
+        raise ValueError("rating must be up, down, or null")
+    if not isinstance(note, str) or len(note) > 500:
+        raise ValueError("note must be a string of at most 500 characters")
+    path = _path(sm_home, course_id, cid)
+    with _lock:
+        if not path.exists():
+            raise KeyError(cid)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not 0 <= turn_index < len(data["turns"]):
+            raise KeyError(turn_index)
+        turn = data["turns"][turn_index]
+        feedback = None
+        if rating is None:
+            turn.pop("feedback", None)
+        else:
+            feedback = {
+                "rating": rating,
+                "note": note,
+                "updated_at": datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z"),
+            }
+            turn["feedback"] = feedback
+        _write(path, data)
+    return feedback
+
+
+def list_feedback(sm_home: Path, course_id: int) -> list[dict]:
+    """Thumbs-down turns for local review, newest feedback first."""
+    turns = []
+    with _lock:
+        for path in _dir(sm_home, course_id).glob("*.json"):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            for turn_index, turn in enumerate(data["turns"]):
+                if (turn.get("feedback") or {}).get("rating") == "down":
+                    turns.append({
+                        **turn,
+                        "conversation_id": data["conversation_id"],
+                        "title": data["title"],
+                        "turn_index": turn_index,
+                    })
+    return sorted(turns, key=lambda t: t["feedback"]["updated_at"], reverse=True)
 
 
 def get_conversation(sm_home: Path, course_id: int, cid: str) -> dict | None:
