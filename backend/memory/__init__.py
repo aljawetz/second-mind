@@ -103,7 +103,7 @@ class MemoryService:
             )
         return ObserveResult(extraction.summary, decisions, extraction.dropped)
 
-    def recall(self, query: str, k: int = 5, include_history: bool = False) -> list[Hit]:
+    def recall(self, query: str, k: int = recall.TOP_K, include_history: bool = False) -> list[Hit]:
         return recall.recall(
             query, store=self._store, embed=self._embed, now=self._now(), k=k, include_history=include_history,
             skip_conversation=self._conversation_id,
