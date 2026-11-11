@@ -1,6 +1,6 @@
 # RAG Gaps from the "Building RAG Agents with LLMs" Course
 
-**Status:** Task 1 built and measured on a new 26-turn set (branch `query-rewrite-follow-ups`); PR not opened yet. Tasks 2 to 8 not started.
+**Status (2026-11-10):** Task 1 is merged (PR #55). Task 5 is built as far as the development sample and is in review (PR #56), together with what it led to: two memory fixes, search over past chats, a recall limit of 10 and `gpt-5-mini` as the default model. Tasks 2, 3, 4, 6, 7 and 8 are not started.
 
 **Goal:** Close the eight gaps found by comparing Second Mind with NVIDIA's "Building RAG Agents with LLMs" notebooks (`docs/RAG with LLMs/`, gitignored). Most of what the course teaches is already here and often goes further (hybrid search with rank fusion, a cross-encoder reranker, the memory layer, the ask-modes eval). These eight are what's missing or unfinished.
 
@@ -16,7 +16,7 @@
 
 ## Tasks
 
-### 1. Rewrite follow-up questions before the first search (beta) — built, measured
+### 1. Rewrite follow-up questions before the first search (beta) — done, merged in PR #55
 
 - **Why:** a follow-up searched as typed ("and the final?") found its fact on 8 of 15 turns. A hand-written stand-alone version found 12 of 14 (Sprint 8 report §1.3). Live chat graded 7 of 16 follow-up turns bad.
 - **Built:** `chat.standalone_query()` makes one JSON call on follow-ups only. The rewritten question is the first search. Any failure falls back to the student's words. 10 new tests; all 554 backend tests pass.
@@ -44,7 +44,7 @@
 
   The 5 "bad" grades without the forced search were read by hand: 4 answers state the fact correctly (main's near-identical answers were graded OK or bad too), and 1 (N7.2, "interview two practitioners") is missed by every version because no search returns that chunk.
 - **Decision:** ship the rewrite with the forced search off. It stays on when the rewrite call fails, and `chat.FOLLOW_UP_MUST_SEARCH = True` brings the old behavior back for comparisons.
-- **Left:** open the PR. N7.2 goes to task 3 as a search miss.
+- **Left:** nothing. N7.2 goes to task 3 as a search miss.
 - **Proof:** the before/after table, and the PR.
 
 ### 2. Thumbs up/down on chat answers (beta)
@@ -70,7 +70,7 @@
 - **Build:** on a parse failure or a reply of the wrong shape, one retry that adds "Return exactly one valid JSON object." Count retries in the log.
 - **Proof:** tests for retry-then-success and retry-then-give-up.
 
-### 5. Build the memory evaluation (final)
+### 5. Build the memory evaluation (final) — development sample done, in PR #56
 
 - **Why:** the LongMemEval harness in `docs/specs/2026-09-25-agent-memory-evaluation-design.md` was never built, so the memory layer has no measured numbers.
 - **Build:**
@@ -79,7 +79,24 @@
     - `recall_memory` called when the answer needs it
     - "forget that" deleting the right memory
     - "what was it before?" using `include_history`
-- **Proof:** a report in `docs/evaluations/` with accuracy per question type and cost per turn.
+- **Built (2026-11-10):** `backend/scripts/memory_eval.py`, on LongMemEval's oracle split, graded by `gpt-4o` with the benchmark's own prompts.
+  - It compares the shipped chat's window (S0), the whole history (S1), search over raw turns (S2), the memory layer (S3) and the memory layer with past-chat search (S4).
+  - It writes each question's memories once and runs 8 questions at a time: 60 questions in about 50 seconds for $0.04 after the first run.
+- **First result:** on 30 questions the memory layer scored lowest (14 of 27, against 23 for raw-turn search), at about a sixth of the prompt tokens.
+- **What the misses led to,** all in PR #56:
+  - The no-grades filter was dropping "lost 10 pounds". Fixed.
+  - The extraction prompt now asks for dated events and the student's specifics.
+  - **Search over past chats** (`search_past_chats`, design in `docs/specs/2026-11-10-past-chat-search-design.md`). Memory never stores what the assistant said, so "which video did you recommend?" scored 0 to 2 of 10; with the search it scores about 6.
+  - **Recall returns 10 memories, not 5.** Counting questions need every matching memory: 35.2 against 32.5 of 54 on multi-chat questions, four runs each.
+  - **`gpt-5-mini` is the default OpenAI model.** It scored 49.5 to 51.5 of 58 against 42 to 43 for `gpt-4o-mini`. In course chat it is about four times slower (11.7 s a turn against 2.6 s), and a gain there is not established.
+- **Tried and dropped:** writing memories with a stronger model (no difference), and an automatic past-chat search (one more question right for twice the tokens).
+- **What the numbers are worth:** a single run on 60 questions varies by up to four questions. The recall-limit and model results use four runs each; the earlier steps are single runs and show direction only.
+- **Left:**
+  1. The full benchmark, where each history has about 50 sessions. The oracle split used so far holds only the sessions with the answer.
+  2. The student-memory set and the tool-sequence checks above. Nothing coursework-specific is measured yet.
+  3. Whether the chat follows the "check a past answer's course fact with course search" rule.
+  4. The report in `docs/evaluations/`. The results so far are in PR #56's description and commit messages.
+- **Proof so far:** PR #56.
 
 ### 6. A grader you can trust (final)
 
