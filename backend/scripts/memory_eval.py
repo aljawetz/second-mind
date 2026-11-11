@@ -74,7 +74,12 @@ S2_TOP_K = 10
 S3_RECALL_ROUNDS = 2
 RECALL_K = 5  # memories per recall, the app's (MemoryService.recall); --recall-k tries others
 # $ per 1M tokens (input, output), the same figures as ask_modes_eval.py.
-PRICES = {"gpt-4o-mini": (0.15, 0.60), "gpt-4o": (2.50, 10.00)}
+# gpt-5.4-mini from OpenAI's model page (developers.openai.com/docs/models/gpt-5.4-mini), read 2026-11-10.
+# gpt-5-mini: OpenAI's list price as of its August 2025 release; check before budgeting.
+PRICES = {"gpt-4o-mini": (0.15, 0.60), "gpt-4o": (2.50, 10.00), "gpt-5.4-mini": (0.75, 4.50), "gpt-5-mini": (0.25, 2.00)}
+# Reasoning models that only accept the default temperature. They reason
+# before answering by default (hidden tokens, billed as output).
+NO_TEMPERATURE = {"gpt-5", "gpt-5-mini", "gpt-5-nano"}
 
 PAST_CHATS_NOTE = (
     "\n\nsearch_past_chats looks through what you and the user said in those conversations, word for word. "
@@ -305,7 +310,9 @@ class CountingLLM:
     client: object
     stage: str = "answer"
     write_model: str = ANSWER_MODEL  # memory extraction and consolidation
+    answer_model: str = ANSWER_MODEL  # the app's default; --answer-model tries others
     usage: dict = field(default_factory=dict)
+    reasoning_tokens: int = 0  # hidden reasoning, already inside the completion tokens
 
     def _count(self, model: str, response) -> None:
         slot = self.usage.setdefault((self.stage, model), {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0})
@@ -323,10 +330,15 @@ class CountingLLM:
         except json.JSONDecodeError:
             return None
 
-    def chat(self, messages: list[dict], tools: list[dict] | None = None, model: str = ANSWER_MODEL, temperature: float = ANSWER_TEMPERATURE):
+    def chat(self, messages: list[dict], tools: list[dict] | None = None, model: str | None = None, temperature: float = ANSWER_TEMPERATURE):
+        model = model or self.answer_model
         kwargs = {"tools": tools} if tools else {}
-        response = self.client.chat.completions.create(model=model, messages=messages, temperature=temperature, **kwargs)
+        if model not in NO_TEMPERATURE:
+            kwargs["temperature"] = temperature
+        response = self.client.chat.completions.create(model=model, messages=messages, **kwargs)
         self._count(model, response)
+        details = getattr(response.usage, "completion_tokens_details", None)
+        self.reasoning_tokens += getattr(details, "reasoning_tokens", 0) or 0
         return response.choices[0].message, response.usage.prompt_tokens
 
     def add(self, other: "CountingLLM") -> None:
@@ -335,6 +347,7 @@ class CountingLLM:
             mine = self.usage.setdefault(key, {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0})
             for field_name in mine:
                 mine[field_name] += slot[field_name]
+        self.reasoning_tokens += other.reasoning_tokens
 
     def dollars(self) -> float:
         total = 0.0
@@ -603,6 +616,8 @@ def print_report(rows: list[dict], llm: CountingLLM | None = None) -> None:
         unpriced = sorted({model for _, model in llm.usage if model not in PRICES})
         note = f", not counting {', '.join(unpriced)} (no price on file)" if unpriced else ""
         print(f"\nThis run's model calls (not counting answers reused from a previous run): ${llm.dollars():.2f}{note}")
+        if llm.reasoning_tokens:
+            print(f"  of the output tokens, {llm.reasoning_tokens} were hidden reasoning")
         for (stage, model), slot in sorted(llm.usage.items()):
             print(f"  {stage:7s} {model:12s} {slot['calls']:5d} calls  {slot['prompt_tokens']:9d} in  {slot['completion_tokens']:7d} out")
 
@@ -620,6 +635,7 @@ def main() -> None:
         "--write-model", default=ANSWER_MODEL,
         help="model for S3's memory writes (extraction and consolidation); answers always use " + ANSWER_MODEL,
     )
+    parser.add_argument("--answer-model", default=ANSWER_MODEL, help="model that answers (every system); the app's is " + ANSWER_MODEL)
     parser.add_argument("--workers", type=int, default=8, help="questions run at the same time")
     parser.add_argument(
         "--no-write-cache", action="store_true",
@@ -648,13 +664,13 @@ def main() -> None:
     done = {(r["question_id"], r["system"]) for r in rows}
 
     client = providers.openai_client(providers.OPENAI)
-    llm = CountingLLM(client, write_model=args.write_model)  # the run's total
+    llm = CountingLLM(client, write_model=args.write_model, answer_model=args.answer_model)  # the run's total
     systems = args.systems.split(",")
 
     def run_question(question: dict) -> tuple[list[dict], CountingLLM]:
         """Every wanted system for one question, on a counter of its own:
         questions run side by side, and a shared counter's stage would mix."""
-        mine = CountingLLM(client, write_model=args.write_model)
+        mine = CountingLLM(client, write_model=args.write_model, answer_model=args.answer_model)
         out_rows = []
         for system in systems:
             if (question["question_id"], system) in done:
