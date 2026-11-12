@@ -7,8 +7,10 @@ course (courses.delete_course) takes its conversations with it:
 
 Each file also carries what agent memory needs to pick up where it left off
 (docs/superpowers/specs/2026-09-25-agent-memory-design.md §5.1, §5.6):
-`memory_processed_upto`, the number of turns memory has already read, and
-`summary`, the conversation's running summary.
+`memory_processed_upto`, the number of turns memory has already read,
+`turns_indexed_upto`, the number already in the past-chat index (absent in
+files saved before it existed), and `summary`, the conversation's running
+summary.
 """
 
 import json
@@ -71,6 +73,7 @@ def append_turn(sm_home: Path, course_id: int, cid: str, turn: dict, *, create_i
                 "title": " ".join(turn["question"].split())[:TITLE_CHARS],
                 "created_at": turn["asked_at"],
                 "memory_processed_upto": 0,
+                "turns_indexed_upto": 0,
                 "summary": "",
                 "turns": [],
             }
@@ -180,6 +183,18 @@ def set_memory_progress(sm_home: Path, course_id: int, cid: str, *, processed_up
         _write(path, data)
 
 
+def set_turns_indexed(sm_home: Path, course_id: int, cid: str, upto: int) -> None:
+    """The first `upto` turns are in the past-chat index (memory/past_chats.py),
+    or were passed over for good. A conversation deleted meanwhile stays deleted."""
+    path = _path(sm_home, course_id, cid)
+    with _lock:
+        if not path.exists():
+            return
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["turns_indexed_upto"] = upto
+        _write(path, data)
+
+
 def clear_summaries(sm_home: Path, course_id: int, cids: list[str]) -> None:
     """Something these chats told memory was forgotten, and their running
     summaries may repeat it. Cleared, not rewritten: the next turn starts a
@@ -195,8 +210,9 @@ def clear_summaries(sm_home: Path, course_id: int, cids: list[str]) -> None:
 
 
 def pending_memory(sm_home: Path, course_id: int) -> list[str]:
-    """Conversations with turns memory hasn't read yet: what the worker
-    picks up again after a restart."""
+    """Conversations with turns memory hasn't read yet, or not yet in the
+    past-chat index: what the worker picks up again after a restart. A chat
+    saved before that index existed has no counter, so all of it is pending."""
     directory = _dir(sm_home, course_id)
     if not directory.exists():
         return []
@@ -204,6 +220,7 @@ def pending_memory(sm_home: Path, course_id: int) -> list[str]:
     with _lock:
         for path in sorted(directory.glob("*.json")):
             data = json.loads(path.read_text(encoding="utf-8"))
-            if data["memory_processed_upto"] < len(data["turns"]):
+            turns = len(data["turns"])
+            if data["memory_processed_upto"] < turns or data.get("turns_indexed_upto", 0) < turns:
                 pending.append(data["conversation_id"])
     return pending

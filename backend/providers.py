@@ -35,9 +35,19 @@ class Provider:
     context_window: int | None = None
     # Provider-specific request fields, sent on every call.
     extra_body: dict = field(default_factory=dict)
+    # A reasoning model that rejects any temperature but its default (a 400
+    # otherwise), so none is sent.
+    fixed_temperature: bool = False
 
 
-OPENAI = Provider(id="openai", name="OpenAI", kind="openai", credential="openai-key", model="gpt-4o-mini")
+# gpt-5-mini since the memory evaluation (PR #56): with the same memories it
+# answered 7 to 9 more of 58 questions than gpt-4o-mini in every one of four
+# runs, and 43 against 35 of 54 on questions that combine several chats. It
+# reasons before answering, which is where the gain comes from and why an
+# answer takes about 8 seconds where gpt-4o-mini took about 3.
+OPENAI = Provider(
+    id="openai", name="OpenAI", kind="openai", credential="openai-key", model="gpt-5-mini", fixed_temperature=True
+)
 
 # Thinking mode is DeepSeek's default. It ignores temperature, and on any
 # request carrying tools it requires every earlier reply's reasoning_content

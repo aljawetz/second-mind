@@ -141,6 +141,24 @@ def test_forgetting_by_id_really_deletes_and_skips_unknown_ids(service_for):
     assert all("auditing" not in h.memory.text for h in svc.recall("Am I auditing the course?"))
 
 
+def test_forgetting_a_memory_stops_its_turn_being_searchable_in_past_chats(service_for):
+    # "Forget that" has to hold against search_past_chats too: the words stay
+    # in the student's saved chat, but the assistant can no longer find them.
+    svc = service_for(ScriptedLLM(_extraction("The student is auditing the course.")))
+    at = datetime(2026, 9, 21, 18, 0, tzinfo=timezone.utc)
+    svc.observe(_turn("I'm auditing the course."), conversation_id="c-1", turn_index=0)
+    svc.index_turn(conversation_id="c-1", turn_index=0, title="Auditing", at=at, question="I'm auditing the course.", answer="Noted.")
+    svc.index_turn(conversation_id="c-1", turn_index=1, title="Auditing", at=at, question="What are mocks?", answer="Stand-ins that check calls.")
+
+    svc.forget([m.id for m in svc.list()])
+
+    assert svc.search_past_chats("am I auditing the course?") == []
+    assert [t.turn_index for t in svc.search_past_chats("what are mocks?")] == [1]
+    # Indexing that turn again (the worker catching up) doesn't bring it back.
+    assert svc.index_turn(conversation_id="c-1", turn_index=0, title="Auditing", at=at, question="I'm auditing the course.", answer="Noted.") is False
+    assert svc.search_past_chats("am I auditing the course?") == []
+
+
 def test_a_student_edit_rewrites_text_and_embedding(service_for):
     svc = service_for(ScriptedLLM(_extraction("The student is on team 4.")))
     svc.observe(_turn("Team 4."), conversation_id="c-1", turn_index=0)

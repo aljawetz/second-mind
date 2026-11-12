@@ -68,6 +68,20 @@ CREATE TABLE IF NOT EXISTS forget_turn (
   turn_index      INTEGER NOT NULL,
   PRIMARY KEY (conversation_id, turn_index)
 );
+-- Saved chat turns, searchable from other chats (search_past_chats,
+-- docs/specs/2026-11-10-past-chat-search-design.md). Not memories: what the
+-- assistant said lives here and never in the memory table.
+CREATE TABLE IF NOT EXISTS turn (
+  conversation_id TEXT NOT NULL,
+  turn_index      INTEGER NOT NULL,
+  title           TEXT NOT NULL,
+  at              TEXT NOT NULL,
+  question        TEXT NOT NULL,
+  answer          TEXT NOT NULL,
+  embedding       BLOB NOT NULL,
+  PRIMARY KEY (conversation_id, turn_index)
+);
+CREATE VIRTUAL TABLE IF NOT EXISTS turn_fts USING fts5(conversation_id UNINDEXED, turn_index UNINDEXED, text);
 """
 
 # Words only. Quotes, NOT, *, : and - are FTS5 query syntax, and the
@@ -108,6 +122,18 @@ class Memory:
     embedding: list[float]
     entities: list[str] = field(default_factory=list)
     provenance: list[tuple[str, int]] = field(default_factory=list)
+
+
+@dataclass
+class Turn:
+    """One saved question and answer, as past-chat search returns it."""
+
+    conversation_id: str
+    turn_index: int
+    title: str
+    at: datetime
+    question: str
+    answer: str
 
 
 def _iso(t: datetime | None) -> str | None:
@@ -310,6 +336,82 @@ class MemoryStore:
                 (conversation_id, turn_index),
             ).fetchone()
             return row is not None
+
+    def add_turn(
+        self, conversation_id: str, turn_index: int, *, title: str, at: datetime, question: str, answer: str,
+        embedding: list[float],
+    ) -> None:
+        """Index one saved turn, replacing what was indexed for it before."""
+        blob = np.asarray(embedding, dtype=np.float32).tobytes()
+        with self._lock, self._conn:
+            self._delete_turn(conversation_id, turn_index)
+            self._conn.execute(
+                "INSERT INTO turn (conversation_id, turn_index, title, at, question, answer, embedding)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (conversation_id, turn_index, title, _iso(at), question, answer, blob),
+            )
+            self._conn.execute(
+                "INSERT INTO turn_fts (conversation_id, turn_index, text) VALUES (?, ?, ?)",
+                (conversation_id, turn_index, f"{question}\n{answer}"),
+            )
+
+    def delete_turn(self, conversation_id: str, turn_index: int) -> None:
+        with self._lock, self._conn:
+            self._delete_turn(conversation_id, turn_index)
+
+    def _delete_turn(self, conversation_id: str, turn_index: int) -> None:
+        key = (conversation_id, turn_index)
+        self._conn.execute("DELETE FROM turn WHERE conversation_id = ? AND turn_index = ?", key)
+        self._conn.execute("DELETE FROM turn_fts WHERE conversation_id = ? AND turn_index = ?", key)
+
+    def delete_turns(self, conversation_id: str) -> int:
+        """The student deleted a chat: its turns stop being searchable. How many went."""
+        with self._lock, self._conn:
+            gone = self._conn.execute("DELETE FROM turn WHERE conversation_id = ?", (conversation_id,)).rowcount
+            self._conn.execute("DELETE FROM turn_fts WHERE conversation_id = ?", (conversation_id,))
+        if gone:
+            self._wal_checkpoint_truncate()
+        return gone
+
+    def list_turns(self) -> list[Turn]:
+        with self._lock:
+            rows = self._conn.execute("SELECT * FROM turn ORDER BY at, conversation_id, turn_index").fetchall()
+            return [self._to_turn(r) for r in rows]
+
+    def turn_vector_search(self, query: list[float], k: int, skip_conversation: str | None = None) -> list[tuple[Turn, float]]:
+        """Top k saved turns by cosine similarity, highest first. A full
+        scan, like vector_search: a semester is a few thousand turns."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM turn WHERE conversation_id IS NOT ?", (skip_conversation,)
+            ).fetchall()
+            if not rows:
+                return []
+            matrix = np.stack([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
+            q = np.asarray(query, dtype=np.float32)
+            norms = np.linalg.norm(matrix, axis=1) * np.linalg.norm(q)
+            scores = matrix @ q / np.where(norms == 0, 1.0, norms)
+            top = np.argsort(-scores, kind="stable")[:k]
+            return [(self._to_turn(rows[i]), float(scores[i])) for i in top]
+
+    def turn_keyword_search(self, query: str, k: int, skip_conversation: str | None = None) -> list[tuple[Turn, float]]:
+        """Top k saved turns by BM25, best first; use the rank, as with keyword_search."""
+        words = [w for w in _WORD.findall(query.lower()) if w not in _STOPWORDS]
+        if not words:
+            return []
+        match = " OR ".join(f'"{w}"' for w in words)
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT t.*, -bm25(turn_fts) AS score FROM turn_fts JOIN turn t"
+                " ON t.conversation_id = turn_fts.conversation_id AND t.turn_index = turn_fts.turn_index"
+                " WHERE turn_fts MATCH ? AND t.conversation_id IS NOT ? ORDER BY score DESC LIMIT ?",
+                (match, skip_conversation, k),
+            ).fetchall()
+            return [(self._to_turn(r), r["score"]) for r in rows]
+
+    @staticmethod
+    def _to_turn(row: sqlite3.Row) -> Turn:
+        return Turn(row["conversation_id"], row["turn_index"], row["title"], _time(row["at"]), row["question"], row["answer"])
 
     def _wal_checkpoint_truncate(self) -> None:
         for attempt in range(8):

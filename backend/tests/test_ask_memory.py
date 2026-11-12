@@ -26,6 +26,7 @@ import main
 import memory_jobs
 from llm import TurnEnd
 from memory import MemoryService
+from memory.store import MemoryStore
 
 COURSE = 55710
 
@@ -238,6 +239,11 @@ def test_memory_edit_returns_not_found_for_unknown_id(app):
     assert body["error"]["code"] == "not_found"
 
 
+def _indexed_turns(app):
+    with MemoryStore(app.home / "courses" / str(COURSE) / "memory.db") as store:
+        return store.list_turns()
+
+
 def test_chats_can_be_listed_read_and_deleted_taking_their_memories_along(app):
     cid = _say(app, "I'm auditing the course.", remembers="The student is auditing the course.")[0]["conversation_id"]
 
@@ -246,8 +252,12 @@ def test_chats_can_be_listed_read_and_deleted_taking_their_memories_along(app):
     status, body = _json(app, "GET", f"/courses/{COURSE}/conversations/{cid}")
     assert status == 200 and body["turns"][0]["question"] == "I'm auditing the course."
 
+    assert main.MEMORY_WORKER.wait_idle(10)
+    assert [t.question for t in _indexed_turns(app)] == ["I'm auditing the course."]
+
     assert _json(app, "DELETE", f"/courses/{COURSE}/conversations/{cid}") == (200, {"status": "deleted"})
 
+    assert _indexed_turns(app) == []  # no longer searchable from other chats
     assert _json(app, "GET", f"/courses/{COURSE}/memories?include_inactive=1") == (200, {"memories": []})
     assert _json(app, "GET", f"/courses/{COURSE}/conversations/{cid}")[0] == 404
     assert _json(app, "DELETE", f"/courses/{COURSE}/conversations/{cid}")[0] == 404

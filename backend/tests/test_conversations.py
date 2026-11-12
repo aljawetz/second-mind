@@ -145,6 +145,10 @@ def test_memory_progress_is_saved_without_touching_the_turns(tmp_path):
     assert conversations.pending_memory(tmp_path, COURSE) == [cid]
 
     conversations.set_memory_progress(tmp_path, COURSE, cid, processed_upto=2, summary="Rubric, then Q2.")
+    # Read by memory, but not yet in the past-chat index: still pending.
+    assert conversations.pending_memory(tmp_path, COURSE) == [cid]
+
+    conversations.set_turns_indexed(tmp_path, COURSE, cid, 2)
     assert conversations.pending_memory(tmp_path, COURSE) == []
 
 

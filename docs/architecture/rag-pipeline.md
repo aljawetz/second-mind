@@ -176,7 +176,7 @@ after it), not just via scripts.
 
 ## 5. Generation — where LLM provider calls happen
 
-**Three providers, chosen at onboarding (since 2026-09-29):** OpenAI (`gpt-4o-mini`), DeepSeek
+**Three providers, chosen at onboarding (since 2026-09-29):** OpenAI (`gpt-5-mini` since 2026-11-10, `gpt-4o-mini` before), DeepSeek
 (`deepseek-flash`) and GitHub Copilot (the student's own Copilot plan, model `auto`).
 `config.json`'s `llm_provider` names the choice and each provider keeps its key in its own Keychain
 item; `providers.py` is the one place that turns that into clients, for chat and memory

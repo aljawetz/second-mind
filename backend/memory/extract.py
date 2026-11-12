@@ -52,6 +52,11 @@ explanations are not facts about the student.
 - Each memory is one sentence in the third person that makes sense on its own. Replace "it", \
 "that one" and relative dates with what they mean; use the conversation's date to turn \
 "yesterday" or "last Tuesday" into a date.
+- Something the student did or that happened ("I read it today", "we met on Friday", "I just \
+bought one") is an event: put its date in the sentence and in event_time. Don't turn it into an \
+undated fact.
+- Keep the specifics the student gave: names, numbers, places, and what something is now when \
+it has changed.
 - Skip facts about the course itself (dates, grading, policies, content): the course materials \
 already hold those. Skip small talk and anything the summary already records.
 - Never write down grades, scores or deadlines, in memories or the summary.
@@ -83,10 +88,27 @@ _GRADES_OR_DEADLINES = [
     # "got a B+", "received an A-". The letter is case-sensitive, so "got a
     # book" isn't a grade, and it must end there: "got a B-tree" isn't either.
     re.compile(r"\b(?i:got|gets?|getting|received|earned|lost)\s+(?:an?\s+)?[A-DF][+-]?(?=[\s.,;:!?)]|$)"),
-    # "got a 72 on the midterm", "lost 10 points", "received 18/20".
-    re.compile(r"\b(got|received|earned|lost)\b[^.]{0,30}?\b\d{1,3}(?:\.\d+)?\b", re.IGNORECASE),
+    # "got a 72 on the midterm", "lost 10 points", "received 18/20", "got
+    # 85% in the course". The number has to read like a grade: a percent, a
+    # fraction, points, or "on/in/for" some coursework. A bare number went
+    # too until the memory evaluation showed "lost 10 pounds" being dropped.
+    re.compile(
+        r"\b(got|received|earned|lost)\b[^.]{0,30}?\b\d{1,3}(?:\.\d+)?"
+        r"(?:\s?%|\s?/\s?\d|\s+(?:points?|pts|percent|out\s+of)\b"
+        r"|\s+(?:on|in|for)\s+[^.]{0,30}?\b(?:midterm|final|exam|quiz|test|assignment|homework|hw|lab|project"
+        r"|paper|essay|course|class|a\d+)\b)",
+        re.IGNORECASE,
+    ),
     re.compile(r"\b(due|overdue|deadlines?)\b", re.IGNORECASE),
 ]
+
+
+def mentions_grades_or_deadlines(text: str) -> bool:
+    """The rule above, for other things kept in the memory database (saved
+    chat turns, memory/past_chats.py)."""
+    return any(p.search(text) for p in _GRADES_OR_DEADLINES)
+
+
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
 _SPEAKERS = {"user": "Student", "assistant": "Assistant"}

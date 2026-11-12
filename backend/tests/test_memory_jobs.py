@@ -2,6 +2,7 @@
 (design spec §5.1): one turn at a time, dated when it was asked, progress
 saved after each, and nothing kept from a chat deleted meanwhile."""
 
+import json
 import re
 import zlib
 from datetime import datetime, timezone
@@ -158,6 +159,7 @@ def test_pending_lists_unread_chats_across_the_selected_courses(tmp_path):
     _save(tmp_path, "q", "2026-09-21T18:00:00Z", cid="c-000000000001")
     _save(tmp_path, "q", "2026-09-21T18:00:00Z", cid="c-000000000002")
     conversations.set_memory_progress(tmp_path, COURSE, "c-000000000002", processed_upto=1, summary="")
+    conversations.set_turns_indexed(tmp_path, COURSE, "c-000000000002", 1)  # read and indexed: nothing left to do
     _save(tmp_path, "q", "2026-09-21T18:00:00Z", cid="c-000000000003", course=55016)
     _save(tmp_path, "q", "2026-09-21T18:00:00Z", cid="c-000000000004", course=11111)  # not selected
 
@@ -173,3 +175,85 @@ def test_the_shared_embedder_gives_normalized_bge_vectors():
     assert a.shape == (384,)
     assert np.linalg.norm(a) == pytest.approx(1.0, abs=1e-5)
     assert a @ b > a @ c
+
+
+# --- past-chat index (docs/specs/2026-11-10-past-chat-search-design.md §3) -----
+
+
+def _indexed(svc):
+    return [(t.conversation_id, t.turn_index, t.question) for t in svc._store.list_turns()]
+
+
+def test_reading_a_chat_also_makes_its_turns_searchable_from_other_chats(tmp_path, service_with):
+    _save(tmp_path, "I'm on team 4.", "2026-09-21T18:00:00Z")
+    svc = service_with(ScriptedLLM(_extraction("The student is on team 4.", "S1")))
+
+    memory_jobs.observe_conversation(tmp_path, COURSE, CID, svc)
+
+    [turn] = svc.search_past_chats("which team am I on?")
+    assert (turn.conversation_id, turn.turn_index, turn.question, turn.answer) == (CID, 0, "I'm on team 4.", "Noted.")
+    assert turn.title == "I'm on team 4." and turn.at == datetime(2026, 9, 21, 18, 0, tzinfo=timezone.utc)
+    assert conversations.get_conversation(tmp_path, COURSE, CID)["turns_indexed_upto"] == 1
+
+
+def test_turns_are_indexed_even_when_the_model_call_fails(tmp_path, service_with):
+    _save(tmp_path, "I'm on team 4.", "2026-09-21T18:00:00Z")
+    svc = service_with(ScriptedLLM(RuntimeError("no OpenAI key stored")))
+
+    with pytest.raises(RuntimeError):
+        memory_jobs.observe_conversation(tmp_path, COURSE, CID, svc)
+
+    assert _indexed(svc) == [(CID, 0, "I'm on team 4.")]
+    assert conversations.get_conversation(tmp_path, COURSE, CID)["turns_indexed_upto"] == 1
+
+
+def test_turns_already_indexed_are_not_indexed_again(tmp_path, service_with):
+    _save(tmp_path, "I'm on team 4.", "2026-09-21T18:00:00Z")
+    svc = service_with(ScriptedLLM(_extraction("The student is on team 4.", "S1")))
+    memory_jobs.observe_conversation(tmp_path, COURSE, CID, svc)
+    svc._store.delete_turns(CID)
+
+    memory_jobs.observe_conversation(tmp_path, COURSE, CID, svc)
+
+    assert _indexed(svc) == []
+
+
+def test_a_chat_saved_before_the_index_existed_is_caught_up_without_the_model(tmp_path, service_with):
+    _save(tmp_path, "I'm on team 4.", "2026-09-21T18:00:00Z")
+    conversations.set_memory_progress(tmp_path, COURSE, CID, processed_upto=1, summary="S1")
+    # What an old file looks like: memory has read it, the counter isn't there.
+    path = tmp_path / "courses" / str(COURSE) / "conversations" / f"{CID}.json"
+    data = json.loads(path.read_text())
+    data.pop("turns_indexed_upto", None)
+    path.write_text(json.dumps(data))
+    llm = ScriptedLLM()
+    svc = service_with(llm)
+
+    assert memory_jobs.pending(tmp_path, [COURSE]) == [(COURSE, CID)]
+    assert memory_jobs.observe_conversation(tmp_path, COURSE, CID, svc) == 0
+
+    assert _indexed(svc) == [(CID, 0, "I'm on team 4.")]
+    assert llm.calls == []
+    assert memory_jobs.pending(tmp_path, [COURSE]) == []
+
+
+def test_a_turn_about_grades_is_passed_over_and_not_tried_again(tmp_path, service_with):
+    _save(tmp_path, "I got a 72 on the midterm.", "2026-09-21T18:00:00Z")
+    svc = service_with(ScriptedLLM({"memories": [], "summary": ""}))
+
+    memory_jobs.observe_conversation(tmp_path, COURSE, CID, svc)
+
+    assert _indexed(svc) == []
+    assert conversations.get_conversation(tmp_path, COURSE, CID)["turns_indexed_upto"] == 1
+
+
+def test_forgetting_a_deleted_chat_removes_its_turns_from_the_index(tmp_path, service_with):
+    _save(tmp_path, "I'm on team 4.", "2026-09-21T18:00:00Z")
+    _save(tmp_path, "Use Java please.", "2026-09-22T09:30:00Z", cid="c-000000000002")
+    svc = service_with(ScriptedLLM(_extraction("The student is on team 4.", "S1"), _extraction("The student wants Java.", "S2")))
+    memory_jobs.observe_conversation(tmp_path, COURSE, CID, svc)
+    memory_jobs.observe_conversation(tmp_path, COURSE, "c-000000000002", svc)
+
+    svc.forget_conversation(CID)
+
+    assert _indexed(svc) == [("c-000000000002", 0, "Use Java please.")]
