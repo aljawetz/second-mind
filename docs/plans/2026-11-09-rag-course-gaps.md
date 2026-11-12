@@ -1,6 +1,6 @@
 # RAG Gaps from the "Building RAG Agents with LLMs" Course
 
-**Status:** Task 1 merged in PR #55. Task 2 built and verified on branch `chat-answer-feedback`; see its [implementation and evidence](2026-11-10-answer-feedback.md). Tasks 3 to 8 not started.
+**Status (2026-11-11):** Task 1 is merged (PR #55). Task 2 is merged (PR #57); see its [implementation and evidence](2026-11-10-answer-feedback.md). Task 5 is built as far as the development sample and merged (PR #56), together with what it led to: two memory fixes, search over past chats, a recall limit of 10 and `gpt-5-mini` as the default model. Task 3 is built on branch `index-filters` (2026-11-11). Tasks 4, 6, 7 and 8 are not started.
 
 **Goal:** Close the eight gaps found by comparing Second Mind with NVIDIA's "Building RAG Agents with LLMs" notebooks (`docs/RAG with LLMs/`, gitignored). Most of what the course teaches is already here and often goes further (hybrid search with rank fusion, a cross-encoder reranker, the memory layer, the ask-modes eval). These eight are what's missing or unfinished.
 
@@ -55,16 +55,22 @@
 - **Built (2026-11-10):** Helpful / Not helpful buttons, removable ratings, and optional notes up to 500 characters. Feedback stays on the saved turn locally and is restored when reopening the chat. `GET /courses/{course_id}/feedback` lists thumbs-down turns for review. The final stream event identifies the saved turn, so failed answers cannot shift feedback onto another answer.
 - **Verified:** 593 backend tests passed (9 skipped), 5 frontend interaction tests passed, production build passed. [Screenshots and verification scope](../evaluations/answer-feedback/README.md).
 
-### 3. Keep graded exam and quiz text out of the index, and drop junk chunks (beta)
+### 3. Keep graded exam and quiz text out of the index, and drop junk chunks (beta) — built on branch `index-filters`
 
-- **Why:** Sprint 8 found a midterm coding question in the index, and an interviewee raised graded-quiz exposure (Sprint 8 next step 1). The course also drops near-empty and mostly-numeric chunks, and `indexing.py` has no such filter.
-- **Build:**
-  - In `course_sync.sync_course` / `canvas.list_assignments`, skip graded quizzes and exams. Decide the rule from Canvas's own fields (quiz assignments, submission types) before falling back to names.
-  - In `indexing.py`, drop chunks under a minimum length or mostly non-letters.
-- **Proof:**
-  - Tests for both rules.
-  - Chunk counts before and after on the two local courses.
-  - `--retrieval-only` on `sprint8` showing facts found didn't drop.
+- **Why:** Sprint 8 found a midterm coding question in the index, and an interviewee raised graded-quiz exposure (Sprint 8 next step 1). The course also drops near-empty and mostly-numeric chunks, and `indexing.py` had no such filter.
+- **What leaked:** two assignments in course 55710, "Midterm Coding Question (access only through Midterm Exam)" and "Midterm Exam- Requires Respondus LockDown Browser". Search returned both for "When is the midterm exam?" and "How much is the final exam worth?". Files and pages weren't the problem: "13 - MidtermReview.pdf" is review material and stays.
+- **Built (2026-11-11):**
+  - `course_sync.is_exam_or_quiz()`. Canvas's own fields come first: `is_quiz_assignment`, `"online_quiz"` in `submission_types`, `is_quiz_lti_assignment` (New Quizzes) and `require_lockdown_browser`. The name is the fallback (exam, midterm, quiz, Respondus, LockDown Browser) for exam parts posted as ordinary assignments.
+  - An exam keeps its name, due date and points, so "when is the midterm?" still works; its description is never indexed. An exam with neither is left out.
+  - Its manifest version gets an `|exam` suffix, so an exam that an older version of the app indexed in full reads as changed, and its text is deleted on the next sync.
+  - `indexing.is_junk()`: under 8 characters, or under 25% letters. It's applied to PDF pages, slides and Canvas sections, and not to transcripts or the student's own notes. A section is judged together with its own heading.
+  - 24 new tests. All 662 backend tests pass (9 skipped).
+- **A miss caught by the eval:** the first version judged a section without its heading and dropped "Syllabus › Units\n- 12", the answer to `sprint9-chat` N5.3 ("how many units is this course?"). With the heading counted, the fact is back.
+- **Measured on the two local courses** (a copy of the index with the dropped chunks removed and its full-text index rebuilt):
+  - Chunks: 55016 185 → 185, 56350 202 → 200 (two Zotero PDF pages, "Enjoy!" and "Zotero").
+  - None of the 34 assignments in either course is an exam or quiz by the rule, so nothing changes there. The exam rule is covered by tests only; course 55710 isn't available.
+  - `--retrieval-only`, local cases only: `sprint8` (P10–P15) facts found 4 of 4 before and after; `heldout` recall@5 0.91 both; `sprint9-chat` facts found 30 of 40 both. One result list changed (N9.2's fifth result).
+- **Left:** an exam already indexed on someone's machine loses its text on their next sync. Junk chunks already indexed stay until their item changes on Canvas.
 
 ### 4. One retry when a model reply isn't valid JSON (beta)
 

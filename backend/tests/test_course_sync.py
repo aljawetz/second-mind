@@ -552,3 +552,100 @@ def test_an_assignment_with_a_due_date_but_no_description_is_indexed(tmp_path, s
 
     assert events[-1] == {"done": True, "new": 1, "changed": 0, "removed": 0, "failed": 0}
     assert _manifest_ids(tmp_path) == {"assignment:1"}
+
+
+# --- Graded exams and quizzes (RAG gaps plan, task 3) ------------------------
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"is_quiz_assignment": True},
+        {"submission_types": ["online_quiz"]},
+        {"is_quiz_lti_assignment": True},  # New Quizzes
+        {"require_lockdown_browser": True},
+    ],
+)
+def test_canvas_quiz_fields_mark_an_exam(fields):
+    assert course_sync.is_exam_or_quiz({"name": "Week 3 check-in", "submission_types": ["online_upload"], **fields})
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Midterm Coding Question (access only through Midterm Exam)",
+        "Midterm Exam- Requires Respondus LockDown Browser",
+        "Final Exam",
+        "Quiz 3: Testing",
+        "Weekly quizzes",
+    ],
+)
+def test_exam_and_quiz_names_mark_an_exam(name):
+    assert course_sync.is_exam_or_quiz({"name": name, "submission_types": ["online_upload"]})
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["Final Product, Impact, and Project Defense", "Sprint 1 Deliverable - Individual", "Examples of good personas", "Field Project: Selecting a Company"],
+)
+def test_ordinary_assignments_are_not_exams(name):
+    assert not course_sync.is_exam_or_quiz({"name": name, "submission_types": ["online_upload"], "is_quiz_assignment": False})
+
+
+@pytest.fixture
+def indexed_texts(monkeypatch, stub_extraction):
+    """The text of every node handed to add_nodes, so a test can check that
+    an exam's own wording never reaches the index."""
+    texts = []
+    monkeypatch.setattr(
+        course_sync.indexing, "add_nodes", lambda nodes, db_path, table_name: texts.extend(n.text for n in nodes)
+    )
+    return texts
+
+
+def test_an_exam_is_indexed_by_name_and_due_date_only(tmp_path, indexed_texts, assignments_only):
+    exam = {
+        **_assignment(1, "Midterm Exam", "<p>Q1. Write a function that reverses a linked list in place.</p>"),
+        "due_at": "2026-10-14T14:00:00Z",
+        "points_possible": 100,
+        "is_quiz_assignment": True,
+    }
+    assignments_only(exam, _assignment(2, "Task 1: Personas", "<p>Write two personas for your app.</p>"))
+
+    events = run(1, tmp_path)
+
+    assert events[-1] == {"done": True, "new": 2, "changed": 0, "removed": 0, "failed": 0}
+    joined = "\n".join(indexed_texts)
+    assert "linked list" not in joined
+    assert "Write two personas" in joined
+    exam_texts = [t for t in indexed_texts if t.startswith("Midterm Exam")]
+    assert len(exam_texts) == 1 and "Worth 100 points." in exam_texts[0]
+
+
+def test_an_exam_with_no_due_date_or_points_is_not_indexed(tmp_path, indexed_texts, assignments_only):
+    assignments_only(_assignment(1, "Midterm Coding Question (access only through Midterm Exam)", "<p>Implement a stack using two queues.</p>"))
+
+    events = run(1, tmp_path)
+
+    assert events[-1] == {"done": True, "new": 0, "changed": 0, "removed": 0, "failed": 0}
+    assert indexed_texts == []
+    assert _manifest_ids(tmp_path) == set()
+
+
+def test_an_exam_indexed_before_this_rule_is_reindexed_without_its_text(
+    tmp_path, stub_extraction, indexed_texts, assignments_only
+):
+    # What an earlier version of the app left behind: the exam synced in full,
+    # its manifest row carrying Canvas's plain updated_at.
+    manifest_path, _ = course_sync._course_paths(tmp_path, 1)
+    conn = course_sync.sync.open_manifest(manifest_path)
+    course_sync.sync.mark_synced(conn, "assignment:1", "assignment", "Midterm Exam", "2026-01-01", "old-hash")
+    conn.close()
+    exam = {**_assignment(1, "Midterm Exam", "<p>Q1. Reverse a linked list.</p>"), "points_possible": 100}
+    assignments_only(exam)
+
+    events = run(1, tmp_path)
+
+    assert events[-1] == {"done": True, "new": 0, "changed": 1, "removed": 0, "failed": 0}
+    assert [c[2] for c in stub_extraction if c[0] == "delete"] == ["assignment:1"]
+    assert "linked list" not in "\n".join(indexed_texts)

@@ -59,6 +59,26 @@ set_global_tokenizer(_tokenize)
 
 _splitter = SentenceSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP, tokenizer=_tokenize)
 
+# Junk-chunk filter for Canvas material (RAG gaps plan, task 3; the NVIDIA
+# RAG course drops near-empty and mostly-numeric chunks the same way). Set
+# on the two local courses: 2 of 387 chunks fall under it ("Enjoy!" and
+# "Zotero", PDF pages); the least wordy real chunk, an Excel table of paper
+# statistics, is 30% letters and stays. A section is judged together with
+# its own heading: "Units\n- 12" is the answer to "how many units is this
+# course?", and judging "- 12" alone dropped it. Not applied to transcripts
+# or the student's own notes: "HW due Fri" is short and still worth finding.
+MIN_CHUNK_CHARS = 8
+MIN_LETTER_SHARE = 0.25
+
+
+def is_junk(text: str) -> bool:
+    """True for text too short or too bare of words to answer anything."""
+    stripped = text.strip()
+    if len(stripped) < MIN_CHUNK_CHARS:
+        return True
+    visible = [c for c in stripped if not c.isspace()]
+    return sum(c.isalpha() for c in visible) < MIN_LETTER_SHARE * len(visible)
+
 
 def _with_ref_doc(node: TextNode, canvas_item_id: str) -> TextNode:
     """Sets the node's ref_doc_id to canvas_item_id (data-model.md §4) — what
@@ -95,6 +115,8 @@ def pages_to_nodes(pages: list[dict], source: str, canvas_item_id: str, item_typ
         if not text.strip():
             continue
         for chunk in _splitter.split_text(text):
+            if is_junk(chunk):
+                continue
             node = TextNode(text=chunk, metadata=_metadata(source, item_type, page=page["page"]))
             nodes.append(_with_ref_doc(node, canvas_item_id))
     return nodes
@@ -109,7 +131,8 @@ def sections_to_nodes(sections: list[dict], source: str, canvas_item_id: str, it
     the embedding and the chat model see what the chunk is part of even when
     the section's own text is just "12.5% | Project" rows. A heading with no
     text of its own ("Class Schedule" directly followed by another bold
-    line) becomes a line of the next section instead of a near-empty chunk."""
+    line) becomes a line of the next section instead of a near-empty chunk.
+    A chunk whose own text is junk (is_junk) is dropped."""
     nodes = []
     pending: list[str] = []
     for section in sections:
@@ -121,9 +144,12 @@ def sections_to_nodes(sections: list[dict], source: str, canvas_item_id: str, it
         body = "\n".join([*pending, section["text"]])
         pending = []
         for chunk in _splitter.split_text(body):
+            # Judged with the section's heading, not the document title every chunk has.
+            if is_junk(f"{section['heading']}\n{chunk}" if section["heading"] else chunk):
+                continue
             node = TextNode(text=f"{path}\n{chunk}", metadata=_metadata(source, item_type))
             nodes.append(_with_ref_doc(node, canvas_item_id))
-    if pending:
+    if pending and not is_junk("\n".join(pending)):
         node = TextNode(text=f"{source}\n" + "\n".join(pending), metadata=_metadata(source, item_type))
         nodes.append(_with_ref_doc(node, canvas_item_id))
     return nodes
@@ -135,7 +161,7 @@ def slides_to_nodes(slides: list[dict], source: str, canvas_item_id: str) -> lis
     nodes = []
     for slide in slides:
         text = slide["text"]
-        if not text.strip():
+        if is_junk(text):
             continue
         node = TextNode(text=text, metadata=_metadata(source, "file", slide=slide["slide"]))
         nodes.append(_with_ref_doc(node, canvas_item_id))

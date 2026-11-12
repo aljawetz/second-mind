@@ -6,6 +6,7 @@ itself stays Canvas-agnostic (its own docstring: "the caller ... is
 responsible for the actual Canvas calls") — this module is that caller.
 """
 
+import re
 import tempfile
 from datetime import datetime, tzinfo
 from pathlib import Path
@@ -123,6 +124,37 @@ def schedule_line(assignment: dict, tz: tzinfo | None = None) -> str:
     if isinstance(points, (int, float)) and points > 0:
         parts.append(f"Worth {points:g} points.")
     return " ".join(parts)
+
+
+# Graded exams and quizzes (RAG gaps plan, task 3). Sprint 8 found a
+# midterm's coding question in the index, reachable from chat, because
+# assignments were indexed with their full description. Canvas's own fields
+# come first: a classic quiz (is_quiz_assignment, "online_quiz"), a New
+# Quizzes one (is_quiz_lti_assignment) or one behind LockDown Browser. The
+# name is the fallback, for exam parts posted as ordinary assignments
+# ("Midterm Coding Question (access only through Midterm Exam)").
+_EXAM_NAME = re.compile(r"\b(exams?|midterms?|quiz(zes)?|respondus|lockdown browser)\b", re.IGNORECASE)
+
+
+def is_exam_or_quiz(assignment: dict) -> bool:
+    if (
+        assignment.get("is_quiz_assignment")
+        or assignment.get("is_quiz_lti_assignment")
+        or assignment.get("require_lockdown_browser")
+        or "online_quiz" in (assignment.get("submission_types") or [])
+    ):
+        return True
+    return bool(_EXAM_NAME.search(assignment.get("name") or ""))
+
+
+def _without_exam_text(assignment: dict) -> dict:
+    """An exam keeps its name, due date and points ("when is the midterm?")
+    and loses its description. The "|exam" version makes an exam synced in
+    full by an older version of the app read as changed, so its text is
+    deleted from the index on the next sync."""
+    if not is_exam_or_quiz(assignment):
+        return assignment
+    return {**assignment, "description": None, "updated_at": f"{assignment.get('updated_at', '')}|exam"}
 
 
 def _sync_assignment(conn, db_path, table_name, assignment, is_changed):
@@ -299,6 +331,8 @@ def sync_course(course_id: int, sm_home: Path):
         # due?". Ones with neither text nor a due date or points are left out;
         # an assignment whose description was cleared then reads as deleted,
         # which matches what the student can see.
+        # Exams and quizzes keep only their name and schedule line.
+        assignments = [_without_exam_text(a) for a in assignments]
         assignments_by_id = {
             str(a["id"]): a
             for a in assignments
