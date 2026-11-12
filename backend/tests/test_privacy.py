@@ -3,9 +3,11 @@
 import http.client
 import json
 import threading
+from datetime import datetime, timezone
 
 import credentials
 import privacy
+from memory.store import MemoryStore
 
 
 def test_delete_all_data_empties_the_folder_and_forgets_credentials(tmp_path, monkeypatch):
@@ -41,6 +43,12 @@ def test_delete_data_endpoint(tmp_path, monkeypatch):
     import main
 
     (tmp_path / "config.json").write_text("{}")
+    # A saved turn in the past-chat index: it lives in the course's
+    # memory.db, so deleting all data must take it too.
+    with MemoryStore(tmp_path / "courses" / "1" / "memory.db") as store:
+        store.add_turn(
+            "c-1", 0, title="t", at=datetime(2026, 9, 21, tzinfo=timezone.utc), question="q", answer="a", embedding=[1.0]
+        )
     monkeypatch.setattr(main, "SM_HOME", tmp_path)
     monkeypatch.setattr(credentials, "delete", lambda key: None)
     server = main.ThreadingHTTPServer(("127.0.0.1", 0), main.Handler)

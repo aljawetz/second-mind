@@ -14,7 +14,7 @@ from llama_index.core.schema import NodeRelationship, NodeWithScore, RelatedNode
 
 import chat
 from llm import ToolCall, TurnEnd
-from memory import MemoryService
+from memory import MemoryService, past_chats
 
 COURSE = 55710
 SAID = datetime(2026, 9, 21, 18, 0, tzinfo=timezone.utc)
@@ -110,7 +110,7 @@ def test_the_profile_and_the_memory_rules_go_into_the_system_prompt(memory):
     assert "Test Course" in system
     assert "recall_memory" in system and "forget_memory" in system
     assert "- The student wants code examples in Java. (since 2026-09-21)" in system
-    assert _tool_names(provider.calls[0]["tools"]) == ["search_course", "recall_memory", "forget_memory"]
+    assert _tool_names(provider.calls[0]["tools"]) == ["search_course", "recall_memory", "forget_memory", "search_past_chats"]
 
 
 def test_an_empty_memory_adds_the_rules_but_no_profile(memory):
@@ -181,6 +181,7 @@ def test_forget_deletes_a_memory_shown_this_turn(memory):
     assert memory.service.list(include_inactive=True) == []
     result = _tool_result(provider, "f1", call=1)
     assert "The student is auditing the course." in result and "saved chat" in result
+    assert "can no longer search" in result
     assert final["memories_used"] == []  # the app must not show forgotten text
 
 
@@ -224,3 +225,89 @@ def test_an_earlier_summary_goes_into_the_system_prompt():
     system = provider.calls[0]["messages"][0]["content"]
     assert "Earlier in this conversation, summarized" in system
     assert "<summary>\nWent over stubs, then fakes.\n</summary>" in system
+
+
+# --- search_past_chats (docs/specs/2026-11-10-past-chat-search-design.md §5) ----
+
+
+def _said_before(service, question, answer, cid="c-old", turn=0, title="Posture videos"):
+    assert service.index_turn(conversation_id=cid, turn_index=turn, title=title, at=SAID, question=question, answer=answer)
+
+
+def _past_search(query, call_id="p1"):
+    return ([], [ToolCall(id=call_id, name="search_past_chats", arguments={"query": query})])
+
+
+def test_the_model_can_search_what_was_said_in_earlier_chats(memory):
+    _said_before(memory.service, "Any posture videos?", "Try the Mayo Clinic one on sitting at a desk.")
+
+    _, _, provider = _run(
+        "Which posture video did you recommend?", [_past_search("posture video"), (["ok"], [])], memory.service
+    )
+
+    assert _tool_result(provider, "p1", call=1) == (
+        '[P1] "Posture videos", 2026-09-21\nStudent: Any posture videos?\n'
+        "Assistant: Try the Mayo Clinic one on sitting at a desk."
+    )
+
+
+def test_past_chat_labels_never_reach_the_answer(memory):
+    _said_before(memory.service, "Any posture videos?", "Try the Mayo Clinic one.")
+
+    text, final, _ = _run(
+        "Which posture video did you recommend?",
+        [_past_search("posture video"), (["Earlier I suggested the Mayo Clinic one [P1]. See also [P1, P2]."], [])],
+        memory.service,
+    )
+
+    assert text == "Earlier I suggested the Mayo Clinic one. See also."
+    assert final["citations"] == [] and final["grounded"] is False
+
+
+def test_past_chat_labels_keep_counting_across_searches(memory):
+    _said_before(memory.service, "Any posture videos?", "Try the Mayo Clinic one.")
+    _said_before(memory.service, "How do mocks work?", "A mock checks calls.", cid="c-older", title="Mocks")
+
+    _, _, provider = _run(
+        "What did we cover?",
+        [_past_search("posture videos", "p1"), _past_search("mocks", "p2"), (["ok"], [])],
+        memory.service,
+    )
+
+    assert _tool_result(provider, "p1", call=1).startswith("[P1] ")
+    assert _tool_result(provider, "p2", call=2).startswith('[P2] "Mocks"')
+
+
+def test_the_answer_event_lists_the_past_chats_it_looked_at(memory):
+    _said_before(memory.service, "Any posture videos?", "Try the Mayo Clinic one.")
+
+    _, final, _ = _run(
+        "Which posture video did you recommend?", [_past_search("posture video"), (["ok"], [])], memory.service
+    )
+
+    assert final["past_chats_used"] == [{"conversation_id": "c-old", "title": "Posture videos"}]
+
+
+def test_a_search_that_finds_nothing_says_so(memory):
+    _, final, provider = _run("What did we cover?", [_past_search("kubernetes"), (["ok"], [])], memory.service)
+
+    assert _tool_result(provider, "p1", call=1) == past_chats.NO_PAST_CHATS
+    assert final["past_chats_used"] == []
+
+
+def test_the_rules_say_a_past_answer_is_not_a_source_and_course_facts_get_rechecked(memory):
+    _, _, provider = _run("q", [(["ok"], [])], memory.service)
+
+    system = provider.calls[0]["messages"][0]["content"]
+    assert "search_past_chats" in system
+    assert "[P1]" in system
+    assert "check it with search_course" in system
+
+
+def test_without_memory_there_is_no_past_chat_search():
+    provider = FakeProvider([_past_search("posture"), (["ok"], [])])
+    events = list(chat.answer("q", [], "Test Course", lambda q: [], provider))
+
+    assert _tool_result(provider, "p1", call=1) == "Unknown tool or empty query."
+    assert "past_chats_used" not in next(e for e in events if "citations" in e)
+

@@ -30,6 +30,10 @@ profile in the system prompt, the question recalled once up front (the same
 reasoning as the first search), and recall_memory / forget_memory tools.
 Memory is never course material: its [M1] labels are stripped from the
 answer here, and forget_memory only accepts labels shown in this turn.
+With memory on there is also search_past_chats
+(docs/specs/2026-11-10-past-chat-search-design.md): the saved turns of the
+student's other chats, which memory doesn't keep because it never stores
+what the assistant said. Its [P1] labels are stripped the same way.
 """
 
 import datetime
@@ -44,6 +48,7 @@ from llama_index.core.schema import NodeWithScore
 import generation
 from llm import LLMProvider, ToolCall, TurnEnd
 from memory.compress import summary_block
+from memory.past_chats import format_turns
 from memory.recall import Hit, format_hits
 
 GENERAL_KNOWLEDGE_LABEL = "General knowledge (not from your course materials):"
@@ -106,7 +111,13 @@ when anything matched. Set include_history to true for questions about what chan
 [M1] labels in your answer; mention them naturally ("You mentioned you're on team 4"). Course facts still come \
 only from search_course, even if the student remembers them differently.
 - If the student asks you to forget something, find it with recall_memory unless it's already shown, then call \
-forget_memory with its label."""
+forget_memory with its label.
+- search_past_chats looks through what you and the student said in their earlier chats in this course. Use it \
+when they ask about an earlier conversation ("which video did you recommend?", "what did we go over last \
+week?") or when the answer needs details from one. Its results are labeled like [P1]: never write those \
+labels and never cite a past chat with [n]. Say where it came from in plain words ("In an earlier chat I \
+suggested..."). An earlier answer of yours can be wrong or out of date: before repeating a fact about the \
+course from one (a date, a rule, a weight), check it with search_course."""
 
 RECALL_TOOL = {
     "type": "function",
@@ -142,6 +153,23 @@ FORGET_TOOL = {
             "type": "object",
             "properties": {"labels": {"type": "array", "items": {"type": "string"}}},
             "required": ["labels"],
+        },
+    },
+}
+
+PAST_CHATS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "search_past_chats",
+        "description": (
+            "Search what was said in this student's earlier chats in this course, by them and by you: what you "
+            "recommended, explained or listed, and what they asked. Returns labeled turns like [P1] with the "
+            "chat's title and date. Not course material, and not this chat."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "What to look for."}},
+            "required": ["query"],
         },
     },
 }
@@ -185,8 +213,9 @@ Reply with JSON only: {"query": "..."}"""
 # One or more source numbers in brackets: [3], [1, 4], [1][3] is two matches.
 # The optional space before it goes too when a citation is dropped entirely.
 _CITATION = re.compile(r"(\s?)\[\s*(\d+(?:\s*,\s*\d+)*)\s*\]")
-# Memory labels, [M1] or [M1, M2]: always dropped, with the space before.
-_MEMORY_LABEL = re.compile(r"\s?\[\s*M\d+(?:\s*,\s*M?\d+)*\s*\]")
+# Memory labels, [M1] or [M1, M2], and past-chat labels, [P1]: always
+# dropped, with the space before.
+_MEMORY_LABEL = re.compile(r"\s?\[\s*[MP]\d+(?:\s*,\s*[MP]?\d+)*\s*\]")
 # Longest unclosed "[..." held back while streaming, in case it's a citation
 # split across chunks. Longer than any real citation, short enough that a
 # stray "[" in prose doesn't stall the stream.
@@ -348,6 +377,8 @@ def answer(
     today = today or datetime.date.today()
     used: dict[str, str] = {}  # memory id -> text, in the order first shown
     forgotten: set[str] = set()
+    past_shown = [0]  # how many [P…] labels this turn has used
+    past_used: dict[str, str] = {}  # chat id -> title, in the order first shown
 
     def run_search(query: str) -> str:
         parts = []
@@ -377,7 +408,8 @@ def answer(
             forgotten.update(ids)
             parts.append(
                 "Forgotten, deleted from memory: " + "; ".join(used[i] for i in ids) + " If the student said it in a "
-                "saved chat, it's still in that chat; deleting that chat removes it completely."
+                "saved chat, it's still there for them to read, but you can no longer search that part of it; "
+                "deleting that chat removes it completely."
             )
         if unknown:
             parts.append(
@@ -395,6 +427,13 @@ def answer(
             return show(memory.recall(query, include_history=call.arguments.get("include_history") is True))
         if memory is not None and call.name == "forget_memory":
             return run_forget(call.arguments.get("labels"))
+        if memory is not None and call.name == "search_past_chats" and has_query:
+            turns = memory.search_past_chats(query)
+            first = past_shown[0] + 1
+            past_shown[0] += len(turns)
+            for turn in turns:
+                past_used.setdefault(turn.conversation_id, turn.title)
+            return format_turns(turns, first_label=first, query=query)
         return "Unknown tool or empty query."
 
     # A tool the model calls runs after the answer may have started
@@ -418,7 +457,7 @@ def answer(
     )
     tools = [SEARCH_TOOL]
     if memory is not None:
-        tools = [SEARCH_TOOL, RECALL_TOOL, FORGET_TOOL]
+        tools = [SEARCH_TOOL, RECALL_TOOL, FORGET_TOOL, PAST_CHATS_TOOL]
         prompt += MEMORY_RULES
         profile = memory.profile_block()
         if profile:
@@ -492,6 +531,7 @@ def answer(
         final["usage"] = usage_total
     if memory is not None:
         final["memories_used"] = [{"id": i, "text": text} for i, text in used.items() if i not in forgotten]
+        final["past_chats_used"] = [{"conversation_id": cid, "title": title} for cid, title in past_used.items()]
     yield final
     yield {"done": True}
 

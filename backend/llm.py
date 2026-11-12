@@ -83,8 +83,8 @@ class OpenAIProvider:
         response = self._client.chat.completions.create(
             model=self._model,
             messages=messages,
-            temperature=temperature,
             response_format={"type": "json_object"},
+            **self._temperature_args(temperature),
             **self._extra,
         )
         try:
@@ -92,21 +92,30 @@ class OpenAIProvider:
         except json.JSONDecodeError:
             return None
 
-    def stream_chat(
-        self, messages: list[dict], tools: list[dict] | None, require_tool: bool = False
-    ) -> Iterator[str | TurnEnd]:
+    def _temperature_args(self, temperature: float) -> dict:
+        """Nothing for a model that only accepts its default temperature."""
+        return {} if self._provider.fixed_temperature else {"temperature": temperature}
+
+    def chat_request(self, messages: list[dict], tools: list[dict] | None, require_tool: bool = False) -> dict:
+        """What stream_chat sends."""
         kwargs = {
             "model": self._model,
             "messages": messages,
-            "temperature": self._temperature,
             "stream": True,
             "stream_options": {"include_usage": True},
+            **self._temperature_args(self._temperature),
             **self._extra,
         }
         if tools:
             kwargs["tools"] = tools
             if require_tool:
                 kwargs["tool_choice"] = "required"
+        return kwargs
+
+    def stream_chat(
+        self, messages: list[dict], tools: list[dict] | None, require_tool: bool = False
+    ) -> Iterator[str | TurnEnd]:
+        kwargs = self.chat_request(messages, tools, require_tool)
         # Tool calls arrive in pieces across chunks, keyed by index: the id and
         # name come once, the JSON arguments as string fragments. The usage
         # chunk (prompt/completion token counts) arrives last, on its own,
