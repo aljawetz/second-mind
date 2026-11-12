@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { askQuestion, getConversation, type Citation, type MemoryUsed } from "../../sidecar";
+import { askQuestion, getConversation, saveAnswerFeedback, type AnswerFeedback as Feedback, type Citation, type MemoryUsed } from "../../sidecar";
 import Answer, { stripCitations } from "./Answer";
+import AnswerFeedback from "./AnswerFeedback";
 
 interface ChatTurn {
   question: string;
@@ -10,6 +11,8 @@ interface ChatTurn {
   memoriesUsed: MemoryUsed[];
   status: "loading" | "streaming" | "done" | "error";
   error?: string;
+  savedTurnIndex?: number;
+  feedback?: Feedback | null;
 }
 
 export default function ChatPanel({
@@ -79,13 +82,15 @@ export default function ChatPanel({
         if (cancelled) return;
         setTitle(c.title);
         setTurns(
-          c.turns.map((t) => ({
+          c.turns.map((t, index) => ({
             question: t.question,
             answer: t.answer,
             citations: t.citations,
             grounded: t.grounded,
             memoriesUsed: [],
             status: "done" as const,
+            savedTurnIndex: index,
+            feedback: t.feedback,
           }))
         );
       })
@@ -165,7 +170,7 @@ export default function ChatPanel({
           setTurns((prev) =>
             prev[turnIndex]?.status === "error"
               ? prev
-              : prev.map((t, i) => (i === turnIndex ? { ...t, status: "done" } : t))
+              : prev.map((t, i) => (i === turnIndex ? { ...t, status: "done", savedTurnIndex: event.turn_index } : t))
           );
         }
       });
@@ -234,21 +239,29 @@ export default function ChatPanel({
                         onOpenCitation={onOpenCitation}
                         actions={
                           turn.status === "done" && (
-                            <div className="qa-actions">
-                              <button type="button" onClick={() => void copy(i)}>
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                  <rect x="9" y="9" width="11" height="11" rx="2" />
-                                  <path d="M5 15V5a2 2 0 0 1 2-2h10" />
-                                </svg>
-                                {copied === i ? "Copied" : "Copy"}
-                              </button>
-                              <button type="button" disabled={busy} onClick={() => void send(turn.question)}>
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                  <path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.2L3 16M3 21v-5h5" />
-                                </svg>
-                                Ask again
-                              </button>
-                            </div>
+                            <>
+                              <div className="qa-actions">
+                                <button type="button" onClick={() => void copy(i)}>
+                                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <rect x="9" y="9" width="11" height="11" rx="2" />
+                                    <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+                                  </svg>
+                                  {copied === i ? "Copied" : "Copy"}
+                                </button>
+                                <button type="button" disabled={busy} onClick={() => void send(turn.question)}>
+                                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.2L3 16M3 21v-5h5" />
+                                  </svg>
+                                  Ask again
+                                </button>
+                              </div>
+                              {conversationId && turn.savedTurnIndex !== undefined && (
+                                <AnswerFeedback
+                                  initialFeedback={turn.feedback}
+                                  onSave={(rating, note) => saveAnswerFeedback(courseId, conversationId, turn.savedTurnIndex!, rating, note)}
+                                />
+                              )}
+                            </>
                           )
                         }
                       />

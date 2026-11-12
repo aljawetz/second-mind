@@ -172,6 +172,8 @@ export interface MemoryUsed {
 
 export interface AskEvent {
   conversation_id?: string;
+  // Only present on done after the backend has saved this answer.
+  turn_index?: number;
   delta?: string;
   citations?: Citation[];
   grounded?: boolean;
@@ -224,12 +226,35 @@ export interface ConversationSummary {
   turn_count: number;
 }
 
+export interface AnswerFeedback {
+  rating: "up" | "down";
+  note: string;
+  updated_at: string;
+}
+
 export interface SavedTurn {
   question: string;
   answer: string;
   citations: Citation[];
   grounded: boolean;
   asked_at: string;
+  feedback?: AnswerFeedback | null;
+}
+
+export async function saveAnswerFeedback(
+  courseId: number,
+  conversationId: string,
+  turnIndex: number,
+  rating: AnswerFeedback["rating"] | null,
+  note = ""
+): Promise<AnswerFeedback | null> {
+  const res = await fetch(
+    `http://127.0.0.1:8756/courses/${courseId}/conversations/${conversationId}/turns/${turnIndex}/feedback`,
+    { method: "POST", body: JSON.stringify({ rating, note }) }
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message ?? `Couldn't save feedback (${res.status})`);
+  return data.feedback;
 }
 
 export async function listConversations(courseId: number): Promise<ConversationSummary[]> {

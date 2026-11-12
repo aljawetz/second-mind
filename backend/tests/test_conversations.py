@@ -103,7 +103,7 @@ def test_append_turn_does_not_recreate_a_deleted_chat_when_create_if_missing_is_
 
     saved = conversations.append_turn(tmp_path, COURSE, cid, _turn(question="Q2"), create_if_missing=False)
 
-    assert saved is False
+    assert saved is None
     assert conversations.list_conversations(tmp_path, COURSE) == []
 
 
@@ -169,3 +169,109 @@ def test_clearing_summaries_keeps_the_turns_and_how_far_memory_read(tmp_path):
     c = conversations.get_conversation(tmp_path, COURSE, "c-000000000001")
     assert (c["summary"], c["memory_processed_upto"], len(c["turns"])) == ("", 1, 1)
     assert not conversations.exists(tmp_path, COURSE, "c-000000000009")
+
+
+def test_appending_returns_the_saved_zero_based_index(tmp_path):
+    assert conversations.append_turn(tmp_path, COURSE, "c-index", _turn()) == 0
+    assert conversations.append_turn(tmp_path, COURSE, "c-index", _turn(question="Next")) == 1
+
+
+def test_feedback_save_replace_clear_preserves_chat_metadata(tmp_path):
+    from datetime import datetime, timezone
+
+    cid = "c-feedback"
+    conversations.append_turn(tmp_path, COURSE, cid, _turn())
+    conversations.set_memory_progress(tmp_path, COURSE, cid, processed_upto=1, summary="Existing memory")
+    before = conversations.get_conversation(tmp_path, COURSE, cid)
+    start = datetime.now(timezone.utc)
+    feedback = conversations.set_feedback(tmp_path, COURSE, cid, 0, "up", "Useful citation")
+    assert feedback["rating"] == "up" and feedback["note"] == "Useful citation"
+    timestamp = datetime.fromisoformat(feedback["updated_at"].replace("Z", "+00:00"))
+    assert start <= timestamp <= datetime.now(timezone.utc)
+    assert timestamp.utcoffset().total_seconds() == 0
+    saved = conversations.get_conversation(tmp_path, COURSE, cid)
+    assert saved["turns"][0] == {**_turn(), "feedback": feedback}
+    assert {k: v for k, v in saved.items() if k != "turns"} == {k: v for k, v in before.items() if k != "turns"}
+    replaced = conversations.set_feedback(tmp_path, COURSE, cid, 0, "down")
+    assert replaced["rating"] == "down" and replaced["note"] == ""
+    assert conversations.get_conversation(tmp_path, COURSE, cid)["turns"][0]["feedback"] == replaced
+    assert conversations.set_feedback(tmp_path, COURSE, cid, 0, None) is None
+    assert conversations.get_conversation(tmp_path, COURSE, cid) == before
+    assert conversations.set_feedback(tmp_path, COURSE, cid, 0, None) is None
+
+
+@pytest.mark.parametrize("rating,note", [("bad", ""), (True, ""), ([], ""), ("up", None), ("down", 2), ("up", "x" * 501)])
+def test_invalid_feedback_never_changes_the_file(tmp_path, rating, note):
+    conversations.append_turn(tmp_path, COURSE, "c-test", _turn())
+    before = conversations.get_conversation(tmp_path, COURSE, "c-test")
+    with pytest.raises(ValueError):
+        conversations.set_feedback(tmp_path, COURSE, "c-test", 0, rating, note)
+    assert conversations.get_conversation(tmp_path, COURSE, "c-test") == before
+
+
+@pytest.mark.parametrize("cid,index", [("c-missing", 0), ("c-test", -1), ("c-test", 1)])
+def test_feedback_missing_target_is_not_created(tmp_path, cid, index):
+    conversations.append_turn(tmp_path, COURSE, "c-test", _turn())
+    with pytest.raises(KeyError):
+        conversations.set_feedback(tmp_path, COURSE, cid, index, "down")
+    assert not conversations.exists(tmp_path, COURSE, "c-missing")
+
+
+def test_legacy_turn_feedback_and_course_filtered_review_order(tmp_path):
+    import json
+    from datetime import datetime, timezone
+    from unittest.mock import patch
+
+    conversations.append_turn(tmp_path, COURSE, "c-old", _turn())
+    path = tmp_path / "courses" / str(COURSE) / "conversations" / "c-old.json"
+    legacy = json.loads(path.read_text())
+    del legacy["summary"], legacy["memory_processed_upto"]
+    path.write_text(json.dumps(legacy))
+    conversations.append_turn(tmp_path, COURSE, "c-new", _turn(question="Newer answer"))
+    conversations.append_turn(tmp_path, COURSE, "c-new", _turn(question="Helpful answer"))
+    conversations.append_turn(tmp_path, COURSE + 1, "c-other", _turn())
+    with patch.object(conversations, "datetime") as clock:
+        clock.now.return_value = datetime(2026, 11, 10, 1, tzinfo=timezone.utc)
+        conversations.set_feedback(tmp_path, COURSE, "c-new", 0, "down", "First review")
+        clock.now.return_value = datetime(2026, 11, 10, 1, microsecond=1, tzinfo=timezone.utc)
+        feedback = conversations.set_feedback(tmp_path, COURSE, "c-old", 0, "down", "Latest review")
+        conversations.set_feedback(tmp_path, COURSE, "c-new", 1, "up")
+        conversations.set_feedback(tmp_path, COURSE + 1, "c-other", 0, "down")
+    rows = conversations.list_feedback(tmp_path, COURSE)
+    assert [(r["conversation_id"], r["turn_index"]) for r in rows] == [("c-old", 0), ("c-new", 0)]
+    assert rows[0] == {**_turn(), "feedback": feedback, "conversation_id": "c-old", "title": legacy["title"], "turn_index": 0}
+    assert "summary" not in conversations.get_conversation(tmp_path, COURSE, "c-old")
+    assert conversations.list_feedback(tmp_path, COURSE + 2) == []
+
+
+def test_feedback_concurrent_with_appends_and_memory_preserves_every_update(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+
+    cid = "c-race"
+    for i in range(12):
+        conversations.append_turn(tmp_path, COURSE, cid, _turn(question=f"Original {i}"))
+    gate = threading.Barrier(3)
+
+    def rate():
+        gate.wait()
+        for i in range(12):
+            conversations.set_feedback(tmp_path, COURSE, cid, i, "down", f"Note {i}")
+
+    def append():
+        gate.wait()
+        return [conversations.append_turn(tmp_path, COURSE, cid, _turn(question=f"New {i}")) for i in range(12)]
+
+    def remember():
+        gate.wait()
+        for i in range(12):
+            conversations.set_memory_progress(tmp_path, COURSE, cid, processed_upto=i + 1, summary=f"Summary {i}")
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(fn) for fn in (rate, append, remember)]
+        results = [f.result(timeout=10) for f in futures]
+    assert results[1] == list(range(12, 24))
+    saved = conversations.get_conversation(tmp_path, COURSE, cid)
+    assert len(saved["turns"]) == 24
+    assert [t["feedback"]["note"] for t in saved["turns"][:12]] == [f"Note {i}" for i in range(12)]
+    assert (saved["memory_processed_upto"], saved["summary"]) == (12, "Summary 11")
+    assert not list((tmp_path / "courses" / str(COURSE) / "conversations").glob("*.tmp"))

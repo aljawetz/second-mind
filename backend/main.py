@@ -94,6 +94,8 @@ SESSION_CHUNK_PATH = re.compile(r"^/sessions/([\w-]+)/chunks/(\d+)$")
 SESSION_NOTES_PATH = re.compile(r"^/sessions/([\w-]+)/notes$")
 CONVERSATION_LIST_PATH = re.compile(r"^/courses/(\d+)/conversations$")
 CONVERSATION_DETAIL_PATH = re.compile(r"^/courses/(\d+)/conversations/([\w-]+)$")
+TURN_FEEDBACK_PATH = re.compile(r"^/courses/(\d+)/conversations/([\w-]+)/turns/(-?\d+)/feedback$")
+FEEDBACK_LIST_PATH = re.compile(r"^/courses/(\d+)/feedback$")
 MEMORY_LIST_PATH = re.compile(r"^/courses/(\d+)/memories$")
 MEMORY_ALL_PATH = re.compile(r"^/courses/(\d+)/memories/all$")
 MEMORY_DETAIL_PATH = re.compile(r"^/courses/(\d+)/memories/([\w-]+)$")
@@ -276,6 +278,10 @@ class Handler(BaseHTTPRequestHandler):
             conversation_list_match = CONVERSATION_LIST_PATH.match(path)
             if conversation_list_match:
                 self._handle_list_conversations(conversation_list_match.group(1))
+                return
+            feedback_list_match = FEEDBACK_LIST_PATH.match(path)
+            if feedback_list_match:
+                self._handle_list_feedback(feedback_list_match.group(1))
                 return
             conversation_match = CONVERSATION_DETAIL_PATH.match(path)
             if conversation_match:
@@ -493,6 +499,11 @@ class Handler(BaseHTTPRequestHandler):
         ask_match = ASK_PATH.match(path)
         if ask_match:
             self._handle_ask(ask_match.group(1))
+            return
+
+        feedback_match = TURN_FEEDBACK_PATH.match(path)
+        if feedback_match:
+            self._handle_turn_feedback(*feedback_match.groups())
             return
 
         sync_match = SYNC_PATH.match(path)
@@ -714,6 +725,36 @@ class Handler(BaseHTTPRequestHandler):
             self._not_found()
             return
         self._send_json(200, {"conversations": conversations.list_conversations(SM_HOME, int(course_id))})
+
+    def _handle_list_feedback(self, course_id: str):
+        import conversations
+
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        self._send_json(200, {"turns": conversations.list_feedback(SM_HOME, int(course_id))})
+
+    def _handle_turn_feedback(self, course_id: str, cid: str, turn_index: str):
+        import conversations
+
+        raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        try:
+            data = json.loads(raw)
+            if not isinstance(data, dict) or "rating" not in data or data.keys() - {"rating", "note"}:
+                raise ValueError("expected rating and an optional note")
+            feedback = conversations.set_feedback(
+                SM_HOME, int(course_id), cid, int(turn_index), data["rating"], data.get("note", "")
+            )
+        except (ValueError, UnicodeDecodeError) as e:
+            self._send_json(400, {"error": {"code": "bad_request", "message": str(e)}})
+            return
+        except KeyError:
+            self._not_found("no such conversation or turn")
+            return
+        self._send_json(200, {"feedback": feedback})
 
     def _handle_conversation_detail(self, course_id: str, cid: str):
         import conversations
@@ -958,9 +999,11 @@ class Handler(BaseHTTPRequestHandler):
                         "grounded": final.get("grounded", False),
                         "asked_at": asked_at,
                     }
-                    if conversations.append_turn(
+                    turn_index = conversations.append_turn(
                         SM_HOME, course_id, cid, turn, create_if_missing=create_if_missing
-                    ):
+                    )
+                    if turn_index is not None:
+                        event = {**event, "turn_index": turn_index}
                         if memory_on:
                             MEMORY_WORKER.submit((course_id, cid))
                 self._write_chunk(event)

@@ -229,7 +229,7 @@ sup.fn{cursor:default}
 .qa-notes .kind{font-size:var(--t2);color:var(--muted);white-space:nowrap}
 .qa-memories{display:flex;flex-direction:column;align-items:flex-start;gap:2px;font-size:var(--t2);color:var(--muted)}
 .memory-chip{color:var(--text)}
-.qa-actions{display:flex;gap:4px;margin:-4px -6px -6px}
+.qa-actions{display:flex;flex-wrap:wrap;gap:4px;margin:-4px -6px -6px}
 .qa-actions button{
   display:flex;align-items:center;gap:6px;cursor:pointer;background:none;border:none;border-radius:6px;
   padding:4px 8px;font-size:var(--t1);color:var(--muted);
@@ -237,6 +237,14 @@ sup.fn{cursor:default}
 .qa-actions button:hover:not(:disabled){background:var(--raised);color:var(--text)}
 .qa-actions button:disabled{opacity:.5}
 .qa-actions svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.qa-actions button[aria-pressed="true"]{background:var(--active);color:var(--text)}
+.qa-actions .thumb-down{transform:rotate(180deg)}
+.answer-feedback{display:flex;flex-direction:column;gap:10px}
+.feedback-status{align-self:center;font-size:var(--t1);color:var(--muted);padding:0 8px}
+.feedback-note{display:flex;flex-direction:column;gap:8px;max-width:32rem}
+.feedback-note label{display:flex;flex-direction:column;gap:4px;font-size:var(--t2);color:var(--text-2)}
+.feedback-note textarea{width:100%;resize:vertical;border:1px solid var(--control);border-radius:var(--r-sm);padding:8px 10px;background:var(--surface);color:var(--text);font:inherit}
+.feedback-saved-note{margin:0;color:var(--muted);font-size:var(--t2);white-space:pre-wrap;overflow-wrap:anywhere}
 .qa-thinking{display:flex;align-items:center;gap:8px;color:var(--muted);margin:0}
 .qa-thinking::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--muted);opacity:.6;flex:none}
 .qa-a-error{color:var(--neg)}
