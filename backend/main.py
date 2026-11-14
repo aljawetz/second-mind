@@ -173,6 +173,26 @@ def _parse_include_inactive(query: str) -> bool:
     return val in ("1", "true", "yes")
 
 
+def _attach_memories_used(course_id: int, conversation: dict) -> None:
+    """A saved turn keeps the ids of the memories its answer drew on
+    (memory_ids). Swap them for memories_used: [{id, text}], the same shape
+    the live /ask stream sends, with today's text. Memories since forgotten,
+    replaced or archived are left out. If the memory store can't be read,
+    the chat still opens, just without them."""
+    turns = conversation.get("turns", [])
+    wanted = {i for t in turns for i in t.get("memory_ids", [])}
+    active: dict[str, str] = {}
+    if wanted and _memory_enabled():
+        try:
+            with _memory_service(course_id) as service:
+                active = {m.id: m.text for m in service.list() if m.id in wanted}
+        except sqlite3.Error:
+            traceback.print_exc()
+    for t in turns:
+        if "memory_ids" in t:
+            t["memories_used"] = [{"id": i, "text": active[i]} for i in t.pop("memory_ids") if i in active]
+
+
 def _memory_json(m) -> dict:
     def iso(t):
         return t.isoformat() if t else None
@@ -766,6 +786,7 @@ class Handler(BaseHTTPRequestHandler):
         if conversation is None:
             self._not_found("no such conversation")
             return
+        _attach_memories_used(int(course_id), conversation)
         self._send_json(200, conversation)
 
     def _handle_conversation_delete(self, course_id: str, cid: str):
@@ -999,6 +1020,11 @@ class Handler(BaseHTTPRequestHandler):
                         "grounded": final.get("grounded", False),
                         "asked_at": asked_at,
                     }
+                    # Ids only: the text is looked up again when the chat is
+                    # opened, so an edited memory shows its new text and a
+                    # forgotten one isn't kept on disk here.
+                    if final.get("memories_used"):
+                        turn["memory_ids"] = [m["id"] for m in final["memories_used"]]
                     turn_index = conversations.append_turn(
                         SM_HOME, course_id, cid, turn, create_if_missing=create_if_missing
                     )
