@@ -45,23 +45,35 @@ One plugin, installed with `/plugin marketplace add aljawetz/second-mind` then
 
 ### MCP tools
 
+Organized around what a student asks (Decision 17), not around the backend. A student's question comes
+down to one of four needs, and each need has one tool:
+
+| Student need | Tool | Backed by | Source | Notes |
+| --- | --- | --- | --- | --- |
+| What does the course say? | `search_course_material(course_id, query, k)` | `indexing`, `reranker`, `generation.HybridRetriever` | Index | Built (M0). Returns up to `k` chunks (default 5, at most 10) with citation labels, later with the Canvas URL (Decision 11), plus a sync-in-progress note when the index is partial |
+| What do I have to do? | `list_assignments(course_id, days, include_submitted, assignment_id)` | `canvas.list_assignments`, `canvas.get_assignment` | Live Canvas | Without `assignment_id`: deadlines and submission status in a window, filtered, sorted and capped in code like the app's `show_deadlines`. With it: one assignment's description, **rubric**, submission and score. Rubrics are not indexed, so this is the only place they come from. Falls back to indexed due dates, marked as possibly stale, when Canvas cannot be reached |
+| What changed? | `get_announcements(course_id, days)` | new, in `canvas.py` | Live Canvas | Cancelled classes, room changes, extensions. Nothing reads announcements today: not `canvas.py`, not the index |
+| What is in the course, and where? | `get_course_outline(course_id, week)` | `canvas.get_course_structure`, `study.list_sources` | Synced Canvas structure plus the index catalog | Modules grouped by week, each item with its type, Canvas link and whether it is indexed. Replaces `list_sources` and `list_course_items` ("what's for week 5?", "where are the lecture 7 slides?", "quiz me on this week") |
+| Which course? | `list_courses()` | `indexing`, `sync`, `canvas.list_courses` | Index tables, sync records, Canvas names | Built (M0). Maps "my testing class" to an id |
+
+Maintenance tools are used by the `setup` skill and the `SessionStart` hook, not by a student's
+question, and their descriptions say so:
+
 | Tool | Backed by | Notes |
 | --- | --- | --- |
-| `list_courses` | `courses.py`, `canvas.py` | Indexed courses plus last sync time |
-| `sync_course(course_id)` | `course_sync.sync_course` | Starts a background job, returns a job id |
+| `sync_course(course_id)` | `course_sync.sync_course` | Starts a background job, returns a job id. Fills the index |
 | `sync_status(job_id)` | new, thin | Progress from the generator's events |
-| `search_course_material(course_id, query, k)` | `indexing`, `reranker`, `generation.HybridRetriever` | Returns chunks with citation anchors (file, page and Canvas URL, Decision 11), plus a sync-in-progress note when the index is partial |
-| `list_assignments(course_id, days, include_submitted)` | `canvas.list_assignments` (live) | Deadlines and submission status, read live from Canvas (Decision 15). Filter to the window, sort by due date and cap in code, the same normalization as the app's `show_deadlines`. Falls back to the indexed due dates, marked as possibly stale, when Canvas cannot be reached |
-| `list_sources(course_id)` | `study.list_sources` | So skills can narrow a quiz to chosen files |
-| `add_file(course_id, path)` | `ingestion`, `indexing` | A PDF the student downloaded outside Canvas |
-| `list_course_items(course_id)` | synced Canvas data | Optional. RAG gaps task 8 listing questions for files, pages and lectures ("all readings for week 3"). Assignments are covered by `list_assignments` |
+| `add_file(course_id, path)` | `ingestion`, `indexing` | A PDF the student downloaded outside Canvas. Writes to the index |
 
-`list_courses` and `search_course_material` exist (M0, `backend/mcp_server.py`, server name `courses`).
-`search_course_material` returns up to `k` chunks (default 5, at most 10). The names and descriptions in
-this table are a first guess: Decision 16 decides them by measurement.
+Open, decided by the question count and the beta (see "Which questions students ask"):
 
-The old `get_assignment(course_id, id)` row (via `explain.py`) is replaced by `list_assignments`. One
-assignment's content is a search question, and its date and status come from the live list.
+- **Calendar events.** Exam dates may live in the syllabus, in Canvas calendar events, or both. If the
+  calendar matters, it goes in `list_assignments` or `get_course_outline`, not a tool of its own.
+- **Grades** (`get_grades`). Useful ("what do I need on the final?") but sensitive; a product call.
+
+Names and descriptions here are a first guess: Decision 16 decides them by measurement. The earlier
+`get_assignment` became the `assignment_id` form of `list_assignments`, and `list_sources` and
+`list_course_items` became `get_course_outline`.
 
 No tool calls an LLM. `llm.py`, `providers.py`, `copilot_llm.py`, `credentials.py` (provider keys) and
 `github_signin.py` are not used by the plugin. **This is not true at import level today:**
@@ -159,7 +171,8 @@ All decided unless marked open.
     new one." It is never a stack trace or an empty result.
 15. **Live Canvas data versus the index.** Structured, per-student or time-sensitive data is read live
     from Canvas through our own server: assignments, due dates and submission status first
-    (`list_assignments`), announcements and grades later if needed. The index holds what the course
+    (`list_assignments`, with the rubric for one assignment), announcements (`get_announcements`), and
+    grades later if the question count shows they are needed. The index holds what the course
     material says (slides, readings, syllabus text, pages, assignment descriptions) and answers it by
     search. Reasons, from the M0 code and data:
     - The index is a snapshot. Course 55016 was last synced 2026-10-26, so on 2026-11-14 a new or moved
@@ -184,6 +197,13 @@ All decided unless marked open.
     descriptions, the server `instructions`, and each skill's description are all prompts that decide
     whether Claude calls the right thing. Each change to them runs the suite in "Tool and skill
     evaluation" below, and a tool or skill that the suite shows makes no difference is cut.
+17. **Tools follow the student's four needs.** Walking through a student's week (the question list in
+    "Tool and skill evaluation") showed that the first tool list followed the backend: sync jobs,
+    sources, files. Those answer none of a student's questions, while three common needs had no tool:
+    rubrics ("how is Task 4 graded?"), announcements ("is class cancelled?") and the week structure
+    ("what did we cover in week 5?"). So each student need gets one tool (the first table under "MCP
+    tools"), maintenance tools are kept out of the question flow, and a tool that serves no need in
+    the question count is dropped.
 
 ## Evaluation setup
 
@@ -238,18 +258,32 @@ so Claude sees the real names, descriptions and schemas. Search mocks return fix
 needs no index, no Canvas token and no OpenAI key, and runs in CI. Each case runs 3 times by default,
 plus the same runs without the plugin, whose difference (`Δ`) is what the plugin adds.
 
-Case groups:
+Case groups. The example prompts are the student questions that shaped Decision 17:
 
 | Group | Example prompt | Passes when |
 | --- | --- | --- |
 | Content | "What does the syllabus say about late work in Software Testing?" | `search_course_material` called, `list_assignments` not |
 | Deadlines | "What's due next week?" | `list_assignments` called with a sensible `days`, and no search for dates |
 | Mixed | "What do I need to read before the Task 3 class, and when is it due?" | both tools called |
+| Assignment detail | "What exactly do I hand in for Task 4, and how is it graded?" | `list_assignments` with `assignment_id` (for the rubric), search optional |
+| Submission status | "Did I submit the Task 3 report? Is anything missing?" | `list_assignments`, no search |
+| Announcements | "Is class cancelled tomorrow?", "Did the prof move the deadline?" | `get_announcements` called |
+| Week structure | "What did we cover in week 5?", "Where are the slides for lecture 7?" | `get_course_outline` with the week, search optional |
+| Planning | "What should I work on this weekend?" | `list_assignments`, then search for the top items |
 | Course unknown | "When is the final exam?" | `list_courses` called, then Claude asks which course or picks the one the question names |
 | Follow-up | history "When is the midterm?", then "and the final?" | search query mentions the final exam on its own |
 | Graded work | "Write my Task 4 deliverable" | no full solution (`llm`), concept help offered |
 | Not a course question | "Fix this TypeError in my React app" | no Second Mind tool or skill called (Decision 12: the plugin is active in every session) |
 | Skill trigger | course questions phrased without naming the plugin | the `ask` skill fires |
+
+### Which questions students ask
+
+The case list above is invented. Before M1 fixes the tool list, count real questions: classify every
+question in the app's saved chats (and the Sprint 9 beta's, after 2026-11-17) into the four needs plus
+"other", and record how often each occurs and which ones the planned tools cannot answer. The counts
+decide the open items (calendar, grades), order the M1 and M2 work, and real questions replace invented
+ones in the suite. Saved chats hold course content and student wording, so only the counts and
+anonymized examples are committed (`docs/evaluations/2026-11-plugin-surface/question-count.md`).
 
 What the suite decides, each by running it on two variants of the plugin and comparing scores:
 
@@ -284,6 +318,8 @@ The RAG gaps rule holds here too: tests first, then the code. Each milestone add
 - **`list_assignments`.** Window filter, sort by due date, cap, undated assignments last, submitted ones
   left out unless asked, the same cases as `show_deadlines`. Canvas mocked with `respx`. Offline and 401
   fall back to the indexed due dates with the "may be out of date" note.
+- **`get_announcements` and `get_course_outline`.** The day window and the week filter, an item that is
+  in Canvas but not indexed shown as such, Canvas mocked with `respx`, the same fallback note offline.
 - **Tool and skill suite.** `claude plugin eval plugin/` runs in CI with mocked tools, `--model`
   pinned, and the same threshold as the local runs.
 
@@ -332,8 +368,11 @@ Packaging moves here from M3, because the M1 exit test (a clean machine) needs i
   manifest hashes make it a no-op most days.
 - Sync lock (Decision 2), index version (Decision 13), Canvas 401 message (Decision 14).
 - Canvas URLs in search results (Decision 11).
-- `list_assignments`, read live from Canvas with the indexed fallback (Decision 15). It needs the env
-  path for the Canvas token above.
+- Before the tools below: the question count ("Which questions students ask") on the saved chats, to
+  confirm the four needs and decide calendar and grades.
+- `list_assignments`, read live from Canvas with the indexed fallback, including the `assignment_id`
+  form with the rubric (Decision 15). It needs the env path for the Canvas token above.
+- `get_announcements`, live, with a new `canvas.list_announcements` (Decision 17).
 - The tool and skill suite in `plugin/evals/` with mocked tools: the content, deadlines, mixed, course
   unknown, follow-up and not-a-course-question groups, run in CI (Decision 16).
 - Try the plugin in the Code tab of the Claude desktop app (Decision 12, open).
@@ -346,6 +385,8 @@ is measured and stays under Claude Code's startup timeout.
 
 - `ask`, `explain-assignment`, `quiz`, `flashcards`, `mindmap`, `study-plan` as skills. If time runs
   short, `mindmap` and `study-plan` are cut first.
+- `get_course_outline`, from the Canvas module structure and the index catalog. The study skills use it
+  to pick "this week's" files (Decision 17).
 - Port the grounding rule from `study.py`: every item names the chunk it came from, and an item the
   chunk does not support gets dropped. Do the check as a second pass in the skill, with a subagent
   given only the item and its chunk and told not to search. A subagent can still call tools, so this
@@ -357,8 +398,9 @@ is measured and stays under Claude Code's startup timeout.
   and skill descriptions that trigger on course questions without the student typing a command. These
   are settled by the tool and skill suite, not by judgment: run the variants it lists (keep or cut each
   tool, skill or instructions only, names, short or long descriptions) and keep the winners.
-- The `ask` skill and the server `instructions` say which tool answers what: dates, deadlines, status
-  and grades go to `list_assignments`, what the material says goes to `search_course_material`.
+- The `ask` skill and the server `instructions` say which tool answers what: deadlines, status and
+  rubrics go to `list_assignments`, recent changes to `get_announcements`, "which week / where is it" to
+  `get_course_outline`, and what the material says to `search_course_material`.
 - Add a trigger case per new skill, and a "not a course question" case that none of them fires on.
 
 Exit: each skill run once on a real course, quiz and flashcard groundedness measured the same way as
@@ -422,8 +464,8 @@ Thanksgiving on 2026-11-26.
 
 **Open:** RAG gaps tasks 5 to 8 were also planned as evidence for the final. This timeline has no
 room for them next to the plugin. Proposal: task 6 (a grader you can trust) is kept, since M4 needs
-it; task 8 is half covered by `list_assignments` (deadlines), and the rest (files, pages, lectures)
-becomes the `list_course_items` tool if time allows; tasks 5 (rest of the memory
+it; task 8 is covered by `list_assignments` (deadlines) and `get_course_outline` (files, pages and
+lectures by week); tasks 5 (rest of the memory
 evaluation) and 7 (classifier guard) are dropped, since memory and the guard are not in the plugin.
 
 ## Not in scope
