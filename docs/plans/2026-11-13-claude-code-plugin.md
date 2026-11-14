@@ -1,0 +1,316 @@
+# Second Mind as a Claude Code plugin
+
+Draft, 2026-11-13. Revised the same day: the plugin is the product, not a second front end. Revised
+again after reading main as of PR #57 (follow-up rewrite, past-chat search, answer feedback,
+`gpt-5-mini` default, and the RAG gaps plan `2026-11-09-rag-course-gaps.md`).
+
+## Why
+
+Students will not download another app to study. They will add a plugin to the Claude Code they
+already use. The backend already does the hard parts locally (Canvas sync, ingestion, hybrid
+retrieval with a reranker, citations), so the plugin is a thin layer over the same code.
+
+Claude Code is the LLM. The plugin supplies retrieval and tools, and Claude answers, writes quizzes,
+flashcards and mind maps. The student pays with the Claude subscription they already have.
+
+That last sentence is an assumption, not a fact: Claude Code needs a paid Claude plan. The Sprint 9
+beta asks every tester whether they use Claude Code and which plan they have (see Timeline).
+
+## Product direction
+
+- **The plugin is the product.** It is what we publish, demo and point students to. A student
+  installs only the plugin. Nothing in the plugin depends on the app being installed.
+- **The app is frozen after the Sprint 9 beta.** It stays working for the final presentation, with no
+  new features. Shared backend modules can change, but the app must still build and run after each
+  change.
+- **Sprint 9 beta (2026-11-17) runs on the app as is.** Plugin work starts 2026-11-18. The beta
+  results, including the thumbs-up and thumbs-down feedback from PR #57, are the baseline the plugin
+  is compared against.
+- The repo (`aljawetz/second-mind`) is public, so the marketplace and the release assets work for
+  anyone.
+
+## What ships
+
+One plugin, installed with `/plugin marketplace add aljawetz/second-mind` then
+`/plugin install second-mind@second-mind`.
+
+| Piece | What it is |
+| --- | --- |
+| MCP server (stdio, Python) | Tools over the existing backend modules, see below |
+| Skills | `setup`, `ask`, `explain-assignment`, `quiz`, `flashcards`, `mindmap`, `study-plan` |
+| Hook | `SessionStart`: incremental sync in the background, never blocks the session |
+| Marketplace | `.claude-plugin/marketplace.json` at the repo root, plugin source in `plugin/` |
+
+### MCP tools
+
+| Tool | Backed by | Notes |
+| --- | --- | --- |
+| `list_courses` | `courses.py`, `canvas.py` | Indexed courses plus last sync time |
+| `sync_course(course_id)` | `course_sync.sync_course` | Starts a background job, returns a job id |
+| `sync_status(job_id)` | new, thin | Progress from the generator's events |
+| `search_course_material(course_id, query, k)` | `indexing`, `reranker`, `generation.HybridRetriever` | Returns chunks with citation anchors (file, page and Canvas URL, Decision 11), plus a sync-in-progress note when the index is partial |
+| `get_assignment(course_id, id)` | `explain.py` | Description, due date, `schedule_line` |
+| `list_sources(course_id)` | `study.list_sources` | So skills can narrow a quiz to chosen files |
+| `add_file(course_id, path)` | `ingestion`, `indexing` | A PDF the student downloaded outside Canvas |
+| `list_course_items(course_id)` | synced Canvas data | Optional. RAG gaps task 8 (listing questions such as "all readings for week 3") lands here instead of in the app |
+
+No tool calls an LLM. `llm.py`, `providers.py`, `copilot_llm.py`, `credentials.py` (provider keys) and
+`github_signin.py` are not used by the plugin. **This is not true at import level today:**
+`generation.py:16` and `explain.py:29` import `providers`, which imports `openai` at module level
+(`providers.py:18`), and `study.py` imports `generation`. Without `openai` installed, every tool
+except `list_courses` fails on import. M1 splits the retrieval half of `generation.py`
+(`HybridRetriever`, `rerank`, citations) from `build_query_engine`, or makes the `providers` import
+lazy, so the `mcp` extra in Decision 4 can leave `openai` out.
+
+## Decisions
+
+All decided unless marked open.
+
+1. **Data home.** The plugin keeps its index, manifests and models in `${CLAUDE_PLUGIN_DATA}`
+   (`~/.claude/plugins/data/<id>/`), which survives plugin updates and is removed on uninstall. The
+   server reads it as `SM_HOME`, set in `.mcp.json` `env` as `"SM_HOME": "${CLAUDE_PLUGIN_DATA}"`.
+   Setting `SM_HOME` explicitly overrides it, which is how M0 reads the index the app already built
+   in `~/.secondmind`. No index is shared with the app.
+2. **Single writer.** Claude Code starts one MCP server per session, so two open sessions mean two
+   servers. A lock in `SM_HOME` allows one sync at a time. It is an `fcntl.flock` on a lock file, not a
+   PID file: the server is killed when its session closes, often mid-sync, and the OS releases a
+   `flock` when the process dies, so a dead session never leaves a stale lock. The `SessionStart`
+   hook exits at once when the lock is held. Searches do not take the lock. A killed sync resumes
+   cleanly because the manifest commits per item (`sync.py:88`). Check in M1 that LanceDB reads stay
+   consistent while a sync writes.
+3. **Canvas token and URL.** Declared in `plugin.json` `userConfig`: `canvas_base_url` (string) and
+   `canvas_token` (string, `sensitive: true`, stored in the system keychain by Claude Code). They
+   reach the server through `env` with `${user_config.canvas_token}`, and the hook through
+   `CLAUDE_PLUGIN_OPTION_CANVAS_TOKEN`. Both need an env path in the backend:
+   - the token is read from `keyring` today (`credentials.py`, `canvas.py:36`);
+   - the base URL is read from `config.json` today (`canvas.py:43`).
+
+   In both cases the env value wins when set.
+4. **How the server is launched.** `uvx` from a git tag, never from `main`:
+   `uvx --from "sm-backend[mcp] @ git+https://github.com/aljawetz/second-mind@<tag>#subdirectory=backend" sm-mcp`.
+   Installed plugins are copied into a cache and paths with `..` are rejected (plugins reference), so
+   a relative path into `backend/` cannot work. The backend becomes an installable package with an
+   `sm-mcp` entry point. The `mcp` extra holds only what search and sync need: no `faster-whisper`,
+   `github-copilot-sdk`, `llama-index-llms-openai` or `openai` (which needs the import split above).
+   Each plugin release bumps `version` in `plugin.json` and the tag together.
+
+   The first `uvx` run downloads onnxruntime, lancedb, pyarrow, pandas and llama-index-core, which
+   can take longer than Claude Code waits for an MCP server to start. `setup` and the `SessionStart`
+   hook both warm the `uvx` cache first (`uvx ... sm-mcp --version`), and M1 measures the cold start
+   on a clean machine.
+5. **Where models live.** BGE and the reranker live in `SM_HOME/models`. They are produced today by
+   converting to ONNX locally (`scripts/convert_embedding_model.py`, `scripts/convert_reranker_model.py`,
+   the `convert` dependency group), which needs torch, so a student cannot build them. We publish the
+   exact `.onnx` files the app uses as GitHub Release assets with sha256 checksums, and the plugin
+   downloads and verifies them on first run. `MODEL_DIR` is relative to the module file today
+   (`embeddings.py:25`, `reranker.py:27`), which points inside site-packages once installed. It becomes
+   configurable, defaulting to `backend/models` so the app is unaffected.
+6. **Prerequisites.** Only `uv` is required (it fetches Python 3.13 itself). Tesseract is optional: it
+   is only used to OCR scanned PDFs, so `setup` reports that it is missing, prints the `brew install`
+   line and continues.
+7. **Memory use with several sessions.** Accept one server per session. Models load on the first
+   search, not at startup, so a session that never asks about a course costs almost nothing. A
+   shared daemon is only worth building if this hurts in practice.
+8. **How `ask` searches.** The app always makes the first search itself before the model writes
+   anything: the student's exact words, or for a follow-up a stand-alone rewrite
+   (`chat.standalone_query`, PR #55, `chat.py:470`). Claude Code decides on its own whether and what
+   to search. The `ask` skill and the server `instructions` say: search before answering any course
+   question, and for a follow-up, search with a stand-alone version of the question. Claude sees the
+   whole conversation, so it does the rewrite itself and no extra LLM call is needed. M0 measures how
+   often it actually searches first.
+9. **Graded-work rule.** The "don't do graded work" rule travels in the skills and server
+   `instructions`, as a prompt, the same as in the app today. The classifier guard in RAG gaps task 7
+   is app-side and does not apply to the plugin. If the plugin needs it later, it fits a
+   `UserPromptSubmit` hook that adds a stricter instruction, but that loads the embedding model on
+   every prompt, so it is not in v1.
+10. **Left out of v1.** Lecture capture and transcripts (they come from the app), memory
+    (`recall_memory`), past-chat search (`search_past_chats`, PR #56), conversation history (Claude
+    Code has its own), answer feedback (PR #57), the `grounded` flag, and provider choice. Lecture
+    support can come back later as `add_file` for an audio file, transcribed with Whisper.
+11. **Citations link to Canvas.** In the app a citation is a link, built in the frontend from the
+    Canvas origin and the item id (`app/src/citations.ts`, `/files/{id}` or `/pages/{url}`). In a
+    terminal, "lecture3.pdf, p.12" alone is hard to open. The server builds the same URL in Python
+    from `canvas_base_url` and returns it with each chunk, next to the label from
+    `generation.citation_for`, so Claude cites with a clickable link.
+12. **Where the plugin runs.** An installed plugin is active in every Claude Code session, including
+    sessions where the student is coding something unrelated. So:
+    - the `SessionStart` hook skips the sync when the last one finished less than 6 hours ago (the
+      last sync time `list_courses` already reports), so Canvas is not called on every session;
+    - tool descriptions, server `instructions` and skill descriptions stay short, since they are in
+      the context of every session.
+
+    Open: whether the plugin works outside the terminal (the Code tab in the Claude desktop app).
+    Many students who do not program would use it there. Checked in M1 and written into the README.
+13. **Index version.** After M3 the plugin has real users, and a plugin update can change chunking
+    (RAG gaps task 3 drops junk chunks and graded quiz text). `SM_HOME` stores an index version. On a
+    mismatch the server deletes the index and manifests and runs a full sync. No migration code, the
+    same rule as the app.
+14. **Canvas errors.** A 401 from Canvas (token expired or revoked) becomes one clear message from
+    `sync_status`, `setup` and the hook: "Your Canvas token no longer works. Run `/config` and paste a
+    new one." It is never a stack trace or an empty result.
+
+## Evaluation setup
+
+Facts from the RAG gaps plan that M0 and M4 depend on:
+
+- **Harness.** `backend/scripts/ask_modes_eval.py`. It drives `chat.answer()` in process, so it needs a
+  new mode that runs each case through `claude -p --plugin-dir plugin/` with the MCP tools allowed
+  (`--allowedTools "mcp__plugin_second-mind_<server>__*"`, the name Claude Code gives plugin MCP tools). Without that flag the tool calls are denied and the score
+  drops for a reason unrelated to quality.
+- **Judge.** `gpt-4o`, the same as Sprint 8 and the memory evaluation. It is not a Claude model, so
+  there is no self-grading bias. Sprint 8 called it too noisy to trust, so retrieval-level numbers
+  ("first search finds the fact", "any search finds it") count more than judge grades. The MCP server
+  logs every query it receives, so these can be scored for the plugin the same way.
+- **Baseline.** The app on current main, not the numbers in the Sprint 8 report: the default model is
+  now `gpt-5-mini` (PR #56) and follow-ups are rewritten (PR #55). The baseline is rerun on the same
+  machine and index as the plugin run.
+- **Sets.** Only courses 55016 and 56350 are indexed locally, and nobody can sync 18-654 (55710) any
+  more, so 8 of the 13 `sprint8-chat` cases cannot run. The usable sets are `heldout`,
+  `sprint8-test` (single questions) and `sprint9-chat` (follow-ups, written for the two local
+  courses).
+- **Frozen sets run once.** The rule in the RAG gaps plan is that frozen sets run once, when the
+  design is settled. M0 tunes and checks on `heldout` only. `sprint8-test` and `sprint9-chat` run in
+  M4.
+- **Confound.** M0 changes both the model and the pipeline. If the plugin scores lower, rerun the app
+  side with its search results handed to Claude through the same tool, to tell the two apart.
+
+## Tests
+
+The RAG gaps rule holds here too: tests first, then the code. Each milestone adds its tests to
+`backend/tests/` and they run with the existing suite.
+
+- **MCP server.** Each tool answers over stdio with a valid MCP response. Nothing but protocol goes
+  to stdout (a test fails on any stray `print`). Sync-in-progress note on a missing and on a partial
+  table.
+- **Lock.** Two processes start a sync at once: one runs, the other gets "sync already running". A
+  process killed mid-sync leaves no lock behind.
+- **Installed package.** In CI, install `sm-backend[mcp]` into a fresh venv and import every module
+  the tools use. This catches the `providers` / `openai` import before a student does.
+- **Config and errors.** Env values for the Canvas token and URL win over keyring and `config.json`.
+  A Canvas 401 gives the message in Decision 14. An index version mismatch triggers a full sync.
+- **Citations.** The Canvas URL for a file and for a page match what `app/src/citations.ts` builds.
+
+## Milestones
+
+### M0. Spike (2026-11-18, one day)
+
+Goal: find out whether answers in Claude Code are as good as the app's before building anything else.
+
+- `backend/mcp_server.py` with `list_courses` and `search_course_material` only, with `SM_HOME`
+  pointed at the index the app already built.
+- Move all logging to stderr. On stdio, stdout is the protocol channel, and
+  `course_sync.py:252` prints to stdout today.
+- An `ask` skill that carries the citation rules from `SYSTEM_PROMPT` in `chat.py` and the search
+  rule in Decision 8.
+- Load it with `claude --plugin-dir` and ask real course questions.
+- Add the `claude -p` mode to `ask_modes_eval.py` and run `heldout` against the app baseline (see
+  Evaluation setup).
+
+Exit: on `heldout`, facts found by search and judge grades are not below the app's beyond the noise
+seen across repeated runs, Claude searches before answering on every course question, first search
+under 10 s, later ones under 2 s. If quality drops, find out why before M1.
+
+### M1. Packaging, sync and setup
+
+Packaging moves here from M3, because the M1 exit test (a clean machine) needs it.
+
+- Split `generation.py` so retrieval does not import `providers` (see MCP tools).
+- Backend as an installable package with the `mcp` extra and the `sm-mcp` entry point (Decision 4).
+- Models published as release assets, downloaded and checked on first run (Decision 5).
+- `sync_course` as a background job with `sync_status`. Do not run it inside one MCP call: the first
+  sync takes minutes and will hit the call timeout.
+- `search_course_material` says "sync in progress, N of M items" while a course is being indexed.
+  This covers both cases: the table does not exist yet (the app returns empty today on
+  `TableNotFoundError`, `main.py:923`, which Claude would read as "the material does not say"), and
+  the table exists but is partial, where results are real but incomplete.
+- `userConfig` for the Canvas URL and token, read through env (Decision 3).
+- `setup` skill: check prerequisites, warm the `uvx` cache, Canvas connection, model download, pick
+  courses, first sync, with progress shown.
+- `SessionStart` hook for incremental sync, skipped within 6 hours of the last one (Decision 12). The
+  manifest hashes make it a no-op most days.
+- Sync lock (Decision 2), index version (Decision 13), Canvas 401 message (Decision 14).
+- Canvas URLs in search results (Decision 11).
+- Try the plugin in the Code tab of the Claude desktop app (Decision 12, open).
+
+Exit: a clean machine with only Claude Code and `uv` goes from install to a first cited answer using
+only `setup`, and the citation link opens the right file in Canvas. The cold start of the MCP server
+is measured and stays under Claude Code's startup timeout.
+
+### M2. Study skills
+
+- `ask`, `explain-assignment`, `quiz`, `flashcards`, `mindmap`, `study-plan` as skills. If time runs
+  short, `mindmap` and `study-plan` are cut first.
+- Port the grounding rule from `study.py`: every item names the chunk it came from, and an item the
+  chunk does not support gets dropped. Do the check as a second pass in the skill, with a subagent
+  given only the item and its chunk and told not to search. A subagent can still call tools, so this
+  is an instruction, not isolation. The method matches Sprint 6 but the model does not, so the
+  numbers are compared as "same method, different model".
+- Outputs are files in the student's working directory (Markdown, CSV for flashcards, Mermaid or
+  HTML for mind maps).
+- Make Claude call the tools on its own: tool names and descriptions, the server `instructions`,
+  and skill descriptions that trigger on course questions without the student typing a command.
+
+Exit: each skill run once on a real course, quiz and flashcard groundedness measured the same way as
+in `2026-10-03-study-artifacts.md`.
+
+### M3. Distribution
+
+- `marketplace.json`, `plugin.json`, `.mcp.json`. `claude plugin validate --strict` passes.
+- README leads with "Install as a Claude Code plugin". The app moves to a short section further down.
+- Test on a second machine and with one person outside the team who has not seen the repo.
+
+Exit: that person completes install, setup and one cited question without help.
+
+### M4. Evaluation, docs and final presentation
+
+- `sprint8-test` and `sprint9-chat`, run once, for both the app and the plugin. Written up next to
+  the Sprint 8 and Sprint 9 reports.
+- If RAG gaps task 6 (hand-graded sample, judge agreement) is done, its grading method is used here.
+- Privacy note in the README: course content goes through Anthropic via Claude Code. The Canvas
+  token and the index stay on the student's machine.
+- Final presentation demos the plugin. The app is shown as the earlier prototype that the plugin
+  grew out of.
+
+## Risks
+
+| Risk | Mitigation |
+| --- | --- |
+| Few students have Claude Code or a paid Claude plan | Ask every Sprint 9 beta tester before plugin work starts |
+| Quality drops because Claude sees raw chunks instead of the app's pipeline | M0 comparison on `heldout`, same judge, retrieval-level numbers first |
+| Claude answers without searching | Search rule in `ask` and the server `instructions`, measured in M0 |
+| The `mcp` extra fails on import | Split `generation.py` in M1, test the installed package, not the repo venv |
+| First `uvx` run is slower than the MCP startup timeout | Cache warm-up in `setup` and the hook, measured on a clean machine in M1 |
+| First sync is slow and looks hung | Background job, progress in `sync_status`, clear message in `setup` |
+| Install friction now decides adoption, since the plugin is the only way in | Only `uv` required, Tesseract optional, M3 outside tester |
+| Two sessions sync at once and corrupt the index | `flock` sync lock (Decision 2) |
+| The plugin only works in the terminal, and most students do not use one | Try the desktop app in M1 (Decision 12) |
+| A plugin update leaves an index built with old chunking | Index version, full sync on mismatch (Decision 13) |
+| An expired Canvas token looks like empty course material | Clear 401 message (Decision 14) |
+| Model files differ from what the index was built with | One published set of files, checksum on download |
+| A push to `main` breaks every installed plugin | Install from a tag (Decision 4) |
+| Shared backend changes break the app before the final presentation | Build and run the app after each change to a shared module |
+| Thirteen days is not enough for M0 to M4 plus the RAG gaps tasks for the final | See Timeline, open |
+
+## Timeline
+
+The final is due 2026-12-01 (RAG gaps plan). That leaves 2026-11-18 to 2026-11-30 for M0 to M4, with
+Thanksgiving on 2026-11-26.
+
+- Until 2026-11-17: Sprint 9 beta on the app. No plugin work. The beta survey adds two questions: do
+  you use Claude Code, and which Claude plan do you have.
+- 2026-11-18: M0.
+- 2026-11-19 to 11-21: M1.
+- 2026-11-22 to 11-24: M2.
+- 2026-11-25 to 11-27: M3, outside tester.
+- 2026-11-28 to 11-30: M4 and the presentation.
+
+**Open:** RAG gaps tasks 5 to 8 were also planned as evidence for the final. This timeline has no
+room for them next to the plugin. Proposal: task 6 (a grader you can trust) is kept, since M4 needs
+it; task 8 becomes the `list_course_items` tool if time allows; tasks 5 (rest of the memory
+evaluation) and 7 (classifier guard) are dropped, since memory and the guard are not in the plugin.
+
+## Not in scope
+
+- Lecture recording and live transcription in Claude Code.
+- Windows and Linux.
+- New features in the app.
