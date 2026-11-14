@@ -164,14 +164,19 @@ export default function Answer({
         </ol>
       )}
       {memoriesUsed.length > 0 && (
-        <div className="qa-memories">
-          <span>Used what you told me earlier</span>
-          {memoriesUsed.map((m) => (
-            <span className="memory-chip" key={m.id}>
-              {m.text}
-            </span>
-          ))}
-        </div>
+        // One quiet line by default; the memories themselves only on request.
+        <details className="qa-memories">
+          <summary>
+            Used {memoriesUsed.length === 1 ? "1 thing" : `${memoriesUsed.length} things`} you told me earlier
+          </summary>
+          <ul>
+            {memoriesUsed.map((m) => (
+              <li className="memory-chip" key={m.id} title={m.text}>
+                {m.text}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
       {actions}
     </>
