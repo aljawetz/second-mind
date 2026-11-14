@@ -68,7 +68,8 @@ jobs:
         # files with st_nlink > 1 when it loads its bundled stopwords.
         env:
           UV_LINK_MODE: copy
-        run: uv sync --all-groups
+        # --all-extras: the plugin's MCP server (the `mcp` extra) has tests too.
+        run: uv sync --all-groups --all-extras
 
       - name: Generate the embedding model
         # Public Hugging Face checkpoint, no secrets needed — gives
