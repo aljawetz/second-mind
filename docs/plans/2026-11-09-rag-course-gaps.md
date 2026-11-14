@@ -100,7 +100,7 @@
   4. The report in `docs/evaluations/`. The results so far are in PR #56's description and commit messages.
 - **Proof so far:** PR #56.
 
-### 6. A grader you can trust (final)
+### 6. A grader you can trust (final) — steps 1 to 3 done on branch `grader-check`
 
 - **Why:** Sprint 8 called the automatic grader "too noisy to trust", and "have a person grade a fixed sample" is still open. The final needs believable answer-quality numbers.
 - **Build:**
@@ -109,6 +109,18 @@
   3. Try the course's pairwise format (old answer vs new answer, verdict first) and keep whichever agrees with people more.
   4. Add generated questions that need two documents, to grow the 60-question set.
 - **Proof:** the agreement numbers and the chosen grading method, written up in `docs/evaluations/`.
+- **Done (2026-11-13), [report](../evaluations/2026-11-grader-check/report.md):**
+  - **Sample:** 20 `sprint9-chat` turns, each with two answers: the shipped chat and the no-search baseline, both on gpt-4o-mini. Graded blind by one person, split into a tuning half and a reporting half.
+  - **Picks:** the judge picked the same better answer on 20 of 20 turns, in both formats.
+  - **Grades:** pointwise grades matched on 32 of 40 answers (kappa 0.82 on the tuning half, 0.52 on the reporting half). All 8 misses are the judge one step stricter.
+  - **Order:** the pairwise verdict never changed with the order of the answers.
+  - **Decision:** keep the pointwise judge, prompt unchanged. Trust it for comparisons against a baseline, and read its "good" counts as a lower bound.
+  - **Code:** `backend/scripts/grader_check.py`, and `--model` in `ask_modes_eval.py`. Mode G also no longer sends a temperature that gpt-5-mini rejects.
+- **Left:**
+  - Step 4 (two-document questions).
+  - A second grader.
+  - A close pair (two versions of the chat) to test the judge where Sprint 8 found it noisy.
+  - Flagged answers from task 2, once the outside tester has used it.
 
 ### 7. A classifier guard for graded-work requests (final)
 

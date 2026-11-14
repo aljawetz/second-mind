@@ -396,3 +396,12 @@ def test_fixed_answer_keys_match_real_file_names():
     primer = [["TDD Primer.pdf · p.1"]]
     for case_id in ("K4", "V6"):
         assert recall_at_5(cases[case_id]["gold_source"], primer) is True
+
+
+def test_the_answering_model_can_be_swapped_for_a_cheaper_one():
+    module = _load_eval()
+
+    module.set_answer_model("gpt-4o-mini")
+    assert (module.MODEL, module.ANSWER_PROVIDER.model, module.ANSWER_PROVIDER.fixed_temperature) == ("gpt-4o-mini", "gpt-4o-mini", False)
+    module.set_answer_model("gpt-5-mini")
+    assert module.ANSWER_PROVIDER.fixed_temperature is True  # takes only its default temperature
