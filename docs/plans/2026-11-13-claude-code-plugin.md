@@ -2,7 +2,9 @@
 
 Draft, 2026-11-13. Revised the same day: the plugin is the product, not a second front end. Revised
 again after reading main as of PR #57 (follow-up rewrite, past-chat search, answer feedback,
-`gpt-5-mini` default, and the RAG gaps plan `2026-11-09-rag-course-gaps.md`).
+`gpt-5-mini` default, and the RAG gaps plan `2026-11-09-rag-course-gaps.md`). Revised 2026-11-14 after
+the M0 spike was built: live Canvas data versus the index (Decision 15), and an evaluation of the tool
+and skill surface itself (Decision 16, "Tool and skill evaluation").
 
 ## Why
 
@@ -49,10 +51,17 @@ One plugin, installed with `/plugin marketplace add aljawetz/second-mind` then
 | `sync_course(course_id)` | `course_sync.sync_course` | Starts a background job, returns a job id |
 | `sync_status(job_id)` | new, thin | Progress from the generator's events |
 | `search_course_material(course_id, query, k)` | `indexing`, `reranker`, `generation.HybridRetriever` | Returns chunks with citation anchors (file, page and Canvas URL, Decision 11), plus a sync-in-progress note when the index is partial |
-| `get_assignment(course_id, id)` | `explain.py` | Description, due date, `schedule_line` |
+| `list_assignments(course_id, days, include_submitted)` | `canvas.list_assignments` (live) | Deadlines and submission status, read live from Canvas (Decision 15). Filter to the window, sort by due date and cap in code, the same normalization as the app's `show_deadlines`. Falls back to the indexed due dates, marked as possibly stale, when Canvas cannot be reached |
 | `list_sources(course_id)` | `study.list_sources` | So skills can narrow a quiz to chosen files |
 | `add_file(course_id, path)` | `ingestion`, `indexing` | A PDF the student downloaded outside Canvas |
-| `list_course_items(course_id)` | synced Canvas data | Optional. RAG gaps task 8 (listing questions such as "all readings for week 3") lands here instead of in the app |
+| `list_course_items(course_id)` | synced Canvas data | Optional. RAG gaps task 8 listing questions for files, pages and lectures ("all readings for week 3"). Assignments are covered by `list_assignments` |
+
+`list_courses` and `search_course_material` exist (M0, `backend/mcp_server.py`, server name `courses`).
+`search_course_material` returns up to `k` chunks (default 5, at most 10). The names and descriptions in
+this table are a first guess: Decision 16 decides them by measurement.
+
+The old `get_assignment(course_id, id)` row (via `explain.py`) is replaced by `list_assignments`. One
+assignment's content is a search question, and its date and status come from the live list.
 
 No tool calls an LLM. `llm.py`, `providers.py`, `copilot_llm.py`, `credentials.py` (provider keys) and
 `github_signin.py` are not used by the plugin. **This is not true at import level today:**
@@ -148,6 +157,33 @@ All decided unless marked open.
 14. **Canvas errors.** A 401 from Canvas (token expired or revoked) becomes one clear message from
     `sync_status`, `setup` and the hook: "Your Canvas token no longer works. Run `/config` and paste a
     new one." It is never a stack trace or an empty result.
+15. **Live Canvas data versus the index.** Structured, per-student or time-sensitive data is read live
+    from Canvas through our own server: assignments, due dates and submission status first
+    (`list_assignments`), announcements and grades later if needed. The index holds what the course
+    material says (slides, readings, syllabus text, pages, assignment descriptions) and answers it by
+    search. Reasons, from the M0 code and data:
+    - The index is a snapshot. Course 55016 was last synced 2026-10-26, so on 2026-11-14 a new or moved
+      assignment is invisible to search.
+    - The index has no submission status. It stores each description plus one "Due ... Worth N points"
+      line (`course_sync.schedule_line`). `canvas.list_assignments` returns `submitted`, `late` and
+      `missing` with `include[]=submission`.
+    - "What is due next week?" is a filter over records, not a similarity search. Search returns the top
+      5 to 10 chunks and can miss items, which is why the app needed `chat.expand_relative_dates` and
+      why RAG gaps task 8 calls listing questions unanswerable from five results.
+    - The app already made this choice: `show_deadlines` in the generative UI plan reads Canvas live.
+    - Canvas cannot search the text inside PDFs and slides, so content stays indexed, with page and
+      slide numbers for citations, local and fast (0.3 to 0.4 s per search in M0).
+
+    The live call goes through our server, not a third-party Canvas MCP: one install and one token for
+    the student, a few tools in every session's context instead of dozens (Decision 12), and no write
+    tools (the canvas-mcp server tried locally exposed 96 tools, including bulk grading, deleting
+    assignments and sending messages). `canvas.py` already handles pagination, 429 retries and 403/404
+    fallbacks. When Canvas cannot be reached (offline, Decision 14's 401), `list_assignments` answers
+    from the indexed due dates and says they may be out of date.
+16. **The tool and skill surface is measured, not assumed.** Which tools exist, their names and
+    descriptions, the server `instructions`, and each skill's description are all prompts that decide
+    whether Claude calls the right thing. Each change to them runs the suite in "Tool and skill
+    evaluation" below, and a tool or skill that the suite shows makes no difference is cut.
 
 ## Evaluation setup
 
@@ -173,6 +209,62 @@ Facts from the RAG gaps plan that M0 and M4 depend on:
   M4.
 - **Confound.** M0 changes both the model and the pipeline. If the plugin scores lower, rerun the app
   side with its search results handed to Claude through the same tool, to tell the two apart.
+- **Mode P isolation (M0).** `ask_modes_eval.py --only P` runs `claude -p --plugin-dir plugin/
+  --setting-sources "" --tools Skill`, allows only the plugin's tools, and sets
+  `ENABLE_CLAUDEAI_MCP_SERVERS=false`. Without that env var the student's claude.ai connectors (Gmail,
+  Drive, ...) load into every run, at about 8x the tokens. `--strict-mcp-config` cannot be used: it
+  also drops the plugin's own server. The appended system prompt names the course, as the app's course
+  picker does, and pins "today" to `EVAL_TODAY`. A search of another course is counted
+  (`wrong_course_search_count`), not scored.
+- **Deadline questions.** Questions such as "what is due next week?" are scored against a saved Canvas
+  snapshot (the `list_assignments` response at a fixed date), replayed to the tool, because live Canvas
+  changes daily and results would drift between runs.
+
+## Tool and skill evaluation
+
+`ask_modes_eval.py` asks whether answers are right. This suite asks an earlier question: does Claude
+call the right tool and skill, with a sensible query, and does it leave them alone when they do not
+apply (Decision 16)? It uses `claude plugin eval` with the cases in `plugin/evals/`. Each case is a
+prompt a student would type plus graders:
+
+- `tool_used` with `input_match`: the right tool was called, with arguments that make sense (the right
+  `course_id`, a stand-alone query on a follow-up).
+- `tool_used` with `min: 0` and `max: 0` and `arm: both`: a tool or skill was not called.
+- `tool_order`: for example `list_courses` before `search_course_material` when no course is named.
+- `llm` rubrics: only for refusal and labeling behavior (graded work, general knowledge).
+
+The MCP tools are mocked (`plugin/evals/mocks/courses/`), with `_tools.json` saved from the real server
+so Claude sees the real names, descriptions and schemas. Search mocks return fixed chunks, so the suite
+needs no index, no Canvas token and no OpenAI key, and runs in CI. Each case runs 3 times by default,
+plus the same runs without the plugin, whose difference (`Δ`) is what the plugin adds.
+
+Case groups:
+
+| Group | Example prompt | Passes when |
+| --- | --- | --- |
+| Content | "What does the syllabus say about late work in Software Testing?" | `search_course_material` called, `list_assignments` not |
+| Deadlines | "What's due next week?" | `list_assignments` called with a sensible `days`, and no search for dates |
+| Mixed | "What do I need to read before the Task 3 class, and when is it due?" | both tools called |
+| Course unknown | "When is the final exam?" | `list_courses` called, then Claude asks which course or picks the one the question names |
+| Follow-up | history "When is the midterm?", then "and the final?" | search query mentions the final exam on its own |
+| Graded work | "Write my Task 4 deliverable" | no full solution (`llm`), concept help offered |
+| Not a course question | "Fix this TypeError in my React app" | no Second Mind tool or skill called (Decision 12: the plugin is active in every session) |
+| Skill trigger | course questions phrased without naming the plugin | the `ask` skill fires |
+
+What the suite decides, each by running it on two variants of the plugin and comparing scores:
+
+- **Which tools to keep.** Remove one (for example `list_courses`, by putting course ids in the server
+  `instructions`) and see whether scores drop.
+- **Whether the `ask` skill is needed**, or the server `instructions` alone are enough. Skill-only and
+  instructions-only variants against both.
+- **Names.** For example `search_course_material` against `search_course`, and `list_assignments`
+  against `get_deadlines`. Claude sees `mcp__plugin_second-mind_courses__<tool>`, so the server name
+  is part of the name too.
+- **Descriptions.** Short against long, since every description is in the context of every session
+  (Decision 12). The shortest one that keeps the scores wins.
+
+A variant is a copy of `plugin/` with one change, run with the same cases and `--model` pinned, so a
+model rollout is not mistaken for a plugin change. Results go in `docs/evaluations/2026-11-plugin-surface/`.
 
 ## Tests
 
@@ -189,12 +281,22 @@ The RAG gaps rule holds here too: tests first, then the code. Each milestone add
 - **Config and errors.** Env values for the Canvas token and URL win over keyring and `config.json`.
   A Canvas 401 gives the message in Decision 14. An index version mismatch triggers a full sync.
 - **Citations.** The Canvas URL for a file and for a page match what `app/src/citations.ts` builds.
+- **`list_assignments`.** Window filter, sort by due date, cap, undated assignments last, submitted ones
+  left out unless asked, the same cases as `show_deadlines`. Canvas mocked with `respx`. Offline and 401
+  fall back to the indexed due dates with the "may be out of date" note.
+- **Tool and skill suite.** `claude plugin eval plugin/` runs in CI with mocked tools, `--model`
+  pinned, and the same threshold as the local runs.
 
 ## Milestones
 
-### M0. Spike (2026-11-18, one day)
+### M0. Spike (built 2026-11-13, branch `feat/plugin-m0-spike`)
 
 Goal: find out whether answers in Claude Code are as good as the app's before building anything else.
+
+Status: built ahead of the 11-18 start. The server, the `ask` skill, the plugin folder, mode P and their
+tests are in. Smoke runs of P on two `heldout` questions searched first, fired the skill and found the
+gold source on the first search. The heldout run against mode E (needs the OpenAI eval key) is the
+remaining step, and the exit below is still open.
 
 - `backend/mcp_server.py` with `list_courses` and `search_course_material` only, with `SM_HOME`
   pointed at the index the app already built.
@@ -230,6 +332,10 @@ Packaging moves here from M3, because the M1 exit test (a clean machine) needs i
   manifest hashes make it a no-op most days.
 - Sync lock (Decision 2), index version (Decision 13), Canvas 401 message (Decision 14).
 - Canvas URLs in search results (Decision 11).
+- `list_assignments`, read live from Canvas with the indexed fallback (Decision 15). It needs the env
+  path for the Canvas token above.
+- The tool and skill suite in `plugin/evals/` with mocked tools: the content, deadlines, mixed, course
+  unknown, follow-up and not-a-course-question groups, run in CI (Decision 16).
 - Try the plugin in the Code tab of the Claude desktop app (Decision 12, open).
 
 Exit: a clean machine with only Claude Code and `uv` goes from install to a first cited answer using
@@ -248,10 +354,16 @@ is measured and stays under Claude Code's startup timeout.
 - Outputs are files in the student's working directory (Markdown, CSV for flashcards, Mermaid or
   HTML for mind maps).
 - Make Claude call the tools on its own: tool names and descriptions, the server `instructions`,
-  and skill descriptions that trigger on course questions without the student typing a command.
+  and skill descriptions that trigger on course questions without the student typing a command. These
+  are settled by the tool and skill suite, not by judgment: run the variants it lists (keep or cut each
+  tool, skill or instructions only, names, short or long descriptions) and keep the winners.
+- The `ask` skill and the server `instructions` say which tool answers what: dates, deadlines, status
+  and grades go to `list_assignments`, what the material says goes to `search_course_material`.
+- Add a trigger case per new skill, and a "not a course question" case that none of them fires on.
 
 Exit: each skill run once on a real course, quiz and flashcard groundedness measured the same way as
-in `2026-10-03-study-artifacts.md`.
+in `2026-10-03-study-artifacts.md`. The tool and skill suite passes, and every kept tool and skill has a
+variant run showing the scores drop without it.
 
 ### M3. Distribution
 
@@ -289,6 +401,10 @@ Exit: that person completes install, setup and one cited question without help.
 | Model files differ from what the index was built with | One published set of files, checksum on download |
 | A push to `main` breaks every installed plugin | Install from a tag (Decision 4) |
 | Shared backend changes break the app before the final presentation | Build and run the app after each change to a shared module |
+| Deadline answers come from a stale index | `list_assignments` reads Canvas live (Decision 15) |
+| Canvas is slow, rate-limited or unreachable when a deadline question comes in | 429 retries in `canvas.py`; offline or 401 falls back to indexed due dates with a "may be out of date" note |
+| Claude calls the wrong tool, or calls the plugin during unrelated work | Tool and skill suite with routing and "not a course question" cases, in CI (Decision 16) |
+| Tool descriptions grow until they crowd every session's context | The suite's short-against-long variants; shortest description that keeps the score wins |
 | Thirteen days is not enough for M0 to M4 plus the RAG gaps tasks for the final | See Timeline, open |
 
 ## Timeline
@@ -298,15 +414,16 @@ Thanksgiving on 2026-11-26.
 
 - Until 2026-11-17: Sprint 9 beta on the app. No plugin work. The beta survey adds two questions: do
   you use Claude Code, and which Claude plan do you have.
-- 2026-11-18: M0.
-- 2026-11-19 to 11-21: M1.
+- 2026-11-13: M0 built (ahead of plan). 2026-11-18: M0's heldout run against the app, and the exit.
+- 2026-11-19 to 11-21: M1, including `list_assignments` and the first tool and skill suite.
 - 2026-11-22 to 11-24: M2.
 - 2026-11-25 to 11-27: M3, outside tester.
 - 2026-11-28 to 11-30: M4 and the presentation.
 
 **Open:** RAG gaps tasks 5 to 8 were also planned as evidence for the final. This timeline has no
 room for them next to the plugin. Proposal: task 6 (a grader you can trust) is kept, since M4 needs
-it; task 8 becomes the `list_course_items` tool if time allows; tasks 5 (rest of the memory
+it; task 8 is half covered by `list_assignments` (deadlines), and the rest (files, pages, lectures)
+becomes the `list_course_items` tool if time allows; tasks 5 (rest of the memory
 evaluation) and 7 (classifier guard) are dropped, since memory and the guard are not in the plugin.
 
 ## Not in scope
