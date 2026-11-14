@@ -158,7 +158,9 @@ class Searcher:
         import generation
 
         k = max(1, min(int(k), MAX_K))
-        if not indexing.index_exists(self._home / "index.lancedb", _table(course_id)):
+        # Checked only until the course's retriever exists: a missing course
+        # is not cached, so it is found once a sync creates its table.
+        if course_id not in self._retrievers and not indexing.index_exists(self._home / "index.lancedb", _table(course_id)):
             return {
                 "course_id": course_id,
                 "results": [],
@@ -172,16 +174,11 @@ class Searcher:
             self._retrievers[course_id] = self._make(course_id)
         expanded = chat.expand_relative_dates(query, self._today())
         nodes = list(self._retrievers[course_id].retrieve(expanded))[:k]
-        results = []
-        for n, node_with_score in enumerate(nodes, start=1):
-            node = node_with_score.node
-            results.append(
-                {
-                    "n": n,
-                    "source": generation.build_citations([node_with_score])[0]["label"],
-                    "text": node.get_content()[: chat.SNIPPET_CHARS],
-                }
-            )
+        labels = [c["label"] for c in generation.build_citations(nodes)]
+        results = [
+            {"n": n, "source": label, "text": node_with_score.node.get_content()[: chat.SNIPPET_CHARS]}
+            for n, (label, node_with_score) in enumerate(zip(labels, nodes), start=1)
+        ]
         seconds = time.perf_counter() - start
         logger.info("search course=%s query=%r results=%d seconds=%.2f", course_id, query, len(results), seconds)
         _log_query(course_id, query, results, seconds)
@@ -196,13 +193,20 @@ def build_server(home: Path | None = None, searcher: Searcher | None = None, nam
     canvas.SM_HOME = home  # canvas.py reads the Canvas base URL from SM_HOME/config.json
     searcher = searcher or Searcher(home)
     server = MCPServer("second-mind", instructions=INSTRUCTIONS)
+    names: dict[int, str] = {}
+
+    def cached_names() -> dict[int, str]:
+        # Names rarely change, so Canvas is asked until one read succeeds.
+        if not names:
+            names.update(names_for())
+        return names
 
     # Tools return dicts, not JSON strings: a str result reaches Claude
     # wrapped as {"result": "<escaped JSON>"}, seen in the first live run.
     @server.tool()
     def list_courses() -> dict:
         """List the student's courses indexed on this machine: course_id, name, last sync time."""
-        return list_courses_result(home, names_for)
+        return list_courses_result(home, cached_names)
 
     @server.tool()
     def search_course_material(course_id: int, query: str, k: int = DEFAULT_K) -> dict:

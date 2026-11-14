@@ -36,10 +36,12 @@ not. Run from backend/:
 """
 
 import argparse
+import atexit
 import datetime
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -1049,6 +1051,7 @@ def run_p(_index, question: str, history: list[dict], course_name: str) -> dict:
     if _plugin_workdir is None:
         # An empty directory: nothing to read, and resume finds sessions by it.
         _plugin_workdir = Path(tempfile.mkdtemp(prefix="sm-plugin-eval-"))
+        atexit.register(shutil.rmtree, _plugin_workdir, ignore_errors=True)
     query_log = _plugin_workdir / f"queries-{uuid.uuid4().hex}.jsonl"
     session_id = history[-1].get("session_id") if history else None
     cmd = plugin_command(question, course_id_for(course_name), course_name, session_id, PLUGIN_MODEL)
@@ -1061,7 +1064,9 @@ def run_p(_index, question: str, history: list[dict], course_name: str) -> dict:
     events = [json.loads(line) for line in proc.stdout.splitlines() if line.startswith("{")]
     if not any(e.get("type") == "result" for e in events):
         raise RuntimeError(f"claude -p exited {proc.returncode}: {proc.stderr[-2000:]}")
+    # The log holds course text: read it, then delete it.
     log = [json.loads(line) for line in query_log.read_text().splitlines()] if query_log.exists() else []
+    query_log.unlink(missing_ok=True)
     out = parse_plugin_run(events, log)
     out["seconds"] = round(elapsed, 2)
     return out
@@ -2380,7 +2385,9 @@ def main():
             continue
         course_id = case.get("course", DEFAULT_COURSE)
         if course_id not in indexes:
-            indexes[course_id] = indexing.load_index(SM_HOME / "index.lancedb", f"course_{course_id}")
+            # Mode P searches through the plugin's own server, not this index.
+            only_plugin = set(modes) == {"P"}
+            indexes[course_id] = None if only_plugin else indexing.load_index(SM_HOME / "index.lancedb", f"course_{course_id}")
         index = indexes[course_id]
         for mode in modes:
             history: list[dict] = []
@@ -2396,7 +2403,8 @@ def main():
                     facts = case["turn_facts"][turn_num - 1] if case.get("turn_facts") else case.get("gold_facts")
                     out.update(search_metrics(out, case.get("gold_source"), facts))
                 # Mode P reports Claude Code's own cost; the others are priced here.
-                out["cost"] = out["cost"] if "cost" in out else cost(out["prompt_tokens"], out["completion_tokens"])
+                if "cost" not in out:
+                    out["cost"] = cost(out["prompt_tokens"], out["completion_tokens"])
                 if judge_client is not None:
                     out.update(judge(judge_client, COURSE_NAMES[course_id], case, question, out["answer"], out["sources"], turn_gold_answer(case, turn_num)))
                 results.append(
@@ -2474,6 +2482,10 @@ def print_report(results: list[dict], modes: list[str]) -> None:
         a = avg(values)
         return f"{a * 100:.0f}%" if a is not None else "n/a"
 
+    def flag_pct(rows, key):
+        # Share of rows where a yes/no metric is true; None means not applicable.
+        return pct([1 if r.get(key) else 0 if r.get(key) is False else None for r in rows])
+
     print("\n## Summary\n")
     header = "| mode | good | ok | bad | citation acc | faithful | correct abstention | searched | first search@5 | recall@5 | precision@5 | p50 (s) | p95 (s) | avg cost |"
     print(header)
@@ -2488,11 +2500,11 @@ def print_report(results: list[dict], modes: list[str]) -> None:
         cost_str = f"${avg_cost:.5f}" if avg_cost is not None else "n/a"
         print(
             f"| {mode} | {good} | {ok} | {bad} | {pct([r.get('citation_accuracy') for r in rows])} | "
-            f"{pct([1 if r.get('faithful') else 0 if r.get('faithful') is False else None for r in rows])} | "
-            f"{pct([1 if r.get('abstained_correctly') else 0 if r.get('abstained_correctly') is False else None for r in rows])} | "
-            f"{pct([1 if r.get('searched') else 0 if r.get('searched') is False else None for r in rows])} | "
-            f"{pct([1 if r.get('first_search_recall_at_5') else 0 if r.get('first_search_recall_at_5') is False else None for r in rows])} | "
-            f"{pct([1 if r.get('recall_at_5') else 0 if r.get('recall_at_5') is False else None for r in rows])} | "
+            f"{flag_pct(rows, 'faithful')} | "
+            f"{flag_pct(rows, 'abstained_correctly')} | "
+            f"{flag_pct(rows, 'searched')} | "
+            f"{flag_pct(rows, 'first_search_recall_at_5')} | "
+            f"{flag_pct(rows, 'recall_at_5')} | "
             f"{pct([r.get('precision_at_5') for r in rows])} | "
             f"{_percentile(seconds, 50) or 'n/a'} | {_percentile(seconds, 95) or 'n/a'} | {cost_str} |"
         )

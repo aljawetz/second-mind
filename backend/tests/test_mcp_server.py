@@ -236,3 +236,19 @@ def test_stdio_subprocess_speaks_only_protocol_on_stdout(tmp_path, caplog):
     assert [r.getMessage() for r in caplog.records if r.name == "mcp.client.stdio"] == []
     assert courses == {"courses": []}
     assert "not indexed" in missing["note"]
+
+
+def test_course_names_are_read_from_canvas_until_one_read_succeeds(tmp_path):
+    _build_index(tmp_path, COURSE)
+    replies = iter([{}, {COURSE: "Requirements"}, {COURSE: "renamed"}])
+    calls = []
+
+    def names():
+        calls.append(1)
+        return next(replies)
+
+    server = mcp_server.build_server(tmp_path, names_for=names)
+    first, second, third = (_call(server, "list_courses")["courses"][0]["name"] for _ in range(3))
+
+    assert (first, second, third) == (None, "Requirements", "Requirements")
+    assert len(calls) == 2
