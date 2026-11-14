@@ -620,6 +620,13 @@ def print_report(rows: list[dict], llm: CountingLLM | None = None) -> None:
             print(f"  of the output tokens, {llm.reasoning_tokens} were hidden reasoning")
         for (stage, model), slot in sorted(llm.usage.items()):
             print(f"  {stage:7s} {model:12s} {slot['calls']:5d} calls  {slot['prompt_tokens']:9d} in  {slot['completion_tokens']:7d} out")
+    import json_retry
+
+    retries = json_retry.counts()
+    print(
+        f"\nJSON retries (memory writes not reused from the cache): {retries['retried']} retried, "
+        f"{retries['recovered']} recovered, {retries['gave_up']} gave up"
+    )
 
 
 def main() -> None:

@@ -66,11 +66,20 @@
   - Chunk counts before and after on the two local courses.
   - `--retrieval-only` on `sprint8` showing facts found didn't drop.
 
-### 4. One retry when a model reply isn't valid JSON (beta)
+### 4. One retry when a model reply isn't valid JSON (beta) — built on branch `json-retry`
 
 - **Why:** `llm.complete_json` returns `None` on bad JSON. Memory extraction then saves nothing for that turn. Consolidation falls back to adding a memory, which can create duplicates. Copilot has no JSON mode, so it's more exposed.
 - **Build:** on a parse failure or a reply of the wrong shape, one retry that adds "Return exactly one valid JSON object." Count retries in the log.
 - **Proof:** tests for retry-then-success and retry-then-give-up.
+- **Built (2026-11-13):**
+  - `json_retry.complete_json(llm, messages, valid=..., label=...)` wraps any provider, so OpenAI, DeepSeek and Copilot all get it. A reply that is `None` (not JSON) or fails the caller's `valid` check gets one more call with a reminder appended. A second failure returns `None`, which every caller already handles.
+  - Provider errors (network, auth) aren't retried.
+  - Each retry is logged with its caller and outcome (recovered or gave up), and counted. `memory_eval.py` prints the counts at the end of a run.
+  - It lives in its own module so the `memory/` package doesn't import the OpenAI client.
+  - Used by memory extraction (needs a `memories` list), consolidation (needs a known decision and a valid target), and quiz/flashcard writing and checking in `study.py`. Bad items inside a usable list are still dropped one by one, not retried.
+  - **Not used by the follow-up rewrite** (`chat.standalone_query`). It runs while the student waits, a retry would add about a second, and a failed rewrite already falls back to the student's own words plus the forced search.
+  - 18 new tests. All 681 backend tests pass (9 skipped).
+- **Left:** how often retries happen with real models isn't measured. A cached `memory_eval.py` run doesn't call extraction, so it needs a run that writes memories afresh.
 
 ### 5. Build the memory evaluation (final) — development sample done, in PR #56
 

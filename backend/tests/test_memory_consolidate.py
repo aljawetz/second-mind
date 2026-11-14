@@ -164,12 +164,26 @@ def test_add_after_asking_keeps_both(store):
     ],
 )
 def test_an_unusable_decision_falls_back_to_adding(store, reply):
-    # A duplicate can be cleaned up later; a lost fact can't be recovered.
+    # Unusable on the retry too. A duplicate can be cleaned up later; a lost
+    # fact can't be recovered.
     old = _stored(store, RECOMMENDER)
 
-    decision = _consolidate(store, _candidate(FRAUD), ScriptedLLM(reply))
+    decision = _consolidate(store, _candidate(FRAUD), ScriptedLLM(reply, reply))
 
     assert decision.action == "ADD"
     assert _all_ids(store) == {old, decision.memory_id}
     assert store.get(old).valid_to is None
     assert store.ops()[-1]["reason"] == "consolidation: fallback"
+
+
+@pytest.mark.parametrize("bad", [None, {"decision": "UPDATE", "target": 2}, "UPDATE 1"])
+def test_an_unusable_decision_is_asked_for_once_more_before_falling_back(store, bad):
+    old = _stored(store, RECOMMENDER)
+    llm = ScriptedLLM(bad, {"decision": "UPDATE", "target": 1})
+
+    decision = _consolidate(store, _candidate(FRAUD), llm)
+
+    assert len(llm.calls) == 2
+    assert "valid JSON object" in llm.calls[1][-1]["content"]
+    assert decision.action == "UPDATE"
+    assert store.get(old).superseded_by == decision.memory_id

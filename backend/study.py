@@ -32,6 +32,7 @@ import lancedb
 
 import generation
 import indexing
+import json_retry
 
 KINDS = ("quiz", "flashcards")
 COUNTS = {
@@ -381,26 +382,33 @@ def _write_round(kind, labelled, *, asked, difficulty, topic, avoid, llm) -> tup
     request = f"Write {asked} {noun}.\nDifficulty: {difficulty}, {_DIFFICULTY[kind][difficulty]}.\nFocus: {focus}\n"
     if avoid:
         request += "\nAlready written, so don't repeat these or ask about the same facts:\n" + "\n".join(f"- {a}" for a in avoid) + "\n"
-    reply = llm.complete_json(
+    field = "questions" if kind == "quiz" else "cards"
+    reply = json_retry.complete_json(
+        llm,
         [
             {"role": "system", "content": _QUIZ_SYSTEM if kind == "quiz" else _FLASHCARD_SYSTEM},
             {"role": "user", "content": f"{request}\nMaterial:\n{_format_material(labelled)}"},
         ],
+        valid=lambda r: isinstance(r, dict) and isinstance(r.get(field), list),
+        label=f"study.{kind}",
         temperature=0.7,
     )
     if not isinstance(reply, dict):
         return "", []
-    raw_items = reply.get("questions" if kind == "quiz" else "cards")
+    raw_items = reply.get(field)
     return _text(reply.get("title")), raw_items if isinstance(raw_items, list) else []
 
 
 def _check(kind, items, llm) -> list[int] | None:
     """1-based numbers of the items their passage supports, or None if the check failed."""
-    verdict = llm.complete_json(
+    verdict = json_retry.complete_json(
+        llm,
         [
             {"role": "system", "content": _CHECK_SYSTEM},
             {"role": "user", "content": "\n\n".join(_describe_for_check(kind, n, it) for n, it in enumerate(items, 1))},
-        ]
+        ],
+        valid=lambda r: isinstance(r, dict) and isinstance(r.get("supported"), list),
+        label="study.check",
     )
     supported = verdict.get("supported") if isinstance(verdict, dict) else None
     if not isinstance(supported, list):
