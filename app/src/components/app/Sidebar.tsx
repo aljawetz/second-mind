@@ -3,6 +3,7 @@ import type { AvailableCourse } from "../../types";
 import type { ConversationSummary, SessionSummary } from "../../sidecar";
 import { useDismissOnOutside } from "../../hooks/useDismissOnOutside";
 import LogoMark from "../LogoMark";
+import ThemePicker from "./ThemePicker";
 
 function canvasHost(canvasBaseUrl: string): string {
   try {
@@ -240,6 +241,7 @@ export default function Sidebar({
               >
                 Model provider
               </button>
+              <ThemePicker />
             </div>
           )}
         </div>
