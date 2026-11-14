@@ -37,9 +37,6 @@ import sync
 
 logger = logging.getLogger("sm-mcp")
 
-# The app's chat cutoff (main.CHAT_SIMILARITY_CUTOFF), copied rather than
-# imported: main.py starts the app's HTTP server machinery on import.
-SIMILARITY_CUTOFF = 0.5
 DEFAULT_K = 5
 MAX_K = 10
 
@@ -114,12 +111,18 @@ def list_courses_result(home: Path, names_for: Callable[[], dict[int, str]] = ca
     }
 
 
+def make_retriever(index):
+    """The app's chat retriever for one index. It returns MAX_K, not its
+    default 5, so search's [:k] can reach MAX_K; fusion and the reranker
+    order before they cut, so the first 5 of 10 are the same top 5."""
+    import generation  # lazy: it loads model code that list_courses never needs
+
+    return generation.HybridRetriever(index, similarity_top_k=MAX_K, similarity_cutoff=generation.SIMILARITY_CUTOFF)
+
+
 def _retriever_factory(home: Path):
     def make(course_id: int):
-        import generation
-
-        index = indexing.load_index(home / "index.lancedb", _table(course_id))
-        return generation.HybridRetriever(index, similarity_cutoff=SIMILARITY_CUTOFF)
+        return make_retriever(indexing.load_index(home / "index.lancedb", _table(course_id)))
 
     return make
 
@@ -161,6 +164,8 @@ class Searcher:
         # Checked only until the course's retriever exists: a missing course
         # is not cached, so it is found once a sync creates its table.
         if course_id not in self._retrievers and not indexing.index_exists(self._home / "index.lancedb", _table(course_id)):
+            # Logged too, so the eval sees the tool call even though nothing came back.
+            _log_query(course_id, query, [], 0.0)
             return {
                 "course_id": course_id,
                 "results": [],

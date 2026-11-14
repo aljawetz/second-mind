@@ -962,7 +962,6 @@ def run_g(_index, question: str, history: list[dict], course_name: str) -> dict:
 
 PLUGIN_DIR = Path(__file__).resolve().parent.parent.parent / "plugin"
 PLUGIN_TOOLS = "mcp__plugin_second-mind_courses__*"
-PLUGIN_SEARCH_TOOL = "mcp__plugin_second-mind_courses__search_course_material"
 PLUGIN_MODEL: str | None = None  # --claude-model; None is Claude Code's default
 _plugin_workdir: Path | None = None
 BRACKETED = re.compile(r"\[([^\[\]]+)\]")
@@ -1006,10 +1005,13 @@ def plugin_env(query_log: Path, today: datetime.date = EVAL_TODAY, base: dict | 
     }
 
 
-def parse_plugin_run(events: list[dict], query_log: list[dict]) -> dict:
+def parse_plugin_run(events: list[dict], query_log: list[dict], course_id: int) -> dict:
     """A claude -p stream-json run plus the server's query log, as one eval
     row. Searches and what each returned come from the query log, in order;
-    cited sources are the [label]s in the answer that a search returned."""
+    cited sources are the [label]s in the answer that a search returned.
+    Only searches of course_id count: Claude can pick another course, and
+    scoring what that returned would grade the wrong material. Those queries
+    go in wrong_course_searches instead, so the row shows it happened."""
     result = next((e for e in events if e.get("type") == "result"), None)
     if result is None or result.get("is_error") or result.get("subtype") != "success":
         raise RuntimeError(f"claude -p failed: {(result or {}).get('result') or (result or {}).get('subtype') or 'no result event'}")
@@ -1020,16 +1022,20 @@ def parse_plugin_run(events: list[dict], query_log: list[dict]) -> dict:
     ]
     init = next((e for e in events if e.get("type") == "system" and e.get("subtype") == "init"), {})
     answer = result.get("result") or ""
-    returned = {label for entry in query_log for label in entry["sources"]}
+    on_course = [entry for entry in query_log if entry["course_id"] == course_id]
+    wrong_course = [{"course_id": e["course_id"], "query": e["query"]} for e in query_log if e["course_id"] != course_id]
+    returned = {label for entry in on_course for label in entry["sources"]}
     cited = list(dict.fromkeys(m for m in BRACKETED.findall(answer) if m in returned))
     usage = result.get("usage") or {}
     return {
         "answer": answer,
-        "searches": [entry["query"] for entry in query_log],
+        "searches": [entry["query"] for entry in on_course],
         "sources": cited,
-        "retrieved": [entry["sources"] for entry in query_log],
-        "retrieved_texts": [entry["texts"] for entry in query_log],
-        "search_seconds": [entry["seconds"] for entry in query_log],
+        "retrieved": [entry["sources"] for entry in on_course],
+        "retrieved_texts": [entry["texts"] for entry in on_course],
+        "search_seconds": [entry["seconds"] for entry in on_course],
+        "wrong_course_searches": wrong_course,
+        "wrong_course_search_count": len(wrong_course),
         "used_skill": any(b["name"] == "Skill" for b in tool_uses),
         "session_id": result.get("session_id"),
         "model": init.get("model"),
@@ -1054,7 +1060,8 @@ def run_p(_index, question: str, history: list[dict], course_name: str) -> dict:
         atexit.register(shutil.rmtree, _plugin_workdir, ignore_errors=True)
     query_log = _plugin_workdir / f"queries-{uuid.uuid4().hex}.jsonl"
     session_id = history[-1].get("session_id") if history else None
-    cmd = plugin_command(question, course_id_for(course_name), course_name, session_id, PLUGIN_MODEL)
+    course_id = course_id_for(course_name)
+    cmd = plugin_command(question, course_id, course_name, session_id, PLUGIN_MODEL)
     start = time.perf_counter()
     proc = subprocess.run(
         cmd, cwd=_plugin_workdir, env=plugin_env(query_log), stdin=subprocess.DEVNULL,
@@ -1067,7 +1074,7 @@ def run_p(_index, question: str, history: list[dict], course_name: str) -> dict:
     # The log holds course text: read it, then delete it.
     log = [json.loads(line) for line in query_log.read_text().splitlines()] if query_log.exists() else []
     query_log.unlink(missing_ok=True)
-    out = parse_plugin_run(events, log)
+    out = parse_plugin_run(events, log, course_id)
     out["seconds"] = round(elapsed, 2)
     return out
 
@@ -1081,7 +1088,8 @@ def search_metrics(out: dict, gold_source: str | None, gold_facts: list[str] | N
     texts = out.get("retrieved_texts")
     return {
         "searched": bool(retrieved),
-        "first_search_recall_at_5": recall_at_5(gold_source, retrieved[:1]),
+        # The plugin's search can return up to 10; recall@5 means its top 5.
+        "first_search_recall_at_5": recall_at_5(gold_source, [labels[:5] for labels in retrieved[:1]]),
         "first_search_fact": None if texts is None else recall_by_fact(gold_facts, texts[0] if texts else []),
         "any_search_fact": None if texts is None else recall_by_fact(gold_facts, [t for ts in texts for t in ts]),
     }
@@ -2398,8 +2406,11 @@ def main():
                 if mode in MODES_WITHOUT_RETRIEVAL:
                     out["recall_at_5"] = out["precision_at_5"] = None
                 else:
-                    out["recall_at_5"] = recall_at_5(case.get("gold_source"), out["retrieved"])
-                    out["precision_at_5"] = precision_at_k(case.get("gold_source"), out["retrieved"], case.get("gold_sources"))
+                    # Each search's top 5 only: the plugin's search can return up to
+                    # 10, and the other modes never return more than 5.
+                    top5 = [labels[:5] for labels in out["retrieved"]]
+                    out["recall_at_5"] = recall_at_5(case.get("gold_source"), top5)
+                    out["precision_at_5"] = precision_at_k(case.get("gold_source"), top5, case.get("gold_sources"))
                     facts = case["turn_facts"][turn_num - 1] if case.get("turn_facts") else case.get("gold_facts")
                     out.update(search_metrics(out, case.get("gold_source"), facts))
                 # Mode P reports Claude Code's own cost; the others are priced here.
@@ -2442,7 +2453,7 @@ GRADES_FIELDS = (
     "case", "course", "kind", "gold_confidence", "variant_of", "turn", "mode",
     "seconds", "cost", "recall_at_5", "precision_at_5", "correct", "citation_accuracy",
     "faithful", "abstained_correctly", "searched", "first_search_recall_at_5", "first_search_fact",
-    "any_search_fact", "used_skill", "search_seconds", "model",
+    "any_search_fact", "used_skill", "search_seconds", "model", "wrong_course_search_count",
 )
 
 

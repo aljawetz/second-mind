@@ -23,7 +23,6 @@ from llama_index.core.schema import TextNode
 from llama_index.vector_stores.lancedb import LanceDBVectorStore
 from mcp import Client, StdioServerParameters
 
-import generation
 import indexing
 import mcp_server
 import sync
@@ -60,12 +59,14 @@ class _HashEmbedding(BaseEmbedding):
         return self._embed(text)
 
 
-def _build_index(home: Path, course_id: int = COURSE) -> VectorStoreIndex:
-    pages = [
-        ("The final exam is worth 20 percent of the grade.", "syllabus", 2),
-        ("Project teams may include at most five students.", "01 CourseInfoF26.pdf", 28),
-        ("Late work loses ten percent per day.", "syllabus", 9),
-    ]
+_PAGES = [
+    ("The final exam is worth 20 percent of the grade.", "syllabus", 2),
+    ("Project teams may include at most five students.", "01 CourseInfoF26.pdf", 28),
+    ("Late work loses ten percent per day.", "syllabus", 9),
+]
+
+
+def _build_index(home: Path, course_id: int = COURSE, pages=_PAGES) -> VectorStoreIndex:
     nodes = [
         TextNode(text=text, metadata={"source": source, "item_type": "file", "page": page, "slide": None, "timestamp": None})
         for text, source, page in pages
@@ -86,7 +87,7 @@ def _searcher(home: Path, index: VectorStoreIndex, today=datetime.date(2026, 10,
 
     def make(course_id):
         calls.append(course_id)
-        return generation.HybridRetriever(index, similarity_cutoff=mcp_server.SIMILARITY_CUTOFF)
+        return mcp_server.make_retriever(index)
 
     return mcp_server.Searcher(home, make_retriever=make, today_fn=lambda: today), calls
 
@@ -136,6 +137,16 @@ def test_search_caps_k_and_builds_the_retriever_once(tmp_path):
     assert calls == [COURSE]
 
 
+def test_search_returns_more_than_five_when_k_asks(tmp_path):
+    # Eight chunks share "rubric", so FTS alone finds them all.
+    pages = [(f"The rubric for lab {i} counts style and tests.", "rubric.pdf", i) for i in range(1, 9)]
+    index = _build_index(tmp_path, pages=pages)
+    searcher, _ = _searcher(tmp_path, index)
+
+    assert len(searcher.search(COURSE, "rubric", k=7)["results"]) == 7
+    assert len(searcher.search(COURSE, "rubric")["results"]) == mcp_server.DEFAULT_K
+
+
 def test_search_expands_relative_dates_with_the_pinned_day(tmp_path):
     index = _build_index(tmp_path)
     searcher, _ = _searcher(tmp_path, index, today=datetime.date(2026, 10, 21))
@@ -169,6 +180,17 @@ def test_search_on_a_course_with_no_index_says_so(tmp_path):
 
     assert out["results"] == []
     assert "not indexed on this machine" in out["note"]
+
+
+def test_query_log_records_a_search_on_a_course_with_no_index(tmp_path, monkeypatch):
+    log = tmp_path / "queries.jsonl"
+    monkeypatch.setenv("SM_QUERY_LOG", str(log))
+    searcher = mcp_server.Searcher(tmp_path, make_retriever=lambda cid: pytest.fail("must not open an index"))
+
+    searcher.search(999, "anything")
+
+    entries = [json.loads(line) for line in log.read_text().splitlines()]
+    assert entries == [{"course_id": 999, "query": "anything", "sources": [], "texts": [], "seconds": 0.0}]
 
 
 def test_search_with_no_match_returns_the_no_results_note(tmp_path):

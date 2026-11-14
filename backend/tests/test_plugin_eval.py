@@ -45,8 +45,8 @@ def _result(text, session_id="s-1", cost=0.12, turns=4):
     }
 
 
-def _log(query, sources, texts=None, seconds=0.5):
-    return {"course_id": 55016, "query": query, "sources": sources, "texts": texts or ["t"] * len(sources), "seconds": seconds}
+def _log(query, sources, texts=None, seconds=0.5, course_id=55016):
+    return {"course_id": course_id, "query": query, "sources": sources, "texts": texts or ["t"] * len(sources), "seconds": seconds}
 
 
 def test_command_loads_only_the_plugin_and_allows_only_its_tools(eval_mod):
@@ -97,7 +97,7 @@ def test_parse_reads_searches_citations_and_timings(eval_mod):
         _log("final exam date", ["syllabus · p.2"], ["Final 20%"], 0.4),
     ]
 
-    out = eval_mod.parse_plugin_run(events, log)
+    out = eval_mod.parse_plugin_run(events, log, 55016)
 
     assert out["answer"].startswith("It is on Dec 4")
     assert out["searches"] == ["When is the final exam?", "final exam date"]
@@ -106,6 +106,8 @@ def test_parse_reads_searches_citations_and_timings(eval_mod):
     # Only labels a search actually returned count as cited sources, in answer order.
     assert out["sources"] == ["Class Preparation", "Syllabus", "syllabus · p.2"]
     assert out["search_seconds"] == [6.1, 0.4]
+    assert out["wrong_course_searches"] == []
+    assert out["wrong_course_search_count"] == 0
     assert out["used_skill"] is True
     assert out["session_id"] == "s-1"
     assert out["model"] == "claude-opus-5-5"
@@ -116,7 +118,7 @@ def test_parse_reads_searches_citations_and_timings(eval_mod):
 
 
 def test_parse_an_answer_with_no_search(eval_mod):
-    out = eval_mod.parse_plugin_run([_result("The final is in December.")], [])
+    out = eval_mod.parse_plugin_run([_result("The final is in December.")], [], 55016)
 
     assert out["searches"] == []
     assert out["retrieved"] == []
@@ -124,11 +126,32 @@ def test_parse_an_answer_with_no_search(eval_mod):
     assert out["used_skill"] is False
 
 
+def test_parse_scores_only_searches_of_the_expected_course(eval_mod):
+    events = [_result("Dec 4 [Syllabus], or maybe [Other Syllabus].")]
+    log = [
+        _log("final exam", ["Syllabus"], ["Final on 12/4"], 0.3),
+        _log("final exam", ["Other Syllabus"], ["Final on 11/30"], 0.7, course_id=99999),
+    ]
+
+    out = eval_mod.parse_plugin_run(events, log, 55016)
+
+    assert out["searches"] == ["final exam"]
+    assert out["retrieved"] == [["Syllabus"]]
+    assert out["retrieved_texts"] == [["Final on 12/4"]]
+    assert out["search_seconds"] == [0.3]
+    # A label only the other course returned is not a cited source.
+    assert out["sources"] == ["Syllabus"]
+    assert out["wrong_course_searches"] == [{"course_id": 99999, "query": "final exam"}]
+    assert out["wrong_course_search_count"] == 1
+    assert "wrong_course_search_count" in eval_mod.GRADES_FIELDS
+    assert "wrong_course_searches" not in eval_mod.GRADES_FIELDS
+
+
 def test_parse_a_failed_run_raises_with_its_message(eval_mod):
     failed = {"type": "result", "subtype": "error_during_execution", "is_error": True, "result": "boom"}
 
     with pytest.raises(RuntimeError, match="boom"):
-        eval_mod.parse_plugin_run([failed], [])
+        eval_mod.parse_plugin_run([failed], [], 55016)
 
 
 def test_search_metrics_split_the_first_search_from_the_rest(eval_mod):
@@ -144,6 +167,14 @@ def test_search_metrics_split_the_first_search_from_the_rest(eval_mod):
     }
 
 
+def test_first_search_recall_looks_only_at_the_top_5(eval_mod):
+    labels = ["A", "B", "C", "D", "E", "syllabus · Grading", "G"]
+
+    metrics = eval_mod.search_metrics({"retrieved": [labels], "retrieved_texts": [["t"] * 7]}, gold_source="syllabus — Grading", gold_facts=None)
+
+    assert metrics["first_search_recall_at_5"] is False
+
+
 def test_search_metrics_without_a_search_or_gold(eval_mod):
     assert eval_mod.search_metrics({"retrieved": []}, gold_source=None, gold_facts=None) == {
         "searched": False,
@@ -155,3 +186,56 @@ def test_search_metrics_without_a_search_or_gold(eval_mod):
 
 def test_course_id_for_a_name(eval_mod):
     assert eval_mod.course_id_for(eval_mod.COURSE_NAMES[55016]) == 55016
+
+
+class _Proc:
+    def __init__(self, stdout, returncode=0):
+        self.stdout = stdout
+        self.stderr = ""
+        self.returncode = returncode
+
+
+@pytest.fixture
+def fake_claude(eval_mod, tmp_path, monkeypatch):
+    """Stands in for subprocess.run: records each command, writes one log line
+    for the course under test, and prints stream-json ending in a result."""
+    monkeypatch.setattr(eval_mod, "_plugin_workdir", tmp_path)
+    calls = []
+
+    def run(cmd, env, **_kwargs):
+        calls.append({"cmd": cmd, "log": Path(env["SM_QUERY_LOG"])})
+        with open(env["SM_QUERY_LOG"], "a") as f:
+            f.write(json.dumps(_log("final exam", ["Syllabus"], ["Final on 12/4"])) + "\n")
+        events = [_assistant(_tool_use(TOOL, {"course_id": 55016, "query": "final exam"})), _result("Dec 4 [Syllabus].")]
+        return _Proc("\n".join(json.dumps(e) for e in events) + "\n")
+
+    monkeypatch.setattr(eval_mod.subprocess, "run", run)
+    return calls
+
+
+def test_run_p_scores_the_query_log_and_deletes_it(eval_mod, fake_claude):
+    out = eval_mod.run_p(None, "When is the final?", [], eval_mod.COURSE_NAMES[55016])
+
+    assert out["searches"] == ["final exam"]
+    assert out["sources"] == ["Syllabus"]
+    assert isinstance(out["seconds"], float)
+    assert "--resume" not in fake_claude[0]["cmd"]
+    # The log holds course text, so it must not outlive the run.
+    assert not fake_claude[0]["log"].exists()
+
+
+def test_run_p_resumes_the_session_on_a_follow_up(eval_mod, fake_claude):
+    history = [{"question": "When is the final?", "answer": "Dec 4.", "session_id": "s-1"}]
+
+    eval_mod.run_p(None, "and the midterm?", history, eval_mod.COURSE_NAMES[55016])
+
+    cmd = fake_claude[0]["cmd"]
+    assert cmd[cmd.index("--resume") + 1] == "s-1"
+
+
+def test_run_p_without_a_result_event_raises_with_the_exit_code(eval_mod, tmp_path, monkeypatch):
+    monkeypatch.setattr(eval_mod, "_plugin_workdir", tmp_path)
+    monkeypatch.setattr(eval_mod.subprocess, "run", lambda *_a, **_k: _Proc('{"type": "system", "subtype": "init"}\n', returncode=1))
+
+    with pytest.raises(RuntimeError, match="exited 1"):
+        eval_mod.run_p(None, "When is the final?", [], eval_mod.COURSE_NAMES[55016])
