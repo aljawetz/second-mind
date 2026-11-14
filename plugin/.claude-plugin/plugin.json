@@ -1,0 +1,9 @@
+{
+  "name": "second-mind",
+  "displayName": "Second Mind",
+  "version": "0.0.1",
+  "description": "Answers questions about your Canvas courses from your own course materials, with citations.",
+  "author": { "name": "Second Mind team" },
+  "repository": "https://github.com/aljawetz/second-mind",
+  "license": "MIT"
+}

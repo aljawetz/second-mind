@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "courses": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--inexact",
+        "--extra",
+        "mcp",
+        "--directory",
+        "${CLAUDE_PLUGIN_ROOT}/../backend",
+        "python",
+        "mcp_server.py"
+      ]
+    }
+  }
+}
