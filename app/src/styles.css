@@ -1,25 +1,30 @@
-/* Second Mind's look: Quiet ledger. Ink on a blue-grey ground, flat white cards,
-   one near-black action. Blue marks sources and countdowns, red marks what is
-   late or failed, and nothing else carries colour. Light only.
+/* Second Mind's look: a clean light tool by day, a soft dark by night.
+   The app follows the computer's light or dark setting. One blue marks the
+   primary action and the sources; red marks what is late or failed, green what
+   is done, and nothing else carries colour.
    Every colour is a token here; components only use the tokens. */
 :root{
   color-scheme:light;
-  --ground:#F2F4F7;      /* the page */
+  --ground:#F5F6F8;      /* the page */
   --surface:#FFFFFF;     /* cards */
-  --raised:#ECEEF2;      /* inset fields, hovers, question bubbles */
-  --active:#E4E7EC;      /* the selected nav item */
-  --control:#D0D4DA;     /* the outline of a small control, like a progress circle */
-  --text:#0A0A0A;
-  --text-2:#3D3D3D;
-  --muted:#666666;
-  --accent:#141414;      /* the one primary action */
+  --raised:#ECEFF3;      /* inset fields, hovers, question bubbles */
+  --active:#E1E5EB;      /* the selected nav item, secondary buttons */
+  --control:#CDD2D9;     /* the outline of a small control, like a progress circle */
+  --text:#0F1114;
+  --text-2:#3A4048;
+  --muted:#5B6370;
+  --accent:#2156D9;      /* the one primary action */
+  --accent-hover:#1A47B8;
   --on-accent:#FFFFFF;
-  --blue:#1D5FBF;        /* source numbers and countdowns only */
-  --mark:#DDE8F8;        /* the highlight that links a footnote to its source */
-  --neg:#C4242A;   --neg-soft:#F6E3E3;
+  --disabled:#C9CDD3;    /* a primary button that can't be pressed yet */
+  --on-disabled:#FFFFFF;
+  --blue:#2156D9;        /* source numbers and countdowns */
+  --mark:#E0E9FF;        /* the highlight that links a footnote to its source */
+  --neg:#C4242A;   --neg-hover:#A81E23;   --neg-soft:#F6E3E3;
   --pos:#2A7330;   --pos-soft:#E3EFE6;
   --warn:#92400E;
-  --shadow-pop:0 12px 32px -10px rgba(10,10,10,.3);  /* only menus and dialogs float */
+  --backdrop:rgba(15,17,20,.42);
+  --shadow-pop:0 12px 32px -10px rgba(15,17,20,.3);  /* only menus and dialogs float */
 
   --f-head:'Geist Variable',ui-sans-serif,system-ui,-apple-system,sans-serif;
   --f-body:'Geist Variable',ui-sans-serif,system-ui,-apple-system,sans-serif;
@@ -27,6 +32,31 @@
   /* The whole type scale. */
   --t1:.6875rem; --t2:.8125rem; --t3:.9375rem; --t4:1.125rem;
   --r:8px; --r-md:8px; --r-sm:6px;
+}
+/* Night: dark grey, never black, with off-white text and a muted blue.
+   theme.ts sets data-theme from the student's choice or the computer's setting. */
+:root[data-theme="dark"]{
+    color-scheme:dark;
+    --ground:#1E2023;
+    --surface:#26292D;
+    --raised:#2F3338;
+    --active:#393D43;
+    --control:#4C5158;
+    --text:#E8E6E1;
+    --text-2:#C9C8C4;
+    --muted:#A3A7AE;
+    --accent:#8FB2E8;
+    --accent-hover:#A6C2EE;
+    --on-accent:#14171A;
+    --disabled:#454A51;
+    --on-disabled:#A3A7AE;
+    --blue:#8FB2E8;
+    --mark:#33435C;
+    --neg:#EC7C82;   --neg-hover:#F29BA0;   --neg-soft:#47292B;
+    --pos:#77C27E;   --pos-soft:#26392A;
+    --warn:#E0A458;
+    --backdrop:rgba(0,0,0,.55);
+    --shadow-pop:0 12px 32px -10px rgba(0,0,0,.6);
 }
 
 *{box-sizing:border-box}
@@ -64,7 +94,7 @@ svg{flex:none}
   border:none;border-radius:var(--r-sm);height:36px;padding:0 12px;cursor:pointer;
   background:var(--accent);color:var(--on-accent);font-weight:500;
 }
-.new-chat:hover{background:#2b2b2b}
+.new-chat:hover{background:var(--accent-hover)}
 .nav-label{font-size:.75rem;color:var(--muted);padding:6px 8px}
 .nav-group{display:flex;flex-direction:column;gap:2px}
 .course-group{display:flex;flex-direction:column;gap:2px}
@@ -136,6 +166,11 @@ svg{flex:none}
   padding:8px 10px;cursor:pointer;color:var(--text);
 }
 .settings-menu-item:hover{background:var(--raised)}
+.theme-picker{display:flex;flex-direction:column;gap:6px;padding:8px 10px 6px;margin-top:4px;border-top:1px solid var(--active);font-size:var(--t1);color:var(--muted)}
+.theme-choices{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:var(--raised);border-radius:var(--r-sm);padding:2px}
+.theme-choices button{border:none;background:none;border-radius:4px;padding:5px 8px;cursor:pointer;font-size:var(--t2);color:var(--muted)}
+.theme-choices button:hover{color:var(--text)}
+.theme-choices button[aria-pressed="true"]{background:var(--surface);color:var(--text);font-weight:500}
 .icon-btn{
   flex:none;width:32px;height:32px;border-radius:var(--r-sm);border:none;background:none;
   color:var(--muted);display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;
@@ -281,8 +316,8 @@ sup.fn{cursor:default}
   display:flex;align-items:center;gap:6px;flex:none;cursor:pointer;border:none;border-radius:var(--r-sm);
   height:36px;padding:0 14px;background:var(--accent);color:var(--on-accent);font-weight:500;
 }
-.ask-send:hover:not(:disabled){background:#2b2b2b}
-.ask-send:disabled{background:#C9CCD1}
+.ask-send:hover:not(:disabled){background:var(--accent-hover)}
+.ask-send:disabled{background:var(--disabled);color:var(--on-disabled)}
 .ask-send svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 .assign-body{flex:1;min-height:0;overflow-y:auto;padding:4px 16px 16px}
@@ -346,7 +381,7 @@ details.panel[open] summary{margin-bottom:10px}
   background:var(--accent);color:var(--on-accent);border:none;border-radius:var(--r-sm);
   min-height:36px;padding:8px 16px;font-weight:500;
 }
-.explain-btn:hover{background:#2b2b2b}
+.explain-btn:hover{background:var(--accent-hover)}
 .explain-panel{display:flex;flex-direction:column;gap:16px}
 .explain-flag{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
 .explain-flag h3{margin:0}
@@ -385,18 +420,18 @@ details.panel[open] summary{margin-bottom:10px}
   background:var(--accent);color:var(--on-accent);border:none;border-radius:var(--r-sm);cursor:pointer;
   min-height:36px;padding:8px 16px;font-weight:500;width:100%;
 }
-.btn-primary:hover:not(:disabled){background:#2b2b2b}
-.btn-primary:disabled{background:#C9CCD1}
+.btn-primary:hover:not(:disabled){background:var(--accent-hover)}
+.btn-primary:disabled{background:var(--disabled);color:var(--on-disabled)}
 .btn-secondary{
-  background:#E5E5E5;color:var(--text);border:none;border-radius:var(--r-sm);cursor:pointer;
+  background:var(--active);color:var(--text);border:none;border-radius:var(--r-sm);cursor:pointer;
   min-height:36px;padding:8px 16px;font-weight:500;width:100%;
 }
-.btn-secondary:hover{background:#DADADA}
+.btn-secondary:hover{background:var(--control)}
 .btn-danger{
   background:var(--neg);color:var(--surface);border:none;border-radius:var(--r-sm);cursor:pointer;
   padding:6px 12px;font-size:var(--t2);font-weight:500;flex:none;
 }
-.btn-danger:hover:not(:disabled){background:#a81e23}
+.btn-danger:hover:not(:disabled){background:var(--neg-hover)}
 .btn-danger:disabled{opacity:.45}
 .back-mini{align-self:flex-start;background:none;border:none;color:var(--muted);font-size:var(--t1);cursor:pointer;padding:0}
 .back-mini:hover{color:var(--accent)}
@@ -531,7 +566,7 @@ fieldset.field legend{padding:0;margin-bottom:6px;font-size:var(--t3);font-weigh
 .study-confirm span{flex:1 1 100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .study-confirm .study-confirm-error{color:var(--neg);font-size:var(--t1);white-space:normal}
 
-.modal-backdrop{position:fixed;inset:0;z-index:50;background:rgba(10,10,10,.42);display:grid;place-items:center;padding:16px}
+.modal-backdrop{position:fixed;inset:0;z-index:50;background:var(--backdrop);display:grid;place-items:center;padding:16px}
 .modal{
   width:min(600px,100%);max-height:calc(100vh - 32px);overflow-y:auto;background:var(--surface);
   border-radius:12px;box-shadow:var(--shadow-pop);padding:28px;
