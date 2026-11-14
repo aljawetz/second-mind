@@ -26,6 +26,15 @@ dependencies = [
     "openpyxl>=3.1",
 ]
 
+[project.optional-dependencies]
+# The Claude Code plugin's MCP server (mcp_server.py). An extra, not a main
+# dependency, so the app's frozen sidecar (`uv sync --group build`) does not
+# bundle it. M1 of docs/plans/2026-11-13-claude-code-plugin.md trims this to
+# what search and sync need.
+mcp = [
+    "mcp>=2.3",
+]
+
 [dependency-groups]
 # Split deliberately: PyInstaller bundles whatever's importable in the venv
 # it runs from, not just what main.py actually needs — building from an

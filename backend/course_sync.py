@@ -6,6 +6,7 @@ itself stays Canvas-agnostic (its own docstring: "the caller ... is
 responsible for the actual Canvas calls") — this module is that caller.
 """
 
+import sys
 import tempfile
 from datetime import datetime, tzinfo
 from pathlib import Path
@@ -249,7 +250,7 @@ def sync_course(course_id: int, sm_home: Path):
                 continue
             display_name = meta.get("display_name", "")
             if Path(display_name).suffix.lower() not in SUPPORTED_FILE_SUFFIXES:
-                print(f"[course_sync] skipping unsupported file: {display_name}")
+                print(f"[course_sync] skipping unsupported file: {display_name}", file=sys.stderr)
                 continue
             file_metas[str(meta["id"])] = meta
 

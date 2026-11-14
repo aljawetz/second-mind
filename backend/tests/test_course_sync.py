@@ -296,7 +296,11 @@ def test_unsupported_file_extension_is_skipped_not_synced(tmp_path, stub_extract
     events = run(1, tmp_path)
 
     assert events == [{"done": True, "new": 0, "changed": 0, "removed": 0, "failed": 0}]
-    assert "lecture.mp4" in capsys.readouterr().out
+    # stderr, never stdout: stdout is the MCP server's protocol channel
+    # (docs/plans/2026-11-13-claude-code-plugin.md, M0).
+    captured = capsys.readouterr()
+    assert "lecture.mp4" in captured.err
+    assert captured.out == ""
 
 
 @pytest.mark.parametrize(
