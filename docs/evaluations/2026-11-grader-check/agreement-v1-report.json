@@ -1,0 +1,34 @@
+{
+  "half": "report",
+  "turns": 10,
+  "pointwise": {
+    "answers": 20,
+    "exact": 14,
+    "kappa": 0.524,
+    "confusion": {
+      "good": {
+        "good": 8,
+        "ok": 2,
+        "bad": 0
+      },
+      "ok": {
+        "good": 0,
+        "ok": 0,
+        "bad": 4
+      },
+      "bad": {
+        "good": 0,
+        "ok": 0,
+        "bad": 6
+      }
+    }
+  },
+  "pointwise_as_pairs": {
+    "turns": 10,
+    "agree": 10
+  },
+  "pairwise": {
+    "turns": 10,
+    "agree": 10
+  }
+}

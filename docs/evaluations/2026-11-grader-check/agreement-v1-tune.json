@@ -1,0 +1,34 @@
+{
+  "half": "tune",
+  "turns": 10,
+  "pointwise": {
+    "answers": 20,
+    "exact": 18,
+    "kappa": 0.818,
+    "confusion": {
+      "good": {
+        "good": 10,
+        "ok": 0,
+        "bad": 0
+      },
+      "ok": {
+        "good": 0,
+        "ok": 0,
+        "bad": 2
+      },
+      "bad": {
+        "good": 0,
+        "ok": 0,
+        "bad": 8
+      }
+    }
+  },
+  "pointwise_as_pairs": {
+    "turns": 10,
+    "agree": 10
+  },
+  "pairwise": {
+    "turns": 10,
+    "agree": 10
+  }
+}

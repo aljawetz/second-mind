@@ -32,6 +32,7 @@ not. Run from backend/:
 """
 
 import argparse
+import dataclasses
 import datetime
 import json
 import re
@@ -61,6 +62,18 @@ COURSE_NAMES = {
 }
 DEFAULT_COURSE = 55710
 MODEL = providers.OPENAI.model  # costs and the gpt-4o judge assume OpenAI, whatever the app is set to
+# What modes E and G answer with: the app's OpenAI default unless --model
+# names another (set_answer_model).
+ANSWER_PROVIDER = providers.OPENAI
+
+
+def set_answer_model(model: str) -> None:
+    """Answer with `model` instead of the app's default, e.g. a cheaper
+    gpt-4o-mini for runs where the answering model isn't what's measured.
+    Reasoning models (gpt-5 family) take only their default temperature."""
+    global MODEL, ANSWER_PROVIDER
+    MODEL = model
+    ANSWER_PROVIDER = dataclasses.replace(providers.OPENAI, model=model, fixed_temperature=model.startswith("gpt-5"))
 TEMPERATURE = 0.1  # llama_index's OpenAI default, which mode A already uses
 MAX_TOOL_ROUNDS = 4
 
@@ -887,7 +900,7 @@ def run_shipped(index, question, history, course_name, cutoff):
         return nodes
 
     start = time.perf_counter()
-    events = list(chat.answer(question, history, course_name, search, llm.OpenAIProvider(providers.OPENAI, temperature=TEMPERATURE), today=EVAL_TODAY))
+    events = list(chat.answer(question, history, course_name, search, llm.OpenAIProvider(ANSWER_PROVIDER, temperature=TEMPERATURE), today=EVAL_TODAY))
     elapsed = time.perf_counter() - start
     final = next(e for e in events if "citations" in e)
     usage = final.get("usage")  # None unless OpenAIProvider reported it (see llm.py's TurnEnd.usage)
@@ -923,14 +936,16 @@ def run_g(_index, question: str, history: list[dict], course_name: str) -> dict:
     """The plain-chatbot baseline for Sprint 7: the same model as the shipped
     chat (MODEL), no search tool, no course text. What a student gets from
     pasting the question into a general chatbot with nothing attached."""
-    client = providers.openai_client(providers.OPENAI)
+    client = providers.openai_client(ANSWER_PROVIDER)
     messages = [{"role": "system", "content": PROMPT_G.format(course_name=course_name)}]
     for turn in history:
         messages.append({"role": "user", "content": turn["question"]})
         messages.append({"role": "assistant", "content": turn["answer"]})
     messages.append({"role": "user", "content": question})
     start = time.perf_counter()
-    response = client.chat.completions.create(model=MODEL, messages=messages, temperature=TEMPERATURE)
+    # gpt-5-mini takes only its default temperature (providers.Provider.fixed_temperature).
+    temperature = {} if ANSWER_PROVIDER.fixed_temperature else {"temperature": TEMPERATURE}
+    response = client.chat.completions.create(model=MODEL, messages=messages, **temperature)
     elapsed = time.perf_counter() - start
     return {
         "answer": response.choices[0].message.content or "",
@@ -2219,7 +2234,12 @@ def main():
     parser.add_argument(
         "--no-judge", action="store_true", help="skip the gpt-4o judge pass (correctness/citation/faithfulness/abstention)"
     )
+    parser.add_argument(
+        "--model", default="", help="answer with this OpenAI model instead of the app's default (modes E and G)"
+    )
     args = parser.parse_args()
+    if args.model:
+        set_answer_model(args.model)
     if args.retrieval_only:
         # Search the local index and stop. No judge, no API key, no chat mode.
         run_retrieval_only(args)
@@ -2227,6 +2247,7 @@ def main():
     from eval_key import use_eval_key
 
     print("OpenAI key: " + ("the evaluation key" if use_eval_key() else "the app's (no evaluation key stored)"), flush=True)
+    print(f"Answering model: {MODEL}", flush=True)
     modes = args.only.split(",")
     wanted = set(filter(None, args.cases.split(",")))
     judge_client = None if args.no_judge else providers.openai_client(providers.OPENAI)
