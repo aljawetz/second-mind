@@ -3,6 +3,9 @@ import ReactDOM from "react-dom/client";
 import "@fontsource-variable/geist";
 import App from "./App";
 import "./styles.css";
+import { initTheme } from "./theme";
+
+initTheme();
 
 const isMac = navigator.userAgent.includes("Macintosh");
 
