@@ -460,6 +460,40 @@ export async function unselectCourse(courseId: number): Promise<void> {
   await fetch(`http://127.0.0.1:8756/courses/${courseId}/unselect`, { method: "POST" });
 }
 
+// A long file kept to a preview, or one too big to download
+// (backend/large_files.py). want_full: the student turned it on, so the next
+// sync indexes all of it.
+export interface LargeFile {
+  file_id: string;
+  name: string;
+  size: number;
+  pages: number | null;
+  chars: number | null;
+  state: "preview" | "none" | "full";
+  want_full: boolean;
+}
+
+export async function listLargeFiles(courseId: number): Promise<LargeFile[]> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/large-files`);
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `failed to list large files (${res.status})`);
+  }
+  return data.files ?? [];
+}
+
+export async function setLargeFileFull(courseId: number, fileId: string, full: boolean): Promise<void> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/large-files/${fileId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ full }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error?.message ?? `failed to update the file (${res.status})`);
+  }
+}
+
 export async function deleteCourse(courseId: number): Promise<void> {
   await fetch(`http://127.0.0.1:8756/courses/${courseId}`, { method: "DELETE" });
 }

@@ -82,8 +82,9 @@ def stub_extraction(monkeypatch):
     monkeypatch.setattr(
         course_sync.ingestion,
         "extract_pdf",
-        lambda path: [{"page": 1, "text": "syllabus content", "char_count": 17, "has_image": False, "needs_fallback": False}],
+        lambda path, max_pages=None: [{"page": 1, "text": "syllabus content", "char_count": 17, "has_image": False, "needs_fallback": False}],
     )
+    monkeypatch.setattr(course_sync.ingestion, "pdf_page_count", lambda path: 1)
     monkeypatch.setattr(
         course_sync.ingestion,
         "extract_pptx",
@@ -216,6 +217,7 @@ def test_file_whose_metadata_fetch_degrades_to_none_is_not_deleted(tmp_path, stu
 
 def test_one_failing_item_does_not_abort_the_rest(tmp_path, stub_canvas, monkeypatch):
     monkeypatch.setattr(course_sync.canvas, "download", lambda url: b"raw bytes")
+    monkeypatch.setattr(course_sync.ingestion, "pdf_page_count", lambda path: 1)
     monkeypatch.setattr(
         course_sync.ingestion, "extract_pdf", lambda path: (_ for _ in ()).throw(RuntimeError("corrupt pdf"))
     )
@@ -793,3 +795,122 @@ def test_outline_lists_linked_files_under_their_page_and_the_rest_in_their_own_g
         ("Announcements", "", "Room", "announcement"),
         ("Discussions", "", "Updates", "discussion"),
     ]
+
+
+
+# --- Large files wait for the student -----------------------------------------
+# A PDF over 150 pages gets its first 150 indexed as a labeled preview; any
+# other file whose text is over 450,000 characters gets a preview of that
+# length; a file over 50 MB isn't downloaded. The student can turn the whole
+# file on (large_files.set_want_full), and the next sync indexes all of it.
+
+BOOK = {"id": 555, "display_name": "About Face.pdf", "updated_at": "2026-01-01", "url": "https://canvas.example/files/555", "size": 33_000_000}
+HUGE = {"id": 666, "display_name": "Lecture videos.pdf", "updated_at": "2026-01-01", "url": "https://canvas.example/files/666", "size": 60_000_000}
+NOTES = {"id": 777, "display_name": "Notes.docx", "updated_at": "2026-01-01", "url": "https://canvas.example/files/777", "size": 200_000}
+
+
+@pytest.fixture
+def book_course(tmp_path, stub_extraction, monkeypatch):
+    """A course whose Files tab has the book, the huge file and the notes;
+    records downloads, extract_pdf's max_pages and the nodes added."""
+    seen = {"downloads": [], "max_pages": [], "sources": []}
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_pages", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_course_files", lambda course_id: [dict(BOOK), dict(HUGE), dict(NOTES)])
+    monkeypatch.setattr(course_sync.canvas, "download", lambda url: seen["downloads"].append(url) or b"raw bytes")
+    monkeypatch.setattr(course_sync.ingestion, "pdf_page_count", lambda path: 722)
+
+    def extract_pdf(path, max_pages=None):
+        seen["max_pages"].append(max_pages)
+        return [{"page": i, "text": f"page {i} text", "char_count": 11, "has_image": False, "needs_fallback": False} for i in range(1, (max_pages or 722) + 1)]
+
+    monkeypatch.setattr(course_sync.ingestion, "extract_pdf", extract_pdf)
+    monkeypatch.setattr(
+        course_sync.ingestion, "extract_docx", lambda path: [{"heading": f"Part {i}", "text": "x" * 50} for i in range(10)]
+    )
+    monkeypatch.setattr(
+        course_sync.indexing, "add_nodes", lambda nodes, db_path, table_name: seen["sources"].extend({n.metadata["source"] for n in nodes})
+    )
+    return seen
+
+
+def _large(sm_home, course_id=1):
+    conn = course_sync.sync.open_manifest(sm_home / "courses" / str(course_id) / "manifest.db")
+    try:
+        return {r["file_id"]: r for r in course_sync.large_files.rows(conn)}
+    finally:
+        conn.close()
+
+
+def _want_full(sm_home, file_id, full=True, course_id=1):
+    conn = course_sync.sync.open_manifest(sm_home / "courses" / str(course_id) / "manifest.db")
+    try:
+        assert course_sync.large_files.set_want_full(conn, file_id, full)
+    finally:
+        conn.close()
+
+
+def test_a_pdf_over_150_pages_is_indexed_as_a_labeled_preview(tmp_path, book_course):
+    run(1, tmp_path)
+    assert book_course["max_pages"] == [150]
+    assert "About Face.pdf (first 150 of 722 pages)" in book_course["sources"]
+    book = _large(tmp_path)["555"]
+    assert (book["pages"], book["state"], book["want_full"]) == (722, "preview", False)
+
+
+def test_a_file_over_50_mb_is_not_downloaded(tmp_path, book_course):
+    run(1, tmp_path)
+    assert HUGE["url"] not in book_course["downloads"]
+    assert "file:666" in _manifest_ids(tmp_path)
+    assert _large(tmp_path)["666"]["state"] == "none"
+
+
+def test_a_long_word_file_is_cut_to_its_text_limit(tmp_path, book_course, monkeypatch):
+    monkeypatch.setattr(course_sync.large_files, "MAX_TEXT_CHARS", 200)
+    run(1, tmp_path)
+    assert "Notes.docx (first part)" in book_course["sources"]
+    assert _large(tmp_path)["777"]["state"] == "preview"
+
+
+def test_previews_are_left_alone_on_the_next_sync(tmp_path, book_course):
+    run(1, tmp_path)
+    book_course["downloads"].clear()
+    summary = run(1, tmp_path)[-1]
+    assert (summary["new"], summary["changed"]) == (0, 0)
+    assert book_course["downloads"] == []
+
+
+def test_turning_a_file_on_indexes_all_of_it_and_off_goes_back_to_the_preview(tmp_path, book_course):
+    run(1, tmp_path)
+    _want_full(tmp_path, "555")
+    _want_full(tmp_path, "666")
+    book_course["max_pages"].clear()
+    summary = run(1, tmp_path)[-1]
+    assert summary["changed"] == 2
+    assert book_course["max_pages"] == [None, None]  # the book, and the huge file now downloaded
+    assert HUGE["url"] in book_course["downloads"]
+    assert "About Face.pdf" in book_course["sources"]
+    assert _large(tmp_path)["555"]["state"] == "full"
+
+    _want_full(tmp_path, "555", full=False)
+    book_course["max_pages"].clear()
+    assert run(1, tmp_path)[-1]["changed"] == 1
+    assert book_course["max_pages"] == [150]
+    assert _large(tmp_path)["555"]["state"] == "preview"
+
+
+def test_the_outline_says_which_files_are_previews_or_not_synced(tmp_path, book_course):
+    run(1, tmp_path)
+    conn = course_sync.sync.open_manifest(tmp_path / "courses" / "1" / "manifest.db")
+    titles = [r["title"] for r in course_sync.course_items.load_outline(conn)]
+    conn.close()
+    assert "About Face.pdf (first 150 of 722 pages synced)" in titles
+    assert "Lecture videos.pdf (not synced: 60 MB)" in titles
+    assert "Notes.docx" in titles
+
+
+def test_a_large_file_removed_from_canvas_is_forgotten(tmp_path, book_course, monkeypatch):
+    run(1, tmp_path)
+    monkeypatch.setattr(course_sync.canvas, "list_course_files", lambda course_id: [dict(NOTES)])
+    run(1, tmp_path)
+    assert set(_large(tmp_path)) == set()

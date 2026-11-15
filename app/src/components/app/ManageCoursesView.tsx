@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { AvailableCourse } from "../../types";
 import { deleteCourse, listCourses, unselectCourse, writeConfig, type CanvasCourse } from "../../sidecar";
+import LargeFilesSection from "./LargeFilesSection";
 
 export default function ManageCoursesView({
   courses,
@@ -134,6 +135,8 @@ export default function ManageCoursesView({
           </div>
         ))}
       </div>
+
+      <LargeFilesSection courses={courses} />
 
       <div className="home-block">
         <div className="section-label">Add a course</div>
