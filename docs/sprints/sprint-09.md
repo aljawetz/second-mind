@@ -28,10 +28,10 @@ test this sprint requires.
 
 ## What we did
 
-Nine PRs (#55–#63), most from the RAG gaps plan
+Eleven PRs (#55–#63, #65, #66), most from the RAG gaps plan
 ([`docs/plans/2026-11-09-rag-course-gaps.md`](../plans/2026-11-09-rag-course-gaps.md)): eight gaps found by
-comparing Second Mind with NVIDIA's "Building RAG Agents with LLMs" course. Merged: #55, #56, #57. Open for
-review: #58–#63.
+comparing Second Mind with NVIDIA's "Building RAG Agents with LLMs" course. Merged: #55–#63. Open for review:
+#65, #66.
 
 ### Beta system completeness
 
@@ -45,18 +45,25 @@ review: #58–#63.
   → about 6 of 10), and recall of 10 memories instead of 5.
 - **Default model `gpt-5-mini` (#56, merged).** It scored 49.5–51.5 of 58 against 42–43 for `gpt-4o-mini`
   (four runs each). The cost: course chat is about four times slower (11.7 s a turn against 2.6 s).
-- **Course sync reads the whole course menu (#63, open).** The sync only read Modules, so none of 18-658's
+- **Course sync reads the whole course menu (#63, merged).** The sync only read Modules, so none of 18-658's
   46 readings were searchable (they are links in its pages and syllabus). It now also reads the Files tab,
   links in every page, syllabus, assignment, announcement and discussion, plus announcements and discussions
   themselves. Files indexed: 18-658 0 → 37, 56350 7 → 29, plus 13 announcements; 0 failures.
-- **Listing questions (#63, open).** A `list_course_items` tool lists a course's modules, files,
+- **Listing questions (#63, merged).** A `list_course_items` tool lists a course's modules, files,
   announcements and discussions. Expected items named in answers: 52 → 93 of 138 over 8 listing questions
   (announcements 3 → 13 of 13).
+- **Large files wait for the student (#65, open).** A PDF over 150 pages is synced as a labeled preview of its
+  first 150 pages, any other file with more than 450,000 characters of text as a preview of that length, and a
+  file over 50 MB not at all. Manage courses has a "Sync whole file" button for each. 18-658's first sync took
+  4.5 minutes instead of 14.4; syncing one textbook whole later took 147 s.
+- **Junk chunks dropped (#66, open).** Chunks under 8 characters or under 25% letters are left out of the
+  index (task 3). The plan's other half, keeping exam and quiz text out, was dropped: the decision is to index
+  whatever the student can open.
 - **Interface.**
   - Helpful / Not helpful buttons with an optional note on each answer, kept locally (#57, merged).
-  - A light look by day and a soft dark look by night, with an Auto / Light / Dark switch (#61, open).
-  - Reopened chats keep their "Used what you told me earlier" list, now folded into one line (#60, open).
-- **Error handling (#58, open).** A model reply that isn't usable JSON is asked for once more, so memory,
+  - A light look by day and a soft dark look by night, with an Auto / Light / Dark switch (#61, merged).
+  - Reopened chats keep their "Used what you told me earlier" list, now folded into one line (#60, merged).
+- **Error handling (#58, merged).** A model reply that isn't usable JSON is asked for once more, so memory,
   consolidation, quizzes and flashcards no longer fail silently.
 
 ### Independent testing and defect resolution
@@ -68,10 +75,10 @@ review: #58–#63.
   - reopened chats losing their memories list (#60);
   - the no-search baseline crashing on `gpt-5-mini`, which rejects a temperature (#59);
   - the grades filter dropping harmless memories (#56).
-- **Answer grading checked (#59, open).** One person hand-graded 20 `sprint9-chat` turns blind. The gpt-4o
+- **Answer grading checked (#59, merged).** One person hand-graded 20 `sprint9-chat` turns blind. The gpt-4o
   judge picked the better answer 20 of 20 times and gave the same grade on 32 of 40; every disagreement had
   the judge one step stricter. The judge is kept as is, for comparisons against a baseline.
-- **Graded-work guard (#62, open).** A small classifier on the local embedding catches 26 of 32 held-out
+- **Graded-work guard (#62, merged).** A small classifier on the local embedding catches 26 of 32 held-out
   misuse requests, with 4 false alarms in 65 (2 in 113 real Sprint 8/9 turns). A flagged turn gets a
   stricter rule. In chat, graded by hand: clear refusals 23 → 29 of 32, while "when is homework 2 due?"
   still gets its date 6 of 6.
@@ -87,13 +94,13 @@ review: #58–#63.
 
 - **The outside tester's run** of the core workflow, and the independent-test report.
 - **Deployment instructions and user/developer docs** for this beta.
-- **Merging the open PRs** (#58–#63), then re-syncing courses: the first sync after #63 downloads every
-  newly found file, about 15 minutes for 18-658, which links two whole textbooks.
+- **Merging #65 and #66,** then re-syncing courses, which picks up everything #63 finds.
 - **Agreed follow-ups:**
-  - a faster first sync (long files wait for the student, with a labeled 150-page preview);
+  - the rest of a faster first sync: names and outline first, then content in the background;
   - a tool that reads a whole page by name, for lists inside one long page.
 
 ### Tests
 
-The backend has 706 tests on #63's branch (9 skipped), up from 536 at the end of Sprint 8. The app builds and
+The backend has 755 tests on main after #58–#63 (9 skipped), up from 536 at the end of Sprint 8; #65 brings
+766 and #66 774 on their branches. The app builds and
 its interaction tests pass.
