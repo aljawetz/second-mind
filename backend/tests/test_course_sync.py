@@ -552,3 +552,32 @@ def test_an_assignment_with_a_due_date_but_no_description_is_indexed(tmp_path, s
 
     assert events[-1] == {"done": True, "new": 1, "changed": 0, "removed": 0, "failed": 0}
     assert _manifest_ids(tmp_path) == {"assignment:1"}
+
+
+def _outline_titles(sm_home, course_id=1):
+    conn = course_sync.sync.open_manifest(sm_home / "courses" / str(course_id) / "manifest.db")
+    try:
+        return [row["title"] for row in course_sync.course_items.load_outline(conn)]
+    finally:
+        conn.close()
+
+
+def test_sync_saves_the_module_outline_for_listing_questions(tmp_path, stub_canvas, stub_extraction, monkeypatch):
+    structure = [
+        {"name": "Week 1", "items": [{"type": "SubHeader", "title": "Readings"}, {"type": "File", "title": "Ch 1", "content_id": 111}]},
+        {"name": "Week 2", "items": [{"type": "ExternalUrl", "title": "Video", "external_url": "https://v.example"}]},
+    ]
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: structure)
+    run(1, tmp_path)
+    assert _outline_titles(tmp_path) == ["Ch 1", "Video"]
+
+
+def test_an_empty_module_listing_keeps_the_saved_outline(tmp_path, stub_canvas, stub_extraction, monkeypatch):
+    """Same guard as the deletions: a modules tab that comes back empty
+    (hidden, or a Canvas hiccup) is not taken as "the course has no modules"."""
+    titled = [{"name": "Week 1", "items": [{"type": "File", "title": "Ch 1", "content_id": 111}]}]
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: titled)
+    run(1, tmp_path)
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [])
+    run(1, tmp_path)
+    assert _outline_titles(tmp_path) == ["Ch 1"]

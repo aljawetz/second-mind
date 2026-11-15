@@ -861,6 +861,7 @@ class Handler(BaseHTTPRequestHandler):
     def _handle_ask(self, course_id: str):
         import chat
         import conversations
+        import course_items
         import indexing
         import llm
         from llama_index.vector_stores.lancedb.base import TableNotFoundError
@@ -934,6 +935,7 @@ class Handler(BaseHTTPRequestHandler):
                     provider,
                     memory=memory,
                     summary=summary,
+                    list_items=lambda topic, types: course_items.list_for_course(SM_HOME, int(course_id), topic, types),
                 )
                 first = next(events)
             except OnnxModelFileMissing:

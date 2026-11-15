@@ -318,3 +318,52 @@ def test_a_tool_that_fails_is_reported_to_the_model_and_the_answer_still_finishe
     assert "index is locked" in tool_result["content"]
     assert "".join(e["delta"] for e in events if "delta" in e) == "I couldn't search the course just now."
     assert events[-1] == {"done": True}
+
+
+def _tool_names(provider_call):
+    return [t["function"]["name"] for t in provider_call["tools"] or []]
+
+
+def test_listing_tool_is_offered_only_when_the_course_outline_is_given():
+    without = FakeProvider([(["ok"], [])])
+    list(chat.answer("hi", [], "Test Course", lambda q: [], without))
+    assert "list_course_items" not in _tool_names(without.calls[0])
+    assert "list_course_items" not in without.calls[0]["messages"][0]["content"]
+
+    with_list = FakeProvider([(["ok"], [])])
+    list(chat.answer("hi", [], "Test Course", lambda q: [], with_list, list_items=lambda topic, types: ""))
+    assert "list_course_items" in _tool_names(with_list.calls[0])
+    assert "list_course_items" in with_list.calls[0]["messages"][0]["content"]
+
+
+def test_listing_tool_call_passes_topic_and_types_and_returns_the_outline():
+    asked = []
+
+    def list_items(topic, types):
+        asked.append((topic, types))
+        return "Week 3: Elicitation\n- 03 Interviews.pdf (file)"
+
+    provider = FakeProvider(
+        [
+            ([], [ToolCall(id="c1", name="list_course_items", arguments={"topic": "week 3", "types": ["file"]})]),
+            (["Week 3 has one reading: 03 Interviews.pdf."], []),
+        ]
+    )
+    events = list(chat.answer("What are the readings for week 3?", [], "Test Course", lambda q: [], provider, list_items=list_items))
+    assert asked == [("week 3", ["file"])]
+    assert provider.calls[1]["messages"][-1]["content"] == "Week 3: Elicitation\n- 03 Interviews.pdf (file)"
+    final = next(e for e in events if "citations" in e)
+    assert final["citations"] == []  # an outline is names, not a citable source
+
+
+@pytest.mark.parametrize(
+    "arguments, expected",
+    [({}, ("", [])), ({"topic": 3, "types": "file"}, ("", [])), ({"types": ["file", 2, "page"]}, ("", ["file", "page"]))],
+)
+def test_listing_tool_tolerates_missing_or_odd_arguments(arguments, expected):
+    asked = []
+    provider = FakeProvider(
+        [([], [ToolCall(id="c1", name="list_course_items", arguments=arguments)]), (["ok"], [])]
+    )
+    list(chat.answer("list everything", [], "Test Course", lambda q: [], provider, list_items=lambda t, ty: asked.append((t, ty)) or "x"))
+    assert asked == [expected]

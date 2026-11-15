@@ -13,6 +13,7 @@ from pathlib import Path
 import httpx
 
 import canvas
+import course_items
 import ingestion
 import indexing
 import sync
@@ -223,6 +224,13 @@ def sync_course(course_id: int, sm_home: Path):
     # sync.diff() and _sync_deleted()'s index/manifest writes are otherwise
     # unguarded, and an exception from either would escape uncaught.
     try:
+        # The module outline, for listing questions in chat (course_items.py).
+        # Like the deletion guards below, an empty listing never wipes one
+        # already saved: a hidden modules tab looks the same as no modules.
+        outline = course_items.outline_rows(structure)
+        if outline:
+            course_items.save_outline(conn, outline)
+
         # Metadata collection itself can fail per-item (a malformed module item
         # missing content_id, or get_file hitting a real Canvas/network error) —
         # isolated here the same as the extraction/indexing failures below, so
