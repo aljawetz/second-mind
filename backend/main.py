@@ -137,6 +137,28 @@ def _memory_service(course_id: int, provider=None, conversation_id: str | None =
     )
 
 
+_guard = None
+_guard_loaded = False
+_guard_lock = threading.Lock()
+
+
+def _graded_work_guard():
+    """guard.Guard.flags, loaded once on first use and shared by request
+    threads; None when the weights file is missing (RAG gaps plan, task 7)."""
+    global _guard, _guard_loaded
+    with _guard_lock:
+        if not _guard_loaded:
+            import guard
+            import memory_jobs
+
+            _guard_loaded = True
+            try:
+                _guard = guard.load(memory_jobs.embed)
+            except Exception:
+                traceback.print_exc(file=sys.stderr)
+    return _guard.flags if _guard is not None else None
+
+
 def _run_memory_job(job: tuple[int, str | None]) -> None:
     """(course, chat): read the chat's new turns, then sweep the course.
     (course, None): just the sweep, which needs no model and so no key."""
@@ -934,6 +956,7 @@ class Handler(BaseHTTPRequestHandler):
                     provider,
                     memory=memory,
                     summary=summary,
+                    guard=_graded_work_guard(),
                 )
                 first = next(events)
             except OnnxModelFileMissing:
