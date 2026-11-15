@@ -137,6 +137,28 @@ def _memory_service(course_id: int, provider=None, conversation_id: str | None =
     )
 
 
+_guard = None
+_guard_loaded = False
+_guard_lock = threading.Lock()
+
+
+def _graded_work_guard():
+    """guard.Guard.flags, loaded once on first use and shared by request
+    threads; None when the weights file is missing (RAG gaps plan, task 7)."""
+    global _guard, _guard_loaded
+    with _guard_lock:
+        if not _guard_loaded:
+            import guard
+            import memory_jobs
+
+            _guard_loaded = True
+            try:
+                _guard = guard.load(memory_jobs.embed)
+            except Exception:
+                traceback.print_exc(file=sys.stderr)
+    return _guard.flags if _guard is not None else None
+
+
 def _run_memory_job(job: tuple[int, str | None]) -> None:
     """(course, chat): read the chat's new turns, then sweep the course.
     (course, None): just the sweep, which needs no model and so no key."""
@@ -171,6 +193,26 @@ def queue_startup_memory_jobs() -> None:
 def _parse_include_inactive(query: str) -> bool:
     val = parse_qs(query).get("include_inactive", [""])[0].strip().lower()
     return val in ("1", "true", "yes")
+
+
+def _attach_memories_used(course_id: int, conversation: dict) -> None:
+    """A saved turn keeps the ids of the memories its answer drew on
+    (memory_ids). Swap them for memories_used: [{id, text}], the same shape
+    the live /ask stream sends, with today's text. Memories since forgotten,
+    replaced or archived are left out. If the memory store can't be read,
+    the chat still opens, just without them."""
+    turns = conversation.get("turns", [])
+    wanted = {i for t in turns for i in t.get("memory_ids", [])}
+    active: dict[str, str] = {}
+    if wanted and _memory_enabled():
+        try:
+            with _memory_service(course_id) as service:
+                active = {m.id: m.text for m in service.list() if m.id in wanted}
+        except sqlite3.Error:
+            traceback.print_exc()
+    for t in turns:
+        if "memory_ids" in t:
+            t["memories_used"] = [{"id": i, "text": active[i]} for i in t.pop("memory_ids") if i in active]
 
 
 def _memory_json(m) -> dict:
@@ -766,6 +808,7 @@ class Handler(BaseHTTPRequestHandler):
         if conversation is None:
             self._not_found("no such conversation")
             return
+        _attach_memories_used(int(course_id), conversation)
         self._send_json(200, conversation)
 
     def _handle_conversation_delete(self, course_id: str, cid: str):
@@ -935,6 +978,7 @@ class Handler(BaseHTTPRequestHandler):
                     provider,
                     memory=memory,
                     summary=summary,
+                    guard=_graded_work_guard(),
                     list_items=lambda topic, types: course_items.list_for_course(SM_HOME, int(course_id), topic, types),
                 )
                 first = next(events)
@@ -1001,6 +1045,11 @@ class Handler(BaseHTTPRequestHandler):
                         "grounded": final.get("grounded", False),
                         "asked_at": asked_at,
                     }
+                    # Ids only: the text is looked up again when the chat is
+                    # opened, so an edited memory shows its new text and a
+                    # forgotten one isn't kept on disk here.
+                    if final.get("memories_used"):
+                        turn["memory_ids"] = [m["id"] for m in final["memories_used"]]
                     turn_index = conversations.append_turn(
                         SM_HOME, course_id, cid, turn, create_if_missing=create_if_missing
                     )

@@ -1,0 +1,162 @@
+[
+  {
+    "case": "N2",
+    "turn": 1,
+    "half": "tune",
+    "human_E": "good",
+    "human_G": "bad",
+    "human_better": "E"
+  },
+  {
+    "case": "N3",
+    "turn": 1,
+    "half": "report",
+    "human_E": "good",
+    "human_G": "ok",
+    "human_better": "E"
+  },
+  {
+    "case": "N3",
+    "turn": 2,
+    "half": "report",
+    "human_E": "good",
+    "human_G": "bad",
+    "human_better": "E"
+  },
+  {
+    "case": "N3",
+    "turn": 3,
+    "half": "report",
+    "human_E": "good",
+    "human_G": "ok",
+    "human_better": "E"
+  },
+  {
+    "case": "N4",
+    "turn": 1,
+    "half": "tune",
+    "human_E": "good",
+    "human_G": "bad",
+    "human_better": "E"
+  },
+  {
+    "case": "N7",
+    "turn": 1,
+    "half": "tune",
+    "human_E": "good",
+    "human_G": "bad",
+    "human_better": "E"
+  },
+  {
+    "case": "N7",
+    "turn": 3,
+    "half": "tune",
+    "human_E": "good",
+    "human_G": "bad",
+    "human_better": "E"
+  },
+  {
+    "case": "N9",
+    "turn": 1,
+    "half": "tune",
+    "human_E": "good",
+    "human_G": "bad",
+    "human_better": "E"
+  },
+  {
+    "case": "N9",
+    "turn": 2,
+    "half": "tune",
+    "human_E": "good",
+    "human_G": "bad",
+    "human_better": "E"
+  },
+  {
+    "case": "N9",
+    "turn": 3,
+    "half": "tune",
+    "human_E": "good",
+    "human_G": "bad",
+    "human_better": "E"
+  },
+  {
+    "case": "N10",
+    "turn": 1,
+    "half": "tune",
+    "human_E": "good",
+    "human_G": "ok",
+    "human_better": "E"
+  },
+  {
+    "case": "N10",
+    "turn": 2,
+    "half": "tune",
+    "human_E": "good",
+    "human_G": "ok",
+    "human_better": "E"
+  },
+  {
+    "case": "N11",
+    "turn": 2,
+    "half": "report",
+    "human_E": "good",
+    "human_G": "bad",
+    "human_better": "E"
+  },
+  {
+    "case": "N12",
+    "turn": 3,
+    "half": "tune",
+    "human_E": "good",
+    "human_G": "bad",
+    "human_better": "E"
+  },
+  {
+    "case": "N13",
+    "turn": 1,
+    "half": "report",
+    "human_E": "good",
+    "human_G": "bad",
+    "human_better": "E"
+  },
+  {
+    "case": "N13",
+    "turn": 2,
+    "half": "report",
+    "human_E": "good",
+    "human_G": "bad",
+    "human_better": "E"
+  },
+  {
+    "case": "N13",
+    "turn": 3,
+    "half": "report",
+    "human_E": "good",
+    "human_G": "bad",
+    "human_better": "E"
+  },
+  {
+    "case": "N14",
+    "turn": 1,
+    "half": "report",
+    "human_E": "good",
+    "human_G": "ok",
+    "human_better": "E"
+  },
+  {
+    "case": "N14",
+    "turn": 2,
+    "half": "report",
+    "human_E": "good",
+    "human_G": "bad",
+    "human_better": "E"
+  },
+  {
+    "case": "N14",
+    "turn": 3,
+    "half": "report",
+    "human_E": "good",
+    "human_G": "ok",
+    "human_better": "E"
+  }
+]

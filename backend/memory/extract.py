@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol
 
+import json_retry
+
 
 class JsonLLM(Protocol):
     def complete_json(self, messages: list[dict]) -> object:
@@ -121,11 +123,15 @@ _CITATION = re.compile(r"\s?\[\s*\d+(?:\s*,\s*\d+)*\s*\]")
 def extract(messages: list[dict], *, at: datetime, summary: str, llm: JsonLLM) -> Extraction:
     """messages: [{"role": "user" | "assistant", "content"}], oldest first.
     at: when they were said. summary: the conversation's summary before them."""
-    reply = llm.complete_json(
-        [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": _prompt(messages, at, summary)}]
+    reply = json_retry.complete_json(
+        llm,
+        [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": _prompt(messages, at, summary)}],
+        valid=_usable,
+        label="memory.extract",
     )
-    # This runs in the background worker: a reply of the wrong shape gives
-    # no memories and keeps the old summary, instead of raising.
+    # This runs in the background worker: a reply still of the wrong shape
+    # after the retry gives no memories and keeps the old summary, instead
+    # of raising.
     if not isinstance(reply, dict):
         reply = {}
     items = reply.get("memories")
@@ -181,6 +187,12 @@ def extract(messages: list[dict], *, at: datetime, summary: str, llm: JsonLLM) -
         if kept:
             summary = " ".join(" ".join(kept).split()[:MAX_SUMMARY_WORDS])
     return Extraction(memories=memories, summary=summary, dropped=dropped)
+
+
+def _usable(reply) -> bool:
+    """Worth keeping without a retry: an object with a memories list. Bad
+    items inside the list are dropped one by one, not retried."""
+    return isinstance(reply, dict) and isinstance(reply.get("memories"), list)
 
 
 def _prompt(messages: list[dict], at: datetime, summary: str) -> str:

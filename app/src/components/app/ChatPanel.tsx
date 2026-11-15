@@ -87,7 +87,7 @@ export default function ChatPanel({
             answer: t.answer,
             citations: t.citations,
             grounded: t.grounded,
-            memoriesUsed: [],
+            memoriesUsed: t.memories_used ?? [],
             status: "done" as const,
             savedTurnIndex: index,
             feedback: t.feedback,

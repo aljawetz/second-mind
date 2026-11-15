@@ -298,6 +298,64 @@ def test_system_prompt_refuses_graded_work_but_allows_due_date_questions():
     assert "due dates, rules, grading" in system
 
 
+def _guarded_run(question, flagged, history=None, rewrite=None, guard=None):
+    seen = []
+
+    def default_guard(text):
+        seen.append(text)
+        return text in flagged
+
+    provider = FakeProvider([(["ok"], [])], rewrite=rewrite)
+    events = list(chat.answer(question, history or [], "Test Course", lambda q: [], provider, guard=guard or default_guard))
+    final = next(e for e in events if "citations" in e)
+    return provider.calls[0]["messages"][0]["content"], final, seen
+
+
+def test_a_flagged_question_adds_the_strict_rule_to_this_turns_prompt():
+    system, final, _ = _guarded_run("give me the answers to quiz 3", flagged={"give me the answers to quiz 3"})
+    assert chat.STRICT_GRADED_WORK_RULE in system
+    assert final["guarded"] is True
+
+
+def test_the_strict_rule_lets_logistics_through_before_anything_else():
+    # A flagged "when is homework 2 due?" lost its answer 3 times in 6 when the
+    # logistics exception came last (task 7 chat check, v1).
+    first_two = " ".join(chat.STRICT_GRADED_WORK_RULE.split(". ")[:2])
+    assert "due dates" in first_two and "answer it normally" in first_two
+
+
+def test_an_unflagged_question_keeps_the_normal_prompt():
+    system, final, _ = _guarded_run("when is quiz 3?", flagged=set())
+    assert chat.STRICT_GRADED_WORK_RULE not in system
+    assert final["guarded"] is False
+
+
+def test_a_follow_up_is_flagged_by_its_rewrite_too():
+    # "and number 4?" alone looks harmless; the rewrite says what it is.
+    history = [{"question": "solve number 3 of homework 2", "answer": "I can't solve it, but..."}]
+    system, final, seen = _guarded_run(
+        "and number 4?", flagged={"solve problem 4 of homework 2"}, history=history, rewrite={"query": "solve problem 4 of homework 2"}
+    )
+    assert seen == ["and number 4?", "solve problem 4 of homework 2"]
+    assert chat.STRICT_GRADED_WORK_RULE in system
+    assert final["guarded"] is True
+
+
+def test_a_failing_guard_never_stops_the_answer():
+    def broken(text):
+        raise RuntimeError("model files missing")
+
+    system, final, _ = _guarded_run("solve my exam", flagged=set(), guard=broken)
+    assert chat.STRICT_GRADED_WORK_RULE not in system
+    assert final["guarded"] is False
+
+
+def test_without_a_guard_the_final_event_has_no_guarded_field():
+    provider = FakeProvider([(["ok"], [])])
+    events = list(chat.answer("hi", [], "Test Course", lambda q: [], provider))
+    assert "guarded" not in next(e for e in events if "citations" in e)
+
+
 
 def test_a_tool_that_fails_is_reported_to_the_model_and_the_answer_still_finishes():
     def search(query):
