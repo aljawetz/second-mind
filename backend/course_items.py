@@ -123,14 +123,30 @@ def _has_table(conn: sqlite3.Connection, name: str) -> bool:
     return conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (name,)).fetchone() is not None
 
 
-def _matcher(topic: str):
-    """Whole words, case-insensitive: "week 3" finds "Week 3: Elicitation"
-    but not "Week 30"."""
+def _word_pattern(words: list[str]) -> re.Pattern:
+    """Whole words, case-insensitive, a plural "s" either way: "week 3"
+    finds "Week 3: Elicitation" but not "Week 30"."""
+    parts = []
+    for word in words:
+        stem = word[:-1] if len(word) > 3 and word.lower().endswith("s") else word
+        parts.append(re.escape(stem) + "s?")
+    return re.compile(r"(?<!\w)" + r"\s+".join(parts) + r"(?!\w)", re.IGNORECASE)
+
+
+def _matches(rows: list[dict], topic: str) -> list[dict]:
+    """The topic as a phrase in the module, section or title first. When
+    that finds nothing, every word anywhere in them: the model asks for
+    "sprint deliverables" when "Sprint" is in the item names and
+    "Deliverables" in the module's (listing eval, 56350)."""
     words = topic.split()
     if not words:
-        return lambda text: True
-    pattern = re.compile(r"(?<!\w)" + r"\s+".join(map(re.escape, words)) + r"(?!\w)", re.IGNORECASE)
-    return lambda text: bool(pattern.search(text))
+        return rows
+    phrase = _word_pattern(words)
+    hits = [r for r in rows if any(phrase.search(r[k]) for k in ("module", "section", "title"))]
+    if hits:
+        return hits
+    each = [_word_pattern([w]) for w in words]
+    return [r for r in rows if all(p.search(f"{r['module']} | {r['section']} | {r['title']}") for p in each)]
 
 
 def _item_line(row: dict) -> str:
@@ -139,14 +155,8 @@ def _item_line(row: dict) -> str:
 
 
 def format_listing(rows: list[dict], topic: str = "", types: list[str] | None = None) -> str:
-    matches = _matcher(topic)
     wanted = {t.lower() for t in types or []}
-    hits = [
-        r
-        for r in rows
-        if (not wanted or r["item_type"] in wanted)
-        and (matches(r["module"]) or matches(r["section"]) or matches(r["title"]))
-    ]
+    hits = _matches([r for r in rows if not wanted or r["item_type"] in wanted], topic)
     asked = " and ".join(part for part in (f'"{topic}"' if topic.strip() else "", ", ".join(sorted(wanted))) if part)
     if not hits:
         modules = list(dict.fromkeys(r["module"] for r in rows if r["module"]))

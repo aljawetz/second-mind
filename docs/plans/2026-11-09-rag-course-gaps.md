@@ -137,4 +137,20 @@
 
   Index on disk: 3.0 MB → 17 MB for both courses. The outline lists each Task page's readings under it ("Linked from Task 3 Resources": 8 files).
 - **Next, as its own change:** a faster first sync. Names and outline first (seconds), content indexed in the background with pages and small files first, and files over a size limit last, with an opt-out per file. Syncing costs no money: Canvas API, local extraction, OCR and embeddings.
-- **Left:** the listing questions and the before/after chat run. The frozen Sprint 8/9 sets were written against the old index, so a re-synced index changes what they measure.
+- **Faster first sync, rule agreed:** a PDF over 150 pages (page count read from the PDF's header after download, 0.25 s for 722 pages), any other file whose text is longer than a 150-page PDF (about 450,000 characters), or any file over 50 MB (from Canvas's size, before download) waits until the student turns it on. Open question: index the first 150 pages as a labeled preview. The pages a course assigns are often later (Cooper p507–554, p655–659), so the label matters.
+- **Listing eval (`scripts/listing_eval.py`, 2026-11-15):** 8 questions with full answers taken from the outline, on the synced copy, `gpt-4o-mini`, 2 runs per variant. Answers kept in `~/second-mind-local/2026-11-listing/` (they quote course text).
+
+  | Question | Without tool | With tool | Tool called |
+  | --- | --- | --- | --- |
+  | L1 Task 3 readings (hand key, 11) | 11, 11 | 11, 11 | no |
+  | L2 Task 4 resources (hand key, 19) | 12, 12 | 12, 12 | no |
+  | L3 class preparation readings (hand key, 18) | 4, 5 | 4, 5 | yes, list ignored |
+  | L4 pages in the Task 1 module (5) | 0, 0 | 5, 5 | yes |
+  | L5 Field Project assignments (3) | 3, 3 | 3, 3 | yes |
+  | L6 week 2 literature review materials (5) | 2, 2 | 2, 5 | yes |
+  | L7 all announcements (13) | 3, 3 | 13, 13 | yes |
+  | L8 all sprint deliverables (9) | 5, 5 | 9, 9 | yes |
+
+  Median time 5.0 s against 5.2 s; about 40% more tokens. The first run found the model asking for "sprint deliverables" when "Sprint" is in the item names and "Deliverables" in the module's: a topic now falls back to every word anywhere when the phrase matches nothing, with a plural "s" ignored.
+- **What the listing tool doesn't fix:** a list held inside one long page. Task 4 Resources is two search chunks and only the first came back (L2); Class Preparation is about 45 chunks over 14 weeks (L3), and the answers mixed in page numbers from other pages. That needs a tool that reads a whole page or file by name: a candidate next task.
+- **Left:** the faster first sync (its own change). The frozen Sprint 8/9 sets were written against the old index, so a re-synced index changes what they measure; re-sync the real index after this merges.

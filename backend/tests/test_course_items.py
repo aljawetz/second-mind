@@ -82,7 +82,8 @@ def test_topic_matching_a_section_or_title_lists_just_those_items():
     assert "Koskela" in by_section and "TDD primer" in by_section and "Welcome" not in by_section
     by_title = course_items.format_listing(_rows(), topic="interview")
     assert "A1 - Interview plan" in by_title  # whole word, case-insensitive
-    assert "03 Interviews.pdf" not in by_title
+    assert "03 Interviews.pdf" in by_title  # a plural "s" either way
+    assert "Welcome" not in by_title
 
 
 def test_types_filter_keeps_only_those_kinds():
@@ -139,3 +140,14 @@ def test_reading_the_listing_never_writes_to_the_manifest(tmp_path):
     path.parent.mkdir(parents=True)
     sqlite3.connect(path).close()  # an old manifest with no tables at all
     assert "hasn't been synced" in course_items.list_for_course(tmp_path, 7)
+
+
+def test_topic_words_may_be_spread_over_module_section_and_title():
+    """The model asks for "sprint deliverables" when "Sprint" is in the item
+    names and "Deliverables" in the module's (56350, listing eval)."""
+    rows = course_items.outline_rows(
+        [{"name": "Weekly Project Deliverables", "items": [{"type": "Assignment", "title": "Sprint 1 Deliverable"}, {"type": "Assignment", "title": "Democracy Day"}]}]
+    )
+    text = course_items.format_listing(rows, topic="sprint deliverables")
+    assert "Sprint 1 Deliverable" in text and "Democracy Day" not in text
+    assert "Sprint 1 Deliverable" in course_items.format_listing(rows, topic="Deliverables sprint")
