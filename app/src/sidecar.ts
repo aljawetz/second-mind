@@ -218,7 +218,8 @@ export async function askQuestion(
 }
 
 // Saved course chats (conversations.py): one per conversation id, newest
-// first. A saved turn has no memories_used; only the live /ask stream does.
+// first. A saved turn's memories_used has today's text of each memory its
+// answer drew on, minus any since forgotten.
 export interface ConversationSummary {
   conversation_id: string;
   title: string;
@@ -238,6 +239,7 @@ export interface SavedTurn {
   citations: Citation[];
   grounded: boolean;
   asked_at: string;
+  memories_used?: MemoryUsed[];
   feedback?: AnswerFeedback | null;
 }
 

@@ -177,6 +177,32 @@ def test_what_one_chat_told_memory_shapes_the_next_chat(app):
     assert [m["text"] for m in _final(events)["memories_used"]] == ["The student is on team 4 with Priya."]
 
 
+
+def test_a_reopened_chat_still_shows_the_memories_its_answers_used(app):
+    _say(app, "I'm on team 4 with Priya.", remembers="The student is on team 4 with Priya.")
+    app.model.chat_replies.append(["Team 4."])
+    _, events = _ask(app, "Which team am I on?")
+    assert main.MEMORY_WORKER.wait_idle(10)
+    cid = events[0]["conversation_id"]
+    [used] = _final(events)["memories_used"]
+
+    # Only the id is saved; the text comes from the memory store on open.
+    [saved] = conversations.get_conversation(app.home, COURSE, cid)["turns"]
+    assert saved["memory_ids"] == [used["id"]] and "memories_used" not in saved
+
+    _, chat_json = _json(app, "GET", f"/courses/{COURSE}/conversations/{cid}")
+    assert chat_json["turns"][0]["memories_used"] == [used]
+    assert "memory_ids" not in chat_json["turns"][0]
+
+    # An edit shows its new text; a forgotten memory is no longer shown.
+    _json(app, "POST", f"/courses/{COURSE}/memories/{used['id']}/edit", {"text": "The student is on team 5."})
+    _, chat_json = _json(app, "GET", f"/courses/{COURSE}/conversations/{cid}")
+    assert [m["text"] for m in chat_json["turns"][0]["memories_used"]] == ["The student is on team 5."]
+
+    _request(app, "DELETE", f"/courses/{COURSE}/memories/{used['id']}")
+    _, chat_json = _json(app, "GET", f"/courses/{COURSE}/conversations/{cid}")
+    assert chat_json["turns"][0]["memories_used"] == []
+
 def test_memories_can_be_listed_and_deleted(app):
     _say(app, "I'm auditing the course.", remembers="The student is auditing the course.")
 
