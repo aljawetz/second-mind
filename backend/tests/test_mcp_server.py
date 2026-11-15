@@ -109,7 +109,7 @@ def test_tools_and_instructions_are_listed():
             return tools, client.instructions
 
     tools, instructions = anyio.run(go)
-    assert tools == {"list_courses", "search_course_material"}
+    assert tools == {"list_courses", "search_course_material", "list_assignments"}
     assert "search_course_material before answering" in instructions
 
 
@@ -274,3 +274,77 @@ def test_course_names_are_read_from_canvas_until_one_read_succeeds(tmp_path):
 
     assert (first, second, third) == (None, "Requirements", "Requirements")
     assert len(calls) == 2
+
+
+# --- list_assignments --------------------------------------------------------
+
+import httpx  # noqa: E402
+
+import canvas  # noqa: E402
+
+FUTURE = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+RAW_ASSIGNMENTS = [
+    {"id": 11, "name": "Lab 3", "due_at": FUTURE, "points_possible": 50, "html_url": "https://c/a/11",
+     "description": "<p>Write tests.</p>", "submission": {"workflow_state": "unsubmitted"},
+     "rubric": [{"description": "Coverage", "points": 50, "ratings": []}], "use_rubric_for_grading": True},
+]
+
+
+def _assignments_server(tmp_path, fetch):
+    return mcp_server.build_server(tmp_path, names_for=dict, assignments_for=fetch)
+
+
+def test_list_assignments_returns_upcoming_work(tmp_path):
+    out = _call(_assignments_server(tmp_path, lambda cid: RAW_ASSIGNMENTS), "list_assignments", {"course_id": COURSE})
+
+    assert [a["name"] for a in out["assignments"]] == ["Lab 3"]
+    assert out["days"] == 14
+
+
+def test_list_assignments_with_an_id_returns_the_rubric(tmp_path):
+    out = _call(_assignments_server(tmp_path, lambda cid: RAW_ASSIGNMENTS), "list_assignments",
+                {"course_id": COURSE, "assignment_id": 11})
+
+    assert out["name"] == "Lab 3"
+    assert out["rubric"]["criteria"][0]["criterion"] == "Coverage"
+    assert out["description"] == "Write tests."
+
+
+def test_list_assignments_with_an_unknown_id_says_so(tmp_path):
+    out = _call(_assignments_server(tmp_path, lambda cid: RAW_ASSIGNMENTS), "list_assignments",
+                {"course_id": COURSE, "assignment_id": 999})
+
+    assert "No assignment 999" in out["note"]
+
+
+def _index_with_an_assignment(home):
+    store = LanceDBVectorStore(uri=str(home / "index.lancedb"), table_name=f"course_{COURSE}")
+    node = TextNode(
+        text="Due date and points\nDue Fri, Nov 20, 2026 at 11:59 PM EST. Worth 50 points.",
+        metadata={"source": "Lab 3", "item_type": "assignment", "page": None, "slide": None, "timestamp": None},
+    )
+    node.relationships = {}
+    VectorStoreIndex([node], storage_context=StorageContext.from_defaults(vector_store=store),
+                     embed_model=_HashEmbedding(), transformations=[])
+
+
+@pytest.mark.parametrize(
+    "error, reason",
+    [
+        (canvas.CanvasError("no Canvas token stored"), "No Canvas token is set up"),
+        (httpx.ConnectError("offline"), "Canvas could not be reached"),
+        (httpx.HTTPStatusError("401", request=httpx.Request("GET", "https://c"), response=httpx.Response(401)),
+         "Your Canvas token no longer works"),
+    ],
+)
+def test_list_assignments_falls_back_to_the_index(tmp_path, error, reason):
+    _index_with_an_assignment(tmp_path)
+
+    def fail(cid):
+        raise error
+
+    out = _call(_assignments_server(tmp_path, fail), "list_assignments", {"course_id": COURSE})
+
+    assert out["stale"] is True
+    assert out["note"].startswith(reason)
+    assert out["assignments"] == [{"name": "Lab 3", "schedule": "Due Fri, Nov 20, 2026 at 11:59 PM EST. Worth 50 points."}]

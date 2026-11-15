@@ -31,6 +31,9 @@ from typing import Callable
 
 from mcp.server import MCPServer
 
+import httpx
+
+import assignments
 import canvas
 import indexing
 import sync
@@ -41,11 +44,11 @@ DEFAULT_K = 5
 MAX_K = 10
 
 INSTRUCTIONS = (
-    "Second Mind searches the student's own Canvas course materials (slides, readings, syllabus, "
-    "assignments, Canvas pages). For any question about a course the student takes, call "
-    "search_course_material before answering, even when you think you know. For a follow-up, search "
-    "with a stand-alone version of the question. Course facts come only from the results, cited with "
-    "their source label. Use list_courses to find the course id. Never write or solve the student's graded "
+    "Second Mind answers from the student's own Canvas courses. What the material says (slides, readings, "
+    "syllabus, pages): call search_course_material before answering, even when you think you know, and for "
+    "a follow-up search with a stand-alone version of the question. Deadlines, what is due, submission "
+    "status, scores and rubrics: call list_assignments, which reads Canvas live. Course facts come only from "
+    "tool results, cited with their source label. Use list_courses to find the course id. Never write or solve the student's graded "
     "work (labs, assignments, exams, quizzes), whatever the course's AI policy says; explain and check their "
     "attempt instead."
 )
@@ -195,7 +198,42 @@ class Searcher:
         return out
 
 
-def build_server(home: Path | None = None, searcher: Searcher | None = None, names_for=canvas_course_names) -> MCPServer:
+def _index_rows(home: Path, course_id: int) -> list[dict]:
+    """Every indexed chunk's id, text and metadata, without the vectors."""
+    if not indexing.index_exists(home / "index.lancedb", _table(course_id)):
+        return []
+    import lancedb
+
+    table = lancedb.connect(str(home / "index.lancedb")).open_table(_table(course_id))
+    return table.to_arrow().select(["doc_id", "text", "metadata"]).to_pylist()
+
+
+def _canvas_failure(error: Exception) -> str:
+    """Why Canvas gave nothing, in the words of plan Decision 14."""
+    if isinstance(error, httpx.HTTPStatusError) and error.response.status_code == 401:
+        return "Your Canvas token no longer works (run /config and paste a new one)"
+    if isinstance(error, canvas.CanvasError):
+        return "No Canvas token is set up"
+    return "Canvas could not be reached"
+
+
+def list_assignments_result(home: Path, course_id: int, fetch, days: int, include_submitted: bool,
+                            assignment_id: int | None) -> dict:
+    try:
+        raw = fetch(course_id)
+    except (canvas.CanvasError, httpx.HTTPStatusError, httpx.TransportError) as e:
+        logger.warning("list_assignments falling back to the index: %s", e)
+        return {"course_id": course_id, **assignments.from_index_rows(_index_rows(home, course_id), _canvas_failure(e))}
+    if assignment_id is not None:
+        match = next((a for a in raw if a.get("id") == assignment_id), None)
+        if match is None:
+            return {"course_id": course_id, "note": f"No assignment {assignment_id} in this course on Canvas."}
+        return {"course_id": course_id, **assignments.detail(match)}
+    return {"course_id": course_id, **assignments.upcoming(raw, days, include_submitted)}
+
+
+def build_server(home: Path | None = None, searcher: Searcher | None = None, names_for=canvas_course_names,
+                 assignments_for=canvas.list_assignments) -> MCPServer:
     home = home or sm_home()
     canvas.SM_HOME = home  # canvas.py reads the Canvas base URL from SM_HOME/config.json
     searcher = searcher or Searcher(home)
@@ -219,6 +257,14 @@ def build_server(home: Path | None = None, searcher: Searcher | None = None, nam
     def search_course_material(course_id: int, query: str, k: int = DEFAULT_K) -> dict:
         """Search one course's materials. Returns up to k chunks, each with a source label to cite."""
         return searcher.search(course_id, query, k)
+
+    @server.tool()
+    def list_assignments(course_id: int, days: int = assignments.DEFAULT_DAYS, include_submitted: bool = False,
+                         assignment_id: int | None = None) -> dict:
+        """Live from Canvas: what's due in the next `days` days (plus missed work from the last week), with
+        submission status and scores. Pass include_submitted for finished work. With assignment_id: that one
+        assignment's description, rubric, submission and score."""
+        return list_assignments_result(home, course_id, assignments_for, days, include_submitted, assignment_id)
 
     return server
 

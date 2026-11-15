@@ -43,6 +43,45 @@
         ],
         "title": "search_course_materialArguments"
       }
+    },
+    {
+      "name": "list_assignments",
+      "description": "Live from Canvas: what's due in the next `days` days (plus missed work from the last week), with\nsubmission status and scores. Pass include_submitted for finished work. With assignment_id: that one\nassignment's description, rubric, submission and score.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "course_id": {
+            "title": "Course Id",
+            "type": "integer"
+          },
+          "days": {
+            "default": 14,
+            "title": "Days",
+            "type": "integer"
+          },
+          "include_submitted": {
+            "default": false,
+            "title": "Include Submitted",
+            "type": "boolean"
+          },
+          "assignment_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Assignment Id"
+          }
+        },
+        "required": [
+          "course_id"
+        ],
+        "title": "list_assignmentsArguments"
+      }
     }
   ],
   "resultType": "complete"

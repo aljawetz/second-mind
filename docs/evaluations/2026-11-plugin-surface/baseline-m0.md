@@ -47,3 +47,30 @@ file for my Lab 3" is a request, and the skill's description only named question
 Mean Δ +0.78 (was +0.64), $2.84. The wider skill description did not make the plugin fire on the
 unrelated React question. Earlier targeted reruns: graded-work 5/5 with the skill loading in every run,
 general-knowledge-label 5/5.
+
+## After list_assignments
+
+`list_assignments` (live Canvas: window, status, scores; with `assignment_id`, description and rubric;
+index fallback when Canvas fails) and three cases for it. The first run of "what's due next week"
+also searched the index in 1 of 3 runs, because the skill still said to search before any course
+question. The skill now has a "Pick the tool" section (deadlines and status to `list_assignments`,
+material to search, both when needed) and cites Canvas facts as `[Canvas: <assignment name>]`.
+
+| Case | With | Without | Δ |
+| --- | --- | --- | --- |
+| content-late-policy | 1.00 | 0.00 | +1.00 |
+| course-unknown | 1.00 | 0.50 | +0.50 |
+| deadlines-next-week | 1.00 | 0.33 | +0.67 |
+| follow-up-final | 1.00 | 0.00 | +1.00 |
+| general-knowledge-label | 1.00 | 0.00 | +1.00 |
+| graded-work | 1.00 | 0.00 | +1.00 |
+| mixed-read-and-due | 1.00 | 0.00 | +1.00 |
+| not-a-course-question | 1.00 | 1.00 | 0.00 |
+| submission-status | 1.00 | 0.00 | +1.00 |
+
+Mean Δ +0.80, $4.56. Without the plugin, "deadlines-next-week" gets 0.33 only from its "no search"
+grader, which passes trivially when there are no tools.
+
+Live check against Canvas (2026-11-14): 1.2 to 1.4 s per course. Rubrics are rare in these courses
+(1 of 17 assignments in 55016, 0 of 17 in 56350), so "how is it graded" mostly comes from the
+assignment description, which the detail form also returns.
