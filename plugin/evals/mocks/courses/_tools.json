@@ -1,0 +1,49 @@
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "second-mind",
+      "version": ""
+    }
+  },
+  "ttlMs": 0,
+  "cacheScope": "private",
+  "tools": [
+    {
+      "name": "list_courses",
+      "description": "List the student's courses indexed on this machine: course_id, name, last sync time.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "title": "list_coursesArguments"
+      }
+    },
+    {
+      "name": "search_course_material",
+      "description": "Search one course's materials. Returns up to k chunks, each with a source label to cite.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "course_id": {
+            "title": "Course Id",
+            "type": "integer"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "k": {
+            "default": 5,
+            "title": "K",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "course_id",
+          "query"
+        ],
+        "title": "search_course_materialArguments"
+      }
+    }
+  ],
+  "resultType": "complete"
+}
