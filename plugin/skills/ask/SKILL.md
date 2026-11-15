@@ -78,6 +78,8 @@ rules, grading and how a topic works are not graded work and get a normal answer
 Use today's date to work out "today", "tomorrow", "this week" and "next week", and pass the matching
 `days` to `list_assignments` (7 for "this week" or "next week", 1 or 2 for "tomorrow"). Only Canvas and
 the course materials say what is due and when, and an assignment already past is not due next week.
-Canvas gives times in UTC: say them in the student's local time.
+`list_assignments` gives every time already in the student's time zone: show `due_at_display`
+exactly as given, and use `due_in` for "how long do I have". Never convert a time, never work out a
+time zone from the course or the Canvas URL, and never show `due_at_utc`.
 
 Answer first, and be concise.

@@ -290,8 +290,13 @@ RAW_ASSIGNMENTS = [
 ]
 
 
-def _assignments_server(tmp_path, fetch):
-    return mcp_server.build_server(tmp_path, names_for=dict, assignments_for=fetch)
+from zoneinfo import ZoneInfo  # noqa: E402
+
+LA = ZoneInfo("America/Los_Angeles")
+
+
+def _assignments_server(tmp_path, fetch, zone=lambda: LA):
+    return mcp_server.build_server(tmp_path, names_for=dict, assignments_for=fetch, zone_for=zone)
 
 
 def test_list_assignments_returns_upcoming_work(tmp_path):
@@ -348,3 +353,36 @@ def test_list_assignments_falls_back_to_the_index(tmp_path, error, reason):
     assert out["stale"] is True
     assert out["note"].startswith(reason)
     assert out["assignments"] == [{"name": "Lab 3", "schedule": "Due Fri, Nov 20, 2026 at 11:59 PM EST. Worth 50 points."}]
+
+
+def test_list_assignments_shows_times_in_the_students_zone(tmp_path):
+    out = _call(_assignments_server(tmp_path, lambda cid: RAW_ASSIGNMENTS), "list_assignments", {"course_id": COURSE})
+
+    assert out["timezone"] == "America/Los_Angeles"
+    row = out["assignments"][0]
+    assert row["due_at_display"].endswith(("PST", "PDT"))
+    assert row["due_in"].startswith("in ")
+
+
+def test_zone_comes_from_the_canvas_profile_once(monkeypatch):
+    calls = []
+
+    def profile():
+        calls.append(1)
+        return {"time_zone": "America/Denver"}
+
+    monkeypatch.setattr(mcp_server.canvas, "get_profile", profile)
+    zone = mcp_server.canvas_zone()
+
+    assert zone() == ZoneInfo("America/Denver")
+    assert zone() == ZoneInfo("America/Denver")
+    assert len(calls) == 1
+
+
+def test_zone_falls_back_to_the_machine_when_canvas_fails(monkeypatch):
+    def boom():
+        raise httpx.ConnectError("offline")
+
+    monkeypatch.setattr(mcp_server.canvas, "get_profile", boom)
+
+    assert mcp_server.canvas_zone()() == mcp_server.assignments.machine_zone()

@@ -131,6 +131,14 @@ def list_courses() -> list[dict]:
         return _get_all(client, "/courses", params={"per_page": 50})
 
 
+def get_profile() -> dict:
+    """The student's own profile; its time_zone (an IANA name) is the zone
+    Canvas shows their deadlines in."""
+    with _client() as client:
+        r = _get(client, "/users/self/profile")
+        return r.json() if r else {}
+
+
 def list_assignments(course_id: int) -> list[dict]:
     # include[]=submission embeds the student's own real submission status
     # (workflow_state, submitted_at, late, missing) directly in each

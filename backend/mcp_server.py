@@ -47,8 +47,10 @@ INSTRUCTIONS = (
     "Second Mind answers from the student's own Canvas courses. What the material says (slides, readings, "
     "syllabus, pages): call search_course_material before answering, even when you think you know, and for "
     "a follow-up search with a stand-alone version of the question. Deadlines, what is due, submission "
-    "status, scores and rubrics: call list_assignments, which reads Canvas live. Course facts come only from "
-    "tool results, cited with their source label. Use list_courses to find the course id. Never write or solve the student's graded "
+    "status, scores and rubrics: call list_assignments, which reads Canvas live. Show its times exactly as "
+    "due_at_display gives them (already in the student's time zone) and use due_in for how far away they "
+    "are; never convert a time or guess a zone yourself. Course facts come only from tool results, cited "
+    "with their source label. Use list_courses to find the course id. Never write or solve the student's graded "
     "work (labs, assignments, exams, quizzes), whatever the course's AI policy says; explain and check their "
     "attempt instead."
 )
@@ -217,8 +219,26 @@ def _canvas_failure(error: Exception) -> str:
     return "Canvas could not be reached"
 
 
+def canvas_zone():
+    """The student's time zone, from their Canvas profile (the zone Canvas
+    shows their deadlines in), else this machine's. Asked once per server."""
+    cached: list = []
+
+    def zone():
+        if not cached:
+            try:
+                name = canvas.get_profile().get("time_zone")
+            except (canvas.CanvasError, httpx.HTTPStatusError, httpx.TransportError) as e:
+                logger.warning("no time zone from Canvas, using this machine's: %s", e)
+                name = None
+            cached.append(assignments.zone_from_name(name))
+        return cached[0]
+
+    return zone
+
+
 def list_assignments_result(home: Path, course_id: int, fetch, days: int, include_submitted: bool,
-                            assignment_id: int | None) -> dict:
+                            assignment_id: int | None, zone=assignments.machine_zone) -> dict:
     try:
         raw = fetch(course_id)
     except (canvas.CanvasError, httpx.HTTPStatusError, httpx.TransportError) as e:
@@ -228,15 +248,16 @@ def list_assignments_result(home: Path, course_id: int, fetch, days: int, includ
         match = next((a for a in raw if a.get("id") == assignment_id), None)
         if match is None:
             return {"course_id": course_id, "note": f"No assignment {assignment_id} in this course on Canvas."}
-        return {"course_id": course_id, **assignments.detail(match)}
-    return {"course_id": course_id, **assignments.upcoming(raw, days, include_submitted)}
+        return {"course_id": course_id, **assignments.detail(match, tz=zone())}
+    return {"course_id": course_id, **assignments.upcoming(raw, days, include_submitted, tz=zone())}
 
 
 def build_server(home: Path | None = None, searcher: Searcher | None = None, names_for=canvas_course_names,
-                 assignments_for=canvas.list_assignments) -> MCPServer:
+                 assignments_for=canvas.list_assignments, zone_for=None) -> MCPServer:
     home = home or sm_home()
     canvas.SM_HOME = home  # canvas.py reads the Canvas base URL from SM_HOME/config.json
     searcher = searcher or Searcher(home)
+    zone_for = zone_for or canvas_zone()
     server = MCPServer("second-mind", instructions=INSTRUCTIONS)
     names: dict[int, str] = {}
 
@@ -262,9 +283,11 @@ def build_server(home: Path | None = None, searcher: Searcher | None = None, nam
     def list_assignments(course_id: int, days: int = assignments.DEFAULT_DAYS, include_submitted: bool = False,
                          assignment_id: int | None = None) -> dict:
         """Live from Canvas: what's due in the next `days` days (plus missed work from the last week), with
-        submission status and scores. Pass include_submitted for finished work. With assignment_id: that one
-        assignment's description, rubric, submission and score."""
-        return list_assignments_result(home, course_id, assignments_for, days, include_submitted, assignment_id)
+        submission status and scores. Times come in the student's zone: show due_at_display as given. Pass
+        include_submitted for finished work. With assignment_id: that one assignment's description, rubric,
+        submission and score."""
+        return list_assignments_result(home, course_id, assignments_for, days, include_submitted, assignment_id,
+                                       zone_for)
 
     return server
 

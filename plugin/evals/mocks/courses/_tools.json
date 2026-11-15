@@ -46,7 +46,7 @@
     },
     {
       "name": "list_assignments",
-      "description": "Live from Canvas: what's due in the next `days` days (plus missed work from the last week), with\nsubmission status and scores. Pass include_submitted for finished work. With assignment_id: that one\nassignment's description, rubric, submission and score.",
+      "description": "Live from Canvas: what's due in the next `days` days (plus missed work from the last week), with\nsubmission status and scores. Times come in the student's zone: show due_at_display as given. Pass\ninclude_submitted for finished work. With assignment_id: that one assignment's description, rubric,\nsubmission and score.",
       "inputSchema": {
         "type": "object",
         "properties": {

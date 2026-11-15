@@ -7,8 +7,13 @@ test_canvas.py.
 """
 
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+import pytest
 
 import assignments
+
+LA = ZoneInfo("America/Los_Angeles")
 
 NOW = datetime(2026, 11, 14, 17, 0, tzinfo=timezone.utc)
 
@@ -51,6 +56,7 @@ def test_upcoming_keeps_the_window_sorted_by_due_date():
     assert out["days"] == 7
     assert out["as_of"] == "2026-11-14T17:00:00Z"
     assert out["assignments"][0]["url"].endswith("/assignments/2")
+    assert "due_at" not in out["assignments"][0]  # only the explicit utc/local/display fields
 
 
 def test_upcoming_hides_submitted_work_unless_asked():
@@ -127,7 +133,7 @@ def test_detail_has_text_rubric_submission_and_dates():
     ]
     assert out["submission"] == {"status": "graded", "score": 42.0, "grade": "42", "late": True, "missing": False,
                                  "submitted_at": "2026-11-02T03:00:00Z"}
-    assert out["unlock_at"] == "2026-11-01T04:00:00Z"
+    assert out["unlock"]["due_at_utc"] == "2026-11-01T04:00:00Z"
     assert out["url"].endswith("/assignments/7")
 
 
@@ -135,7 +141,7 @@ def test_detail_without_a_rubric_says_so():
     out = assignments.detail(_a(8, "Reading response", None, UNSUBMITTED))
 
     assert out["rubric"] is None
-    assert out["due_at"] is None
+    assert out["due"] is None
 
 
 def test_detail_caps_a_long_description():
@@ -160,3 +166,53 @@ def test_fallback_reads_due_lines_from_indexed_assignments():
     assert out["assignments"] == [
         {"name": "Lab 3: Branch Coverage", "schedule": "Due Fri, Nov 20, 2026 at 11:59 PM EST. Worth 50 points."}
     ]
+
+
+# --- time zones: the server converts, the model only copies ----------------
+
+
+def test_due_times_are_given_in_the_students_zone():
+    due = datetime(2026, 11, 17, 7, 59, 59, tzinfo=timezone.utc)  # Mon 11:59 PM in Los Angeles
+    out = assignments.upcoming([_a(1, "Field project", due, UNSUBMITTED)], days=7, now=NOW, tz=LA)
+
+    row = out["assignments"][0]
+    assert out["timezone"] == "America/Los_Angeles"
+    assert row["due_at_utc"] == "2026-11-17T07:59:59Z"
+    assert row["due_at_local"] == "2026-11-16T23:59:59-08:00"
+    assert row["due_at_display"] == "Mon, Nov 16, 11:59 PM PST"
+    assert row["due_in"] == "in 2 days, 14 hours"  # 2d 14h 59m, rounded down
+
+
+def test_display_follows_daylight_saving():
+    due = datetime(2026, 10, 1, 6, 59, tzinfo=timezone.utc)
+    when = assignments.when(due, LA, now=due - timedelta(minutes=45))
+
+    assert when["due_at_display"] == "Wed, Sep 30, 11:59 PM PDT"
+    assert when["due_in"] == "in 45 minutes"
+
+
+@pytest.mark.parametrize(
+    "delta, text",
+    [(timedelta(hours=-3), "3 hours ago"), (timedelta(days=-1, hours=-2), "1 day, 2 hours ago"),
+     (timedelta(seconds=30), "in less than a minute"), (timedelta(days=9), "in 9 days")],
+)
+def test_due_in_reads_naturally(delta, text):
+    assert assignments.when(NOW + delta, LA, now=NOW)["due_in"] == text
+
+
+def test_detail_gives_local_times_for_every_date():
+    raw = _a(3, "Essay", datetime(2026, 11, 20, 4, 59, tzinfo=timezone.utc), UNSUBMITTED,
+             unlock_at="2026-11-01T07:00:00Z", lock_at=None)
+
+    out = assignments.detail(raw, now=NOW, tz=LA)
+
+    assert out["timezone"] == "America/Los_Angeles"
+    assert out["due"]["due_at_display"] == "Thu, Nov 19, 8:59 PM PST"
+    assert out["unlock"]["due_at_display"] == "Sun, Nov 1, 12:00 AM PDT"
+    assert out["lock"] is None
+
+
+def test_zone_from_name_falls_back_to_the_machine():
+    assert assignments.zone_from_name("America/Denver") == ZoneInfo("America/Denver")
+    assert assignments.zone_from_name("Not/AZone") == assignments.machine_zone()
+    assert assignments.zone_from_name(None) == assignments.machine_zone()

@@ -74,3 +74,14 @@ grader, which passes trivially when there are no tools.
 Live check against Canvas (2026-11-14): 1.2 to 1.4 s per course. Rubrics are rare in these courses
 (1 of 17 assignments in 55016, 0 of 17 in 56350), so "how is it graded" mostly comes from the
 assignment description, which the detail form also returns.
+
+## Time zones
+
+Found by hand-testing (2026-11-14): `list_assignments` returned bare UTC, Claude picked Eastern time from
+the canvas.cmu.edu URL, and then converted wrong (11:59 PM ET for what was 2:59 AM ET). The server now
+converts: the zone comes from the student's Canvas profile (`time_zone`, America/Los_Angeles here), else
+the machine's, and every time is returned as `due_at_utc`, `due_at_local`, `due_at_display` ("Wed, Nov
+18, 11:59 PM PST") and `due_in` ("in 4 days, 3 hours"), with `timezone` at the top. The server
+instructions and the skill say to show `due_at_display` as given and never convert. The deadline cases
+gained a grader that fails on any other zone or a raw UTC time. Deadline cases after the fix: all 1.00
+with the plugin.
