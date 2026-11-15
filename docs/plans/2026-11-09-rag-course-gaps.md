@@ -55,7 +55,7 @@
 - **Built (2026-11-10):** Helpful / Not helpful buttons, removable ratings, and optional notes up to 500 characters. Feedback stays on the saved turn locally and is restored when reopening the chat. `GET /courses/{course_id}/feedback` lists thumbs-down turns for review. The final stream event identifies the saved turn, so failed answers cannot shift feedback onto another answer.
 - **Verified:** 593 backend tests passed (9 skipped), 5 frontend interaction tests passed, production build passed. [Screenshots and verification scope](../evaluations/answer-feedback/README.md).
 
-### 3. Keep graded exam and quiz text out of the index, and drop junk chunks (beta)
+### 3. Keep graded exam and quiz text out of the index, and drop junk chunks (beta) — junk filter built; exam rule dropped
 
 - **Why:** Sprint 8 found a midterm coding question in the index, and an interviewee raised graded-quiz exposure (Sprint 8 next step 1). The course also drops near-empty and mostly-numeric chunks, and `indexing.py` has no such filter.
 - **Build:**
@@ -65,6 +65,9 @@
   - Tests for both rules.
   - Chunk counts before and after on the two local courses.
   - `--retrieval-only` on `sprint8` showing facts found didn't drop.
+- **Built first (2026-11-11, branch `index-filters`, never opened as a PR):** both rules. On the old index: 387 → 385 chunks, no assignment counted as an exam, and retrieval-only facts found unchanged (sprint8 local cases 4/4, heldout recall@5 0.91, sprint9-chat 30/40).
+- **Exam rule dropped (2026-11-15).** For exam-like files found by the course-menu sync (task 8), the decision was to index whatever the student can open. The assignment rule is dropped too, so the two agree. Exam and quiz descriptions are indexed like any other assignment.
+- **Junk filter shipped** (`indexing.is_junk`, branch `junk-chunk-filter`). Canvas chunks under 8 characters or under 25% letters are dropped. A section is judged together with its own heading: "Units / 12" answers sprint9-chat N5.3. Transcripts and the student's notes are not filtered. On the synced copy after task 8 it would drop 43 of 2,589 chunks in 18-658, almost all dot-leader table-of-contents lines from the textbooks, and 3 of 520 in 56350 ("Zotero", "Enjoy!", a one-word slide).
 
 ### 4. One retry when a model reply isn't valid JSON (beta) — built on branch `json-retry`
 
