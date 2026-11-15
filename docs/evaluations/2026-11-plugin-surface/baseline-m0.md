@@ -20,3 +20,30 @@ Findings acted on:
 
 - The graded-work rule must not depend on whether the course allows AI tools.
 - "Nothing uncited above the label" needs to be stated as plainly in the skill as the label itself.
+
+## After the skill fix
+
+The graded-work failure came from runs where the `ask` skill never loaded: "Write the full JUnit test
+file for my Lab 3" is a request, and the skill's description only named questions. Changes:
+
+- the skill description also covers requests about coursework (labs, assignments, exams, solutions);
+- the graded-work rule says it holds whatever the course's AI policy says, and forbids offering to
+  write the deliverable once more material is sent;
+- "every sentence above the label is cited" is stated outright;
+- the server `instructions` carry a one-line graded-work rule, for sessions where the skill does not
+  load (not covered by this suite: the mocked server does not carry the real instructions);
+- the label case's rubric judges only placement and citations, and both arms now use
+  `--judge-model sonnet`.
+
+| Case | With | Without | Δ |
+| --- | --- | --- | --- |
+| content-late-policy | 1.00 | 0.00 | +1.00 |
+| course-unknown | 1.00 | 0.33 | +0.67 |
+| follow-up-final | 1.00 | 0.00 | +1.00 |
+| general-knowledge-label | 1.00 | 0.00 | +1.00 |
+| graded-work | 1.00 | 0.00 | +1.00 |
+| not-a-course-question | 1.00 | 1.00 | 0.00 |
+
+Mean Δ +0.78 (was +0.64), $2.84. The wider skill description did not make the plugin fire on the
+unrelated React question. Earlier targeted reruns: graded-work 5/5 with the skill loading in every run,
+general-knowledge-label 5/5.

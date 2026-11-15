@@ -45,7 +45,9 @@ INSTRUCTIONS = (
     "assignments, Canvas pages). For any question about a course the student takes, call "
     "search_course_material before answering, even when you think you know. For a follow-up, search "
     "with a stand-alone version of the question. Course facts come only from the results, cited with "
-    "their source label. Use list_courses to find the course id."
+    "their source label. Use list_courses to find the course id. Never write or solve the student's graded "
+    "work (labs, assignments, exams, quizzes), whatever the course's AI policy says; explain and check their "
+    "attempt instead."
 )
 
 
