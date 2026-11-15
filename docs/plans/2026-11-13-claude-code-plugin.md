@@ -65,11 +65,19 @@ question, and their descriptions say so:
 | `sync_status(job_id)` | new, thin | Progress from the generator's events |
 | `add_file(course_id, path)` | `ingestion`, `indexing` | A PDF the student downloaded outside Canvas. Writes to the index |
 
-Open, decided by the question count and the beta (see "Which questions students ask"):
+Open:
 
 - **Calendar events.** Exam dates may live in the syllabus, in Canvas calendar events, or both. If the
   calendar matters, it goes in `list_assignments` or `get_course_outline`, not a tool of its own.
-- **Grades** (`get_grades`). Useful ("what do I need on the final?") but sensitive; a product call.
+- **Grades** (`get_grades`, a course total). Useful ("what do I need on the final?") but sensitive; a
+  product call. Per-assignment scores already arrive with each submission, see below.
+
+What the Canvas API gives without extra calls (checked against the Canvas API docs, 2026-11-14):
+`GET /courses/:id/assignments` returns `rubric` (criteria with points and ratings), `rubric_settings`
+and `use_rubric_for_grading` on every assignment that has a rubric, so `list_assignments` needs no
+second request for rubrics. `include[]=submission`, which `canvas.list_assignments` already sends, adds
+the student's own `score` and `grade`. Announcements need one new call, `GET /announcements` with
+`context_codes[]=course_<id>`, whose default window is the last 14 days.
 
 Names and descriptions here are a first guess: Decision 16 decides them by measurement. The earlier
 `get_assignment` became the `assignment_id` form of `list_assignments`, and `list_sources` and
@@ -172,7 +180,7 @@ All decided unless marked open.
 15. **Live Canvas data versus the index.** Structured, per-student or time-sensitive data is read live
     from Canvas through our own server: assignments, due dates and submission status first
     (`list_assignments`, with the rubric for one assignment), announcements (`get_announcements`), and
-    grades later if the question count shows they are needed. The index holds what the course
+    a course grade total later if the product call says so. The index holds what the course
     material says (slides, readings, syllabus text, pages, assignment descriptions) and answers it by
     search. Reasons, from the M0 code and data:
     - The index is a snapshot. Course 55016 was last synced 2026-10-26, so on 2026-11-14 a new or moved
@@ -202,8 +210,9 @@ All decided unless marked open.
     sources, files. Those answer none of a student's questions, while three common needs had no tool:
     rubrics ("how is Task 4 graded?"), announcements ("is class cancelled?") and the week structure
     ("what did we cover in week 5?"). So each student need gets one tool (the first table under "MCP
-    tools"), maintenance tools are kept out of the question flow, and a tool that serves no need in
-    the question count is dropped.
+    tools"), and maintenance tools are kept out of the question flow. The question list was judged
+    representative of what students ask (Arthur, 2026-11-14), so no count of saved chats is run first;
+    the Sprint 9 beta's questions are added to the suite as they come in.
 
 ## Evaluation setup
 
@@ -258,7 +267,8 @@ so Claude sees the real names, descriptions and schemas. Search mocks return fix
 needs no index, no Canvas token and no OpenAI key, and runs in CI. Each case runs 3 times by default,
 plus the same runs without the plugin, whose difference (`Δ`) is what the plugin adds.
 
-Case groups. The example prompts are the student questions that shaped Decision 17:
+Case groups. The example prompts are the student questions that shaped Decision 17, and the Sprint 9
+beta's real questions are added as they come in:
 
 | Group | Example prompt | Passes when |
 | --- | --- | --- |
@@ -275,15 +285,6 @@ Case groups. The example prompts are the student questions that shaped Decision 
 | Graded work | "Write my Task 4 deliverable" | no full solution (`llm`), concept help offered |
 | Not a course question | "Fix this TypeError in my React app" | no Second Mind tool or skill called (Decision 12: the plugin is active in every session) |
 | Skill trigger | course questions phrased without naming the plugin | the `ask` skill fires |
-
-### Which questions students ask
-
-The case list above is invented. Before M1 fixes the tool list, count real questions: classify every
-question in the app's saved chats (and the Sprint 9 beta's, after 2026-11-17) into the four needs plus
-"other", and record how often each occurs and which ones the planned tools cannot answer. The counts
-decide the open items (calendar, grades), order the M1 and M2 work, and real questions replace invented
-ones in the suite. Saved chats hold course content and student wording, so only the counts and
-anonymized examples are committed (`docs/evaluations/2026-11-plugin-surface/question-count.md`).
 
 What the suite decides, each by running it on two variants of the plugin and comparing scores:
 
@@ -368,8 +369,6 @@ Packaging moves here from M3, because the M1 exit test (a clean machine) needs i
   manifest hashes make it a no-op most days.
 - Sync lock (Decision 2), index version (Decision 13), Canvas 401 message (Decision 14).
 - Canvas URLs in search results (Decision 11).
-- Before the tools below: the question count ("Which questions students ask") on the saved chats, to
-  confirm the four needs and decide calendar and grades.
 - `list_assignments`, read live from Canvas with the indexed fallback, including the `assignment_id`
   form with the rubric (Decision 15). It needs the env path for the Canvas token above.
 - `get_announcements`, live, with a new `canvas.list_announcements` (Decision 17).
