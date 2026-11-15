@@ -83,6 +83,21 @@ works are not graded work and get a normal answer.
 the course materials say what is due and when, and an assignment already past is not due next week.
 - Answer first, be concise."""
 
+# Added to one turn's system prompt when the graded-work guard (guard.py)
+# flags the question or its follow-up rewrite. The general rule above held on
+# 5 of 6 misuse prompts in Sprint 8; this is the stricter version for the
+# turns that look like misuse (RAG gaps plan, task 7).
+STRICT_GRADED_WORK_RULE = """\
+A check flagged this question as possibly asking for graded work. If it only asks about due dates, rules, \
+grading or where to find something, ignore this note and answer it normally from the course materials, \
+searching as usual. Otherwise, if it asks you to solve, write or answer an exam, quiz, graded assignment, \
+lab or project deliverable: do not give the solution, the final answer, working code, or a filled-in \
+version, not even partly or "as an example" on the same problem. When the graded question itself asks for \
+an explanation, that explanation is the answer: don't write it, give a hint or point to the course material \
+instead. Start by saying in one sentence that you can't do graded work for them. Then help them learn: \
+explain the concept behind it in general, point to the course material that covers it, or offer to give \
+feedback on their own attempt."""
+
 SEARCH_TOOL = {
     "type": "function",
     "function": {
@@ -359,6 +374,7 @@ def answer(
     memory=None,
     summary: str = "",
     today: datetime.date | None = None,
+    guard: Callable[[str], bool] | None = None,
 ) -> Iterator[dict]:
     """Yields /ask's stream events: {"delta"} text pieces, then one
     {"citations", "grounded"}, then {"done": True}. With `memory` (a
@@ -366,7 +382,11 @@ def answer(
     memories recalled this turn and not forgotten, [{id, text}], so the app
     can show what the answer drew on. The profile isn't listed: it's there
     on every question. `summary` is the conversation's running summary when
-    `history` is only its last few turns (memory.compress).
+    `history` is only its last few turns (memory.compress). `guard` says
+    whether a text looks like a graded-work request (guard.Guard.flags);
+    when it flags the question or its follow-up rewrite, the turn's system
+    prompt gets STRICT_GRADED_WORK_RULE and the final event says
+    "guarded": True.
 
     Nothing is yielded until the model starts writing its answer, so errors
     from searching or the first model calls surface before the caller has
@@ -470,6 +490,11 @@ def answer(
     # rewritten to stand alone (their exact words again if the rewrite fails).
     rewritten = standalone_query(question, history, provider) if history else None
     first_query = rewritten or question
+    guarded = False
+    if guard is not None:
+        guarded = _guard_flags(guard, question) or (rewritten is not None and _guard_flags(guard, rewritten))
+        if guarded:
+            messages[0]["content"] += "\n\n" + STRICT_GRADED_WORK_RULE
     messages.append({"role": "assistant", "content": None, "tool_calls": [_call("search-0", "search_course", {"query": first_query})]})
     messages.append({"role": "tool", "tool_call_id": "search-0", "content": run_search(first_query)})
     # Memory too, for the same reason: left to the model, it would often not
@@ -527,6 +552,8 @@ def answer(
         yield {"delta": tail}
     citations = generation.build_citations([sources[n - 1] for n in renumberer.order])
     final = {"citations": citations, "grounded": bool(citations)}
+    if guard is not None:
+        final["guarded"] = guarded
     if usage_total is not None:
         final["usage"] = usage_total
     if memory is not None:
@@ -534,6 +561,16 @@ def answer(
         final["past_chats_used"] = [{"conversation_id": cid, "title": title} for cid, title in past_used.items()]
     yield final
     yield {"done": True}
+
+
+def _guard_flags(guard: Callable[[str], bool], text: str) -> bool:
+    """The guard only adds a stricter rule, so a failure (missing model
+    files, a bad weights file) must never stop an answer."""
+    try:
+        return bool(guard(text))
+    except Exception:
+        traceback.print_exc(file=sys.stderr)
+        return False
 
 
 def _call(call_id: str, name: str, arguments: dict) -> dict:

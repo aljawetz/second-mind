@@ -131,7 +131,7 @@
   - A close pair (two versions of the chat) to test the judge where Sprint 8 found it noisy.
   - Flagged answers from task 2, once the outside tester has used it.
 
-### 7. A classifier guard for graded-work requests (final)
+### 7. A classifier guard for graded-work requests (final) — built, on branch `classifier-guard`
 
 - **Why:** the "don't do graded work" rule is prompt-only, and it held on 5 of 6 misuse prompts in Sprint 8. The course's method is a logistic regression on question embeddings that switches to a stricter prompt instead of refusing outright. It costs one local embedding, which the bge model already loaded can do.
 - **Build:**
@@ -139,6 +139,7 @@
   - The classifier, loaded at startup.
   - A high score adds a stricter instruction to that turn's system prompt.
 - **Proof:** held-out accuracy and false-alarm rate. Misuse prompts refused before and after. Normal study questions still answered.
+- **Proof so far:** `docs/evaluations/2026-11-classifier-guard/report.md`. Held-out: 26 of 32 misuse caught, 4 of 65 false alarms (2 of 113 on frozen turns). Chat on gpt-4o-mini, graded by hand: a clear refusal on 29 of 32 misuse requests with the guard vs 23 without, work handed over 1 vs 2. The flagged "when is homework 2 due?" still gets its date 6 of 6. The guard loads on the first question, not at startup.
 
 ### 8. Listing questions (final, if time)
 
