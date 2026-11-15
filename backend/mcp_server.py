@@ -35,6 +35,7 @@ import httpx
 
 import assignments
 import canvas
+import citation_links
 import indexing
 import sync
 
@@ -50,7 +51,8 @@ INSTRUCTIONS = (
     "status, scores and rubrics: call list_assignments, which reads Canvas live. Show its times exactly as "
     "due_at_display gives them (already in the student's time zone) and use due_in for how far away they "
     "are; never convert a time or guess a zone yourself. Course facts come only from tool results, cited "
-    "with their source label. Use list_courses to find the course id. Never write or solve the student's graded "
+    "with their source label as a markdown link to its url when it has one, like "
+    "[syllabus · p.3](https://...). Use list_courses to find the course id. Never write or solve the student's graded "
     "work (labs, assignments, exams, quizzes), whatever the course's AI policy says; explain and check their "
     "attempt instead."
 )
@@ -186,10 +188,16 @@ class Searcher:
             self._retrievers[course_id] = self._make(course_id)
         expanded = chat.expand_relative_dates(query, self._today())
         nodes = list(self._retrievers[course_id].retrieve(expanded))[:k]
-        labels = [c["label"] for c in generation.build_citations(nodes)]
+        citations = generation.build_citations(nodes)
+        origin = citation_links.canvas_origin(self._home)
         results = [
-            {"n": n, "source": label, "text": node_with_score.node.get_content()[: chat.SNIPPET_CHARS]}
-            for n, (label, node_with_score) in enumerate(zip(labels, nodes), start=1)
+            {
+                "n": n,
+                "source": citation["label"],
+                "url": citation_links.canvas_url(origin, course_id, citation["source_type"], citation["item_id"]),
+                "text": node_with_score.node.get_content()[: chat.SNIPPET_CHARS],
+            }
+            for n, (citation, node_with_score) in enumerate(zip(citations, nodes), start=1)
         ]
         seconds = time.perf_counter() - start
         logger.info("search course=%s query=%r results=%d seconds=%.2f", course_id, query, len(results), seconds)
@@ -276,7 +284,8 @@ def build_server(home: Path | None = None, searcher: Searcher | None = None, nam
 
     @server.tool()
     def search_course_material(course_id: int, query: str, k: int = DEFAULT_K) -> dict:
-        """Search one course's materials. Returns up to k chunks, each with a source label to cite."""
+        """Search one course's materials. Returns up to k chunks, each with a source label to cite and,
+        when the item is in Canvas, the url of its Canvas page."""
         return searcher.search(course_id, query, k)
 
     @server.tool()

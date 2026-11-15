@@ -19,7 +19,7 @@
     },
     {
       "name": "search_course_material",
-      "description": "Search one course's materials. Returns up to k chunks, each with a source label to cite.",
+      "description": "Search one course's materials. Returns up to k chunks, each with a source label to cite and,\nwhen the item is in Canvas, the url of its Canvas page.",
       "inputSchema": {
         "type": "object",
         "properties": {

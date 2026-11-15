@@ -122,7 +122,7 @@ def test_search_returns_chunks_with_citation_labels(tmp_path):
 
     assert out["course_id"] == COURSE
     top = out["results"][0]
-    assert top == {"n": 1, "source": "syllabus · p.9", "text": "Late work loses ten percent per day."}
+    assert {k: top[k] for k in ("n", "source", "text")} == {"n": 1, "source": "syllabus · p.9", "text": "Late work loses ten percent per day."}
     assert [r["n"] for r in out["results"]] == list(range(1, len(out["results"]) + 1))
 
 
@@ -386,3 +386,19 @@ def test_zone_falls_back_to_the_machine_when_canvas_fails(monkeypatch):
     monkeypatch.setattr(mcp_server.canvas, "get_profile", boom)
 
     assert mcp_server.canvas_zone()() == mcp_server.assignments.machine_zone()
+
+
+def test_search_results_link_to_their_canvas_page(tmp_path):
+    (tmp_path / "config.json").write_text('{"canvas_base_url": "https://canvas.example.edu"}')
+    store = LanceDBVectorStore(uri=str(tmp_path / "index.lancedb"), table_name=f"course_{COURSE}")
+    node = TextNode(text="Late work loses ten percent per day.",
+                    metadata={"source": "syllabus", "item_type": "syllabus", "page": None, "slide": None, "timestamp": None})
+    node = indexing._with_ref_doc(node, f"syllabus:{COURSE}")
+    index = VectorStoreIndex([node], storage_context=StorageContext.from_defaults(vector_store=store),
+                             embed_model=_HashEmbedding(), transformations=[])
+    indexing.ensure_fts_index(store.table)
+    searcher, _ = _searcher(tmp_path, index)
+
+    out = searcher.search(COURSE, "late work")
+
+    assert out["results"][0]["url"] == f"https://canvas.example.edu/courses/{COURSE}/assignments/syllabus"

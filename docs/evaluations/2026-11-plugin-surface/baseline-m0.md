@@ -85,3 +85,11 @@ the machine's, and every time is returned as `due_at_utc`, `due_at_local`, `due_
 instructions and the skill say to show `due_at_display` as given and never convert. The deadline cases
 gained a grader that fails on any other zone or a raw UTC time. Deadline cases after the fix: all 1.00
 with the plugin.
+
+## Clickable citations
+
+Search results now carry the Canvas `url` of their item (plan Decision 11), built like the app's
+`app/src/citations.ts`: `/files/<id>`, `/pages/<slug>`, `/assignments/<id>`, and
+`/assignments/syllabus` for the syllabus; class recordings made in the app have none. The skill cites
+as a markdown link, `[syllabus · p.9](<url>)`, copying the url as given. Three cases gained a grader
+for the exact link. Full suite after the change: all 9 cases 1.00 with the plugin, mean Δ +0.76.
