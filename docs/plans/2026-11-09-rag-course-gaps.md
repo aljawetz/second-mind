@@ -124,3 +124,17 @@
 - **Why:** "What are all the readings for week 3?" can't be answered from five search results. The course adds an "available documents" overview for this.
 - **Build:** decide with the generative UI plan first. Its `show_deadlines` covers assignments and due dates. What's left is files, pages and lectures. A `list_course_items` tool built from the synced Canvas data would cover them.
 - **Proof:** a few listing questions added to the eval, answered before and after.
+- **Decided (2026-11-15):** `show_deadlines` is still only proposed, so due dates stay with it. Task 8 saves the course outline at sync (module, sub-header section, title, kind) in each course's `manifest.db`, and chat gets a `list_course_items` tool (topic in whole words, item types). Names from it need no citation.
+- **Found on the way: the sync only read Modules.** 18-658 lists no files in its Modules; all 46 of its readings are links in its pages and syllabus, so none were searchable. 56350's Files tab has 24 files no module lists, and 13 announcements nothing read. The sync now covers the whole course menu: files from module items, the Files tab and links in every text it reads (Home, Syllabus, pages, assignments, announcements, discussions), plus announcements and discussion posts as their own kinds. Exam-like files are indexed like any other, by choice.
+- **Live sync into a copy of `~/.secondmind` (the frozen-eval index untouched):**
+
+  | | 18-658 (55016) | 56350 |
+  | --- | --- | --- |
+  | Files indexed, before → after | 0 → 37 (8 images skipped) | 7 → 29 (3 unsupported skipped) |
+  | New announcements / discussions | 0 / 2 | 13 / 0 |
+  | Failures | 0 | 0 |
+  | First-sync time | 14.4 min (two whole textbooks took ~7.5) | 76 s |
+
+  Index on disk: 3.0 MB → 17 MB for both courses. The outline lists each Task page's readings under it ("Linked from Task 3 Resources": 8 files).
+- **Next, as its own change:** a faster first sync. Names and outline first (seconds), content indexed in the background with pages and small files first, and files over a size limit last, with an opt-out per file. Syncing costs no money: Canvas API, local extraction, OCR and embeddings.
+- **Left:** the listing questions and the before/after chat run. The frozen Sprint 8/9 sets were written against the old index, so a re-synced index changes what they measure.
