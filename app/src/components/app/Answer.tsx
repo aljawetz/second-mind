@@ -17,6 +17,8 @@ export const SOURCE_KIND: Record<Citation["source_type"], string> = {
   file: "File",
   syllabus: "Syllabus",
   assignment: "Assignment",
+  announcement: "Announcement",
+  discussion: "Discussion",
   transcript: "Recording",
   notes: "Your notes",
 };

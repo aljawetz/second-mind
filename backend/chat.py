@@ -45,6 +45,7 @@ from typing import Callable, Iterator
 
 from llama_index.core.schema import NodeWithScore
 
+import course_items
 import generation
 from llm import LLMProvider, ToolCall, TurnEnd
 from memory.compress import summary_block
@@ -185,6 +186,42 @@ PAST_CHATS_TOOL = {
             "type": "object",
             "properties": {"query": {"type": "string", "description": "What to look for."}},
             "required": ["query"],
+        },
+    },
+}
+
+LIST_RULES = """
+- list_course_items lists what's in the course on Canvas: the items in its modules (with the files each page \
+links to), other course files, announcements and discussions. Names and kinds only, grouped by module and \
+section, no content. Use it when the student asks for all of something (every reading for week 3, all the \
+lecture slides, what's in a module), since a search only returns the closest few passages. You may list names \
+from it without citations. For what an item says, use search_course and cite it as usual."""
+
+LIST_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "list_course_items",
+        "description": (
+            "List what's in this course on Canvas, grouped by module and section: files, pages, assignments, "
+            "quizzes, discussions and links in its modules (with the files each page links to), then other course "
+            "files, announcements and discussions. Names and kinds only, not content."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "description": (
+                        "Words a module, section or item name must contain, like 'week 3', 'readings' or "
+                        "'unit testing'. Leave out to list everything."
+                    ),
+                },
+                "types": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": course_items.TYPE_NAMES},
+                    "description": "Only these kinds of items. Leave out for all kinds.",
+                },
+            },
         },
     },
 }
@@ -375,6 +412,7 @@ def answer(
     summary: str = "",
     today: datetime.date | None = None,
     guard: Callable[[str], bool] | None = None,
+    list_items: Callable[[str, list[str]], str] | None = None,
 ) -> Iterator[dict]:
     """Yields /ask's stream events: {"delta"} text pieces, then one
     {"citations", "grounded"}, then {"done": True}. With `memory` (a
@@ -387,6 +425,8 @@ def answer(
     when it flags the question or its follow-up rewrite, the turn's system
     prompt gets STRICT_GRADED_WORK_RULE and the final event says
     "guarded": True.
+    With `list_items` (topic, types -> text, course_items.list_for_course), the
+    model can also list the course's module outline.
 
     Nothing is yielded until the model starts writing its answer, so errors
     from searching or the first model calls surface before the caller has
@@ -454,6 +494,11 @@ def answer(
             for turn in turns:
                 past_used.setdefault(turn.conversation_id, turn.title)
             return format_turns(turns, first_label=first, query=query)
+        if list_items is not None and call.name == "list_course_items":
+            topic = call.arguments.get("topic")
+            types = call.arguments.get("types")
+            types = [t for t in types if isinstance(t, str)] if isinstance(types, list) else []
+            return list_items(topic if isinstance(topic, str) else "", types)
         return "Unknown tool or empty query."
 
     # A tool the model calls runs after the answer may have started
@@ -476,8 +521,11 @@ def answer(
         today=f"{today:%A}, {today:%B} {today.day}, {today.year}",
     )
     tools = [SEARCH_TOOL]
+    if list_items is not None:
+        tools = [SEARCH_TOOL, LIST_TOOL]
+        prompt += LIST_RULES
     if memory is not None:
-        tools = [SEARCH_TOOL, RECALL_TOOL, FORGET_TOOL, PAST_CHATS_TOOL]
+        tools = [*tools, RECALL_TOOL, FORGET_TOOL, PAST_CHATS_TOOL]
         prompt += MEMORY_RULES
         profile = memory.profile_block()
         if profile:

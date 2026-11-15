@@ -146,3 +146,33 @@
 - **Why:** "What are all the readings for week 3?" can't be answered from five search results. The course adds an "available documents" overview for this.
 - **Build:** decide with the generative UI plan first. Its `show_deadlines` covers assignments and due dates. What's left is files, pages and lectures. A `list_course_items` tool built from the synced Canvas data would cover them.
 - **Proof:** a few listing questions added to the eval, answered before and after.
+- **Decided (2026-11-15):** `show_deadlines` is still only proposed, so due dates stay with it. Task 8 saves the course outline at sync (module, sub-header section, title, kind) in each course's `manifest.db`, and chat gets a `list_course_items` tool (topic in whole words, item types). Names from it need no citation.
+- **Found on the way: the sync only read Modules.** 18-658 lists no files in its Modules; all 46 of its readings are links in its pages and syllabus, so none were searchable. 56350's Files tab has 24 files no module lists, and 13 announcements nothing read. The sync now covers the whole course menu: files from module items, the Files tab and links in every text it reads (Home, Syllabus, pages, assignments, announcements, discussions), plus announcements and discussion posts as their own kinds. Exam-like files are indexed like any other, by choice.
+- **Live sync into a copy of `~/.secondmind` (the frozen-eval index untouched):**
+
+  | | 18-658 (55016) | 56350 |
+  | --- | --- | --- |
+  | Files indexed, before → after | 0 → 37 (8 images skipped) | 7 → 29 (3 unsupported skipped) |
+  | New announcements / discussions | 0 / 2 | 13 / 0 |
+  | Failures | 0 | 0 |
+  | First-sync time | 14.4 min (two whole textbooks took ~7.5) | 76 s |
+
+  Index on disk: 3.0 MB → 17 MB for both courses. The outline lists each Task page's readings under it ("Linked from Task 3 Resources": 8 files).
+- **Next, as its own change:** a faster first sync. Names and outline first (seconds), content indexed in the background with pages and small files first, and files over a size limit last, with an opt-out per file. Syncing costs no money: Canvas API, local extraction, OCR and embeddings.
+- **Faster first sync, rule agreed:** a PDF over 150 pages (page count read from the PDF's header after download, 0.25 s for 722 pages), any other file whose text is longer than a 150-page PDF (about 450,000 characters), or any file over 50 MB (from Canvas's size, before download) waits until the student turns it on. Decided: a long PDF's first 150 pages are indexed as a preview, labeled ("About Face: 150 of 722 pages indexed") in the outline and for the model, so chat says it has only part of the book instead of "not covered". The pages a course assigns are often later (Cooper p507–554, p655–659), so indexing the page ranges the course pages cite is a later option.
+- **Listing eval (`scripts/listing_eval.py`, 2026-11-15):** 8 questions with full answers taken from the outline, on the synced copy, `gpt-4o-mini`, 2 runs per variant. Answers kept in `~/second-mind-local/2026-11-listing/` (they quote course text).
+
+  | Question | Without tool | With tool | Tool called |
+  | --- | --- | --- | --- |
+  | L1 Task 3 readings (hand key, 11) | 11, 11 | 11, 11 | no |
+  | L2 Task 4 resources (hand key, 19) | 12, 12 | 12, 12 | no |
+  | L3 class preparation readings (hand key, 18) | 4, 5 | 4, 5 | yes, list ignored |
+  | L4 pages in the Task 1 module (5) | 0, 0 | 5, 5 | yes |
+  | L5 Field Project assignments (3) | 3, 3 | 3, 3 | yes |
+  | L6 week 2 literature review materials (5) | 2, 2 | 2, 5 | yes |
+  | L7 all announcements (13) | 3, 3 | 13, 13 | yes |
+  | L8 all sprint deliverables (9) | 5, 5 | 9, 9 | yes |
+
+  Median time 5.0 s against 5.2 s; about 40% more tokens. The first run found the model asking for "sprint deliverables" when "Sprint" is in the item names and "Deliverables" in the module's: a topic now falls back to every word anywhere when the phrase matches nothing, with a plural "s" ignored.
+- **What the listing tool doesn't fix:** a list held inside one long page. Task 4 Resources is two search chunks and only the first came back (L2); Class Preparation is about 45 chunks over 14 weeks (L3), and the answers mixed in page numbers from other pages. That needs a tool that reads a whole page or file by name: a candidate next task.
+- **Left:** the faster first sync (its own change). The frozen Sprint 8/9 sets were written against the old index, so a re-synced index changes what they measure; re-sync the real index after this merges.

@@ -18,6 +18,8 @@ const SOURCE_KIND: Record<StudySource["source_type"], string> = {
   file: "File",
   syllabus: "Syllabus",
   assignment: "Assignment",
+  announcement: "Announcement",
+  discussion: "Discussion",
   transcript: "Recording",
   notes: "Your notes",
 };

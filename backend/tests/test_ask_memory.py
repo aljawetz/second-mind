@@ -615,3 +615,11 @@ def test_saved_feedback_is_not_sent_to_chat_or_memory_models(app):
     sent = json.dumps([app.model.chat_calls, app.model.json_calls, app.model.rewrite_calls])
     assert "PRIVATE FEEDBACK NOTE" not in sent
     assert '"feedback"' not in sent
+
+
+def test_ask_offers_the_course_listing_tool(app):
+    """The listing tool (course_items.py) is wired into /ask for the course
+    asked about; its outline lives in that course's manifest.db."""
+    events = _say(app, "What are all the readings for week 3?", answer="None found.")
+    assert events[-1]["done"] is True
+    assert "list_course_items" in app.model.chat_calls[0][0]["content"]
