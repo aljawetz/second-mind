@@ -1,6 +1,6 @@
 # Sprint 9 — Beta Release and Independent Testing
 
-**Type:** Team · **Due:** 2026-11-17 · **Points:** 100 · **Status:** In progress
+**Type:** Team · **Due:** 2026-11-17 · **Points:** 100 · **Status:** In progress (this "What we did" section is a draft)
 
 ## Purpose
 
