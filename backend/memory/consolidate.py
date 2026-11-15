@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable
 
+import json_retry
+
 from memory.extract import Candidate, JsonLLM
 from memory.store import MemoryStore
 
@@ -71,12 +73,16 @@ def consolidate(
 
     if not neighbours:
         return Decision("ADD", add("new"))
-    reply = llm.complete_json(
-        [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": _prompt(candidate, neighbours, at)}]
+    reply = json_retry.complete_json(
+        llm,
+        [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": _prompt(candidate, neighbours, at)}],
+        valid=lambda r: _parse(r, len(neighbours))[0] is not None,
+        label="memory.consolidate",
     )
     action, target = _parse(reply, len(neighbours))
     if action is None:
-        # A duplicate can be cleaned up later; a lost fact can't be recovered.
+        # Unusable twice. A duplicate can be cleaned up later; a lost fact
+        # can't be recovered.
         return Decision("ADD", add("consolidation: fallback"))
 
     reason = f"consolidation: {action}"
