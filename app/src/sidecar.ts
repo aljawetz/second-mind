@@ -142,7 +142,7 @@ export async function listAssignments(courseId: number): Promise<CanvasAssignmen
 }
 
 export interface Citation {
-  source_type: "page" | "file" | "syllabus" | "assignment" | "transcript" | "notes";
+  source_type: "page" | "file" | "syllabus" | "assignment" | "announcement" | "discussion" | "transcript" | "notes";
   label: string;
   item_id: string;
 }

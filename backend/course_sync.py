@@ -6,6 +6,7 @@ itself stays Canvas-agnostic (its own docstring: "the caller ... is
 responsible for the actual Canvas calls") — this module is that caller.
 """
 
+import re
 import tempfile
 from datetime import datetime, tzinfo
 from pathlib import Path
@@ -190,6 +191,64 @@ def _deletable(remote_items: list[dict], deleted_ids: list[str], unresolved_ids:
     return [i for i in deleted_ids if i not in unresolved_ids]
 
 
+def _linked_file_ids(html: str, course_id: int) -> list[str]:
+    """Ids of this course's files linked from a page, syllabus, assignment,
+    announcement or discussion: "/courses/<id>/files/<n>" (Canvas's own
+    links, also under /api/v1) or a bare "/files/<n>". Another course's or a
+    user's files are left alone."""
+    found = []
+    for link_course, course_file, bare_file in _FILE_LINK_RE.findall(html or ""):
+        if course_file and link_course == str(course_id):
+            found.append(course_file)
+        elif bare_file:
+            found.append(bare_file)
+    return list(dict.fromkeys(found))
+
+
+_FILE_LINK_RE = re.compile(r"/courses/(\d+)/files/(\d+)|(?<![\d/])/files/(\d+)")
+
+
+def _topic_text(topic: dict) -> str:
+    message = (topic.get("message") or "").strip()
+    return ingestion.extract_html_page(message).strip() if message else ""
+
+
+def _topic_version(topic: dict) -> str:
+    """Discussion topics carry no updated_at (always null on canvas.cmu.edu),
+    so their text stands in, as for the syllabus."""
+    return sync.content_hash(f"{topic.get('title') or ''}\n{topic.get('message') or ''}")
+
+
+def _posted_line(topic: dict, tz: tzinfo | None = None) -> str:
+    when = topic.get("posted_at") or topic.get("created_at")
+    if not when:
+        return ""
+    try:
+        posted = datetime.fromisoformat(when.replace("Z", "+00:00")).astimezone(tz)
+    except ValueError:
+        return ""
+    return f"Posted {posted.strftime('%a, %b')} {posted.day}, {posted.year}."
+
+
+def _sync_topic(conn, db_path, table_name, topic, kind, is_changed):
+    """An announcement or a discussion's opening post (not the replies)."""
+    prefixed_id = f"{kind}:{topic['id']}"
+    title = (topic.get("title") or "").strip() or f"{kind.title()} {topic['id']}"
+    if is_changed:
+        indexing.delete_ref_doc_nodes(db_path, table_name, prefixed_id)
+    sections = ingestion.extract_html_sections(topic.get("message") or "")
+    posted = _posted_line(topic) if kind == "announcement" else ""
+    if posted:
+        sections.insert(0, {"heading": "Posted", "text": posted})
+    text = ingestion.sections_text(sections)
+    # Own item_type: citations.ts opens /discussion_topics/<id> for both.
+    nodes = indexing.sections_to_nodes(sections, title, prefixed_id, item_type=kind)
+    if nodes:
+        indexing.add_nodes(nodes, db_path, table_name)
+    sync.mark_synced(conn, prefixed_id, kind, title, _topic_version(topic), sync.content_hash(text))
+    return title
+
+
 def sync_course(course_id: int, sm_home: Path):
     """Generator — see module docstring and the design spec for the full
     contract. Yields {"item", "status", "error"?} per processed item, then
@@ -199,7 +258,14 @@ def sync_course(course_id: int, sm_home: Path):
     if something unexpected blows up mid-stream — main.py has already sent
     the 200 and streaming headers by the time this generator's body runs,
     so an uncaught exception here would leave the connection dying
-    mid-stream with no terminating event for the frontend to act on."""
+    mid-stream with no terminating event for the frontend to act on.
+
+    Everything a student reaches from the course menu, not only Modules:
+    Home, Syllabus, Pages, Assignments, Announcements, Discussions and Files.
+    Files are found three ways: module items, the Files tab when the course
+    shows it, and links in the text of all the others. 18-658 lists no files
+    in its Modules; all 46 of its readings are links in its pages and
+    syllabus."""
     manifest_path, db_path = _course_paths(sm_home, course_id)
     table_name = f"course_{course_id}"
     conn = sync.open_manifest(manifest_path)
@@ -210,11 +276,14 @@ def sync_course(course_id: int, sm_home: Path):
         front_page = canvas.get_front_page(course_id)
         syllabus_html = canvas.get_syllabus(course_id)
         assignments = canvas.list_assignments(course_id)
+        files_tab = canvas.list_course_files(course_id)
+        announcements = canvas.list_announcements(course_id)
+        discussions = canvas.list_discussions(course_id)
     except (canvas.CanvasError, httpx.HTTPStatusError, httpx.TransportError) as e:
         yield {"done": True, "error": str(e)}
         return
 
-    file_items = [item for module in structure for item in module.get("items", []) if item.get("type") == "File"]
+    module_items = [item for module in structure for item in module.get("items", [])]
 
     new_count = changed_count = removed_count = failed_count = 0
 
@@ -224,46 +293,6 @@ def sync_course(course_id: int, sm_home: Path):
     # sync.diff() and _sync_deleted()'s index/manifest writes are otherwise
     # unguarded, and an exception from either would escape uncaught.
     try:
-        # The module outline, for listing questions in chat (course_items.py).
-        # Like the deletion guards below, an empty listing never wipes one
-        # already saved: a hidden modules tab looks the same as no modules.
-        outline = course_items.outline_rows(structure)
-        if outline:
-            course_items.save_outline(conn, outline)
-
-        # Metadata collection itself can fail per-item (a malformed module item
-        # missing content_id, or get_file hitting a real Canvas/network error) —
-        # isolated here the same as the extraction/indexing failures below, so
-        # one bad file doesn't abort the whole course sync.
-        file_metas = {}
-        unresolved_file_ids: set[str] = set()
-        for item in file_items:
-            content_id = item.get("content_id")
-            prefixed_id = f"file:{content_id}" if content_id is not None else None
-            try:
-                meta = canvas.get_file(item["content_id"])
-            except Exception as e:
-                failed_count += 1
-                if prefixed_id:
-                    unresolved_file_ids.add(prefixed_id)
-                yield {"item": str(content_id) if content_id is not None else "?", "status": "failed", "error": str(e)}
-                continue
-            if meta is None:
-                # get_file degraded a 403/404 to None — skip indexing it as
-                # before, but record it as unresolved so its absence from
-                # file_remote isn't mistaken for "deleted from Canvas".
-                if prefixed_id:
-                    unresolved_file_ids.add(prefixed_id)
-                continue
-            display_name = meta.get("display_name", "")
-            if Path(display_name).suffix.lower() not in SUPPORTED_FILE_SUFFIXES:
-                print(f"[course_sync] skipping unsupported file: {display_name}")
-                continue
-            file_metas[str(meta["id"])] = meta
-
-        file_remote = [
-            {"id": f"file:{fid}", "updated_at": meta.get("updated_at", "")} for fid, meta in file_metas.items()
-        ]
         # Pages come from three places, merged by url slug. list_pages is
         # the Pages-tab listing, which 404s for students in most courses
         # (8 of 10 surveyed) — yet every Page item in those courses' Modules
@@ -271,15 +300,12 @@ def sync_course(course_id: int, sm_home: Path):
         # other content at all. Module items carry no updated_at, so each
         # one is fetched in full here; the body is kept for _sync_page. A
         # fetch that fails or 404s is unresolved, not deleted — same guard
-        # as files above.
+        # as files below.
         pages_by_url = {p["url"]: p for p in pages_list}
         if front_page and front_page.get("url"):
             pages_by_url.setdefault(front_page["url"], front_page)
         unresolved_page_ids: set[str] = set()
-        module_page_urls = [
-            item["page_url"] for module in structure for item in module.get("items", [])
-            if item.get("type") == "Page" and item.get("page_url")
-        ]
+        module_page_urls = [item["page_url"] for item in module_items if item.get("type") == "Page" and item.get("page_url")]
         for url in dict.fromkeys(module_page_urls):
             if url in pages_by_url:
                 continue
@@ -294,6 +320,24 @@ def sync_course(course_id: int, sm_home: Path):
                 unresolved_page_ids.add(f"page:{url}")
                 continue
             pages_by_url[url] = full
+        # Pages-tab summaries carry no body, and a page's links are needed
+        # every sync (a file linked only from an unchanged page is still
+        # there). A page whose body can't be read leaves its links unknown,
+        # so no file is taken as deleted this round.
+        links_complete = True
+        for url, page in list(pages_by_url.items()):
+            if "body" in page:
+                continue
+            try:
+                full = canvas.get_page(course_id, url)
+            except Exception as e:
+                full = None
+                yield {"item": url, "status": "failed", "error": str(e)}
+                failed_count += 1
+            if full is None:
+                links_complete = False
+                continue
+            pages_by_url[url] = {**page, **full, "updated_at": page.get("updated_at", full.get("updated_at", ""))}
         page_remote = [{"id": f"page:{url}", "updated_at": p.get("updated_at", "")} for url, p in pages_by_url.items()]
 
         # The syllabus has no updated_at of its own: its content hash stands
@@ -316,30 +360,122 @@ def sync_course(course_id: int, sm_home: Path):
             {"id": f"assignment:{aid}", "updated_at": a.get("updated_at", "")} for aid, a in assignments_by_id.items()
         ]
 
+        # Announcements and discussions: the opening post only. Empty ones
+        # (or a locked topic Canvas sends without its text) are left out.
+        topics = {
+            kind: {str(t["id"]): t for t in listing if t.get("id") is not None and _topic_text(t)}
+            for kind, listing in (("announcement", announcements), ("discussion", discussions))
+        }
+        topic_remote = {
+            kind: [{"id": f"{kind}:{tid}", "updated_at": _topic_version(t)} for tid, t in by_id.items()]
+            for kind, by_id in topics.items()
+        }
+
+        # Files: module items, then the Files tab and attachments (which
+        # come with their details), then links in every text above.
+        page_links = {url: _linked_file_ids(p.get("body") or "", course_id) for url, p in pages_by_url.items()}
+        other_html = [syllabus_html or ""] + [a.get("description") or "" for a in assignments]
+        other_html += [t.get("message") or "" for t in [*announcements, *discussions]]
+        known_metas = {str(f["id"]): f for f in files_tab if f.get("id") is not None}
+        for topic in [*announcements, *discussions]:
+            for attachment in topic.get("attachments") or []:
+                if attachment.get("id") is not None:
+                    known_metas.setdefault(str(attachment["id"]), attachment)
+        wanted_ids = [str(item["content_id"]) for item in module_items if item.get("type") == "File" and item.get("content_id") is not None]
+        wanted_ids += list(known_metas)
+        wanted_ids += [fid for links in page_links.values() for fid in links]
+        wanted_ids += [fid for html in other_html for fid in _linked_file_ids(html, course_id)]
+        # A module File item with no content_id can't be looked up: counted
+        # as failed, as before.
+        for item in module_items:
+            if item.get("type") == "File" and item.get("content_id") is None:
+                failed_count += 1
+                yield {"item": "?", "status": "failed", "error": "module file item has no content_id"}
+
+        # Metadata collection itself can fail per-item (get_file hitting a
+        # real Canvas/network error) — isolated here the same as the
+        # extraction/indexing failures below, so one bad file doesn't abort
+        # the whole course sync.
+        file_metas = {}
+        all_file_names: dict[str, str] = {}
+        unresolved_file_ids: set[str] = set()
+        for fid in dict.fromkeys(wanted_ids):
+            prefixed_id = f"file:{fid}"
+            meta = known_metas.get(fid)
+            if meta is None:
+                try:
+                    meta = canvas.get_file(int(fid))
+                except Exception as e:
+                    failed_count += 1
+                    unresolved_file_ids.add(prefixed_id)
+                    yield {"item": fid, "status": "failed", "error": str(e)}
+                    continue
+            if meta is None:
+                # get_file degraded a 403/404 to None — skip indexing it as
+                # before, but record it as unresolved so its absence from
+                # file_remote isn't mistaken for "deleted from Canvas".
+                unresolved_file_ids.add(prefixed_id)
+                continue
+            display_name = meta.get("display_name", "")
+            if Path(display_name).suffix.lower() not in SUPPORTED_FILE_SUFFIXES:
+                print(f"[course_sync] skipping unsupported file: {display_name}")
+                continue
+            file_metas[str(meta["id"])] = meta
+            all_file_names[str(meta["id"])] = display_name
+
+        file_remote = [
+            {"id": f"file:{fid}", "updated_at": meta.get("updated_at", "")} for fid, meta in file_metas.items()
+        ]
+
+        # The course outline, for listing questions in chat (course_items.py).
+        # Like the deletion guards below, an empty listing never wipes one
+        # already saved: a hidden modules tab looks the same as no modules.
+        outline = course_items.outline_rows(structure, page_links=page_links, file_names=all_file_names)
+        # By id, not name: a module item's title often isn't its file's name.
+        in_modules = {str(item.get("content_id")) for item in module_items if item.get("type") == "File"}
+        in_modules |= {fid for url in module_page_urls for fid in page_links.get(url, [])}
+        module_topics = {str(item.get("content_id")) for item in module_items if item.get("type") == "Discussion"}
+        outline += course_items.group_rows(
+            "Other course files", sorted(n for fid, n in all_file_names.items() if fid not in in_modules), "file"
+        )
+        outline += course_items.group_rows(
+            "Announcements", [(t.get("title") or "").strip() for t in announcements], "announcement"
+        )
+        outline += course_items.group_rows(
+            "Discussions",
+            [(t.get("title") or "").strip() for t in discussions if str(t.get("id")) not in module_topics],
+            "discussion",
+        )
+        if outline:
+            course_items.save_outline(conn, outline)
+
         file_diff = sync.diff(conn, "file", file_remote)
         page_diff = sync.diff(conn, "page", page_remote)
         syllabus_diff = sync.diff(conn, "syllabus", syllabus_remote)
         assignment_diff = sync.diff(conn, "assignment", assignment_remote)
+        topic_diffs = {kind: sync.diff(conn, kind, remote) for kind, remote in topic_remote.items()}
 
-        file_deleted = _deletable(file_remote, file_diff["deleted"], unresolved_file_ids)
+        file_deleted = _deletable(file_remote, file_diff["deleted"], unresolved_file_ids) if links_complete else []
         page_deleted = _deletable(page_remote, page_diff["deleted"], unresolved_page_ids)
         # Like the other empty-listing guards: a syllabus that comes back
         # empty or 403 is never taken as "removed".
         syllabus_deleted = _deletable(syllabus_remote, syllabus_diff["deleted"], set())
         assignment_deleted = _deletable(assignment_remote, assignment_diff["deleted"], set())
+        topic_deleted = {
+            kind: _deletable(topic_remote[kind], topic_diffs[kind]["deleted"], set()) for kind in topic_remote
+        }
 
-        for event in _sync_deleted(conn, db_path, table_name, "file", file_deleted):
-            removed_count += 1
-            yield event
-        for event in _sync_deleted(conn, db_path, table_name, "page", page_deleted):
-            removed_count += 1
-            yield event
-        for event in _sync_deleted(conn, db_path, table_name, "syllabus", syllabus_deleted):
-            removed_count += 1
-            yield event
-        for event in _sync_deleted(conn, db_path, table_name, "assignment", assignment_deleted):
-            removed_count += 1
-            yield event
+        deletions = [
+            ("file", file_deleted),
+            ("page", page_deleted),
+            ("syllabus", syllabus_deleted),
+            ("assignment", assignment_deleted),
+            *topic_deleted.items(),
+        ]
+        for item_type, deleted_ids in deletions:
+            for event in _sync_deleted(conn, db_path, table_name, item_type, deleted_ids):
+                removed_count += 1
+                yield event
 
         for ids, is_changed in ((file_diff["new"], False), (file_diff["changed"], True)):
             for prefixed_id in ids:
@@ -391,6 +527,19 @@ def sync_course(course_id: int, sm_home: Path):
                 except Exception as e:
                     failed_count += 1
                     yield {"item": assignment.get("name", prefixed_id), "status": "failed", "error": str(e)}
+
+        for kind, diff in topic_diffs.items():
+            for ids, is_changed in ((diff["new"], False), (diff["changed"], True)):
+                for prefixed_id in ids:
+                    topic = topics[kind][prefixed_id.removeprefix(f"{kind}:")]
+                    try:
+                        name = _sync_topic(conn, db_path, table_name, topic, kind, is_changed)
+                        yield {"item": name, "status": "done"}
+                        changed_count += is_changed
+                        new_count += not is_changed
+                    except Exception as e:
+                        failed_count += 1
+                        yield {"item": topic.get("title") or prefixed_id, "status": "failed", "error": str(e)}
     except Exception as e:
         yield {"done": True, "error": str(e)}
         return

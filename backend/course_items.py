@@ -41,7 +41,8 @@ ITEM_TYPES = {
     "ExternalUrl": "link",
     "ExternalTool": "tool",
 }
-TYPE_NAMES = sorted(set(ITEM_TYPES.values()))
+# Plus announcements, which live outside Modules (course_sync's own group).
+TYPE_NAMES = sorted({*ITEM_TYPES.values(), "announcement"})
 # Enough for every item of the larger local course's modules at once (~100),
 # small enough to stay a few thousand tokens.
 MAX_ITEMS = 150
@@ -51,7 +52,14 @@ def _tidy(text) -> str:
     return " ".join(str(text or "").split())
 
 
-def outline_rows(structure: list[dict]) -> list[dict]:
+def outline_rows(
+    structure: list[dict], page_links: dict[str, list[str]] | None = None, file_names: dict[str, str] | None = None
+) -> list[dict]:
+    """`page_links` (page url -> linked file ids) and `file_names` (file id
+    -> name) put the files a module's page links to right under that page,
+    in a "Linked from <page>" section: 18-658's readings are such links, so
+    "week 3" then finds them with the page."""
+    page_links, file_names = page_links or {}, file_names or {}
     rows = []
     for module in structure:
         module_name = _tidy(module.get("name"))
@@ -73,7 +81,23 @@ def outline_rows(structure: list[dict]) -> list[dict]:
                     "url": str(item.get("external_url") or "") if raw_type == "ExternalUrl" else "",
                 }
             )
+            if raw_type == "Page":
+                linked = [file_names[f] for f in page_links.get(item.get("page_url") or "", []) if f in file_names]
+                rows += [
+                    {"module": module_name, "section": f"Linked from {title}", "title": name, "item_type": "file", "url": ""}
+                    for name in dict.fromkeys(linked)
+                ]
     return rows
+
+
+def group_rows(group: str, titles: list[str], item_type: str) -> list[dict]:
+    """Rows for items outside Modules, under a group named like a module
+    ("Announcements", "Other course files")."""
+    return [
+        {"module": group, "section": "", "title": _tidy(t), "item_type": item_type, "url": ""}
+        for t in dict.fromkeys(titles)
+        if _tidy(t)
+    ]
 
 
 def save_outline(conn: sqlite3.Connection, rows: list[dict]) -> None:

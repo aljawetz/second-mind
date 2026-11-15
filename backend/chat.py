@@ -176,7 +176,8 @@ PAST_CHATS_TOOL = {
 }
 
 LIST_RULES = """
-- list_course_items lists what's in the course's Canvas modules: item names and kinds, grouped by module and \
+- list_course_items lists what's in the course on Canvas: the items in its modules (with the files each page \
+links to), other course files, announcements and discussions. Names and kinds only, grouped by module and \
 section, no content. Use it when the student asks for all of something (every reading for week 3, all the \
 lecture slides, what's in a module), since a search only returns the closest few passages. You may list names \
 from it without citations. For what an item says, use search_course and cite it as usual."""
@@ -186,8 +187,9 @@ LIST_TOOL = {
     "function": {
         "name": "list_course_items",
         "description": (
-            "List the items in this course's Canvas modules (files, pages, assignments, quizzes, discussions, "
-            "links), grouped by module and section. Names and kinds only, not content."
+            "List what's in this course on Canvas, grouped by module and section: files, pages, assignments, "
+            "quizzes, discussions and links in its modules (with the files each page links to), then other course "
+            "files, announcements and discussions. Names and kinds only, not content."
         ),
         "parameters": {
             "type": "object",

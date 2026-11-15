@@ -56,6 +56,9 @@ def no_front_page_syllabus_or_assignments(monkeypatch):
     monkeypatch.setattr(course_sync.canvas, "get_front_page", lambda course_id: None)
     monkeypatch.setattr(course_sync.canvas, "get_syllabus", lambda course_id: None)
     monkeypatch.setattr(course_sync.canvas, "list_assignments", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_course_files", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_announcements", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_discussions", lambda course_id: [])
 
 
 @pytest.fixture
@@ -581,3 +584,212 @@ def test_an_empty_module_listing_keeps_the_saved_outline(tmp_path, stub_canvas, 
     monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [])
     run(1, tmp_path)
     assert _outline_titles(tmp_path) == ["Ch 1"]
+
+
+
+# --- Everything in the course menu, not only Modules -------------------------
+# 18-658 lists no files in its Modules: all 46 of its readings are links in
+# its pages and syllabus. 56350's Files tab has 24 files no module lists.
+
+READING = {"id": 333, "display_name": "Koskela Ch1.pdf", "updated_at": "2026-01-01", "url": "https://canvas.example/files/333"}
+SLIDES = {"id": 444, "display_name": "Lecture 2.pptx", "updated_at": "2026-01-01", "url": "https://canvas.example/files/444"}
+
+
+def _link(file_id, course_id=1):
+    return f'<p><a href="https://canvas.example/courses/{course_id}/files/{file_id}?wrap=1">reading</a></p>'
+
+
+@pytest.fixture
+def files_by_id(monkeypatch):
+    """get_file over a small table; records which ids were looked up."""
+    table = {333: READING, 444: SLIDES}
+    asked = []
+
+    def get_file(file_id):
+        asked.append(int(file_id))
+        meta = table.get(int(file_id))
+        return dict(meta) if meta else None
+
+    monkeypatch.setattr(course_sync.canvas, "get_file", get_file)
+    monkeypatch.setattr(course_sync.canvas, "list_pages", lambda course_id: [])
+    return asked
+
+
+def _module_page_with_body(monkeypatch, body, url="task-1-resources", title="Task 1 Resources"):
+    monkeypatch.setattr(
+        course_sync.canvas,
+        "get_course_structure",
+        lambda course_id: [{"name": "Week 1", "items": [{"type": "Page", "title": title, "page_url": url}]}],
+    )
+    monkeypatch.setattr(
+        course_sync.canvas, "get_page", lambda course_id, u: {"url": u, "title": title, "body": body, "updated_at": "1"}
+    )
+
+
+def test_a_file_linked_from_a_module_page_is_indexed(tmp_path, stub_extraction, files_by_id, monkeypatch):
+    _module_page_with_body(monkeypatch, _link(333) + _link(333))
+    run(1, tmp_path)
+    assert "file:333" in _manifest_ids(tmp_path)
+    assert files_by_id == [333]  # linked twice, looked up once
+
+
+@pytest.mark.parametrize("where", ["syllabus", "front_page", "assignment", "announcement", "discussion"])
+def test_files_linked_from_any_course_menu_text_are_indexed(tmp_path, stub_extraction, files_by_id, monkeypatch, where):
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [])
+    html = _link(333)
+    if where == "syllabus":
+        monkeypatch.setattr(course_sync.canvas, "get_syllabus", lambda course_id: html)
+    elif where == "front_page":
+        monkeypatch.setattr(
+            course_sync.canvas, "get_front_page", lambda course_id: {"url": "home", "title": "Home", "body": html, "updated_at": "1"}
+        )
+    elif where == "assignment":
+        monkeypatch.setattr(
+            course_sync.canvas, "list_assignments", lambda course_id: [{"id": 9, "name": "A1", "description": html, "updated_at": "1"}]
+        )
+    else:
+        topic = [{"id": 9, "title": "Read this", "message": html}]
+        monkeypatch.setattr(course_sync.canvas, f"list_{where}s", lambda course_id: topic)
+    run(1, tmp_path)
+    assert "file:333" in _manifest_ids(tmp_path)
+
+
+def test_a_link_to_another_courses_file_is_not_followed(tmp_path, stub_extraction, files_by_id, monkeypatch):
+    _module_page_with_body(monkeypatch, _link(333, course_id=999) + '<a href="/files/444/download">slides</a>')
+    run(1, tmp_path)
+    assert files_by_id == [444]
+    assert "file:333" not in _manifest_ids(tmp_path)
+
+
+def test_pages_listed_without_a_body_are_read_for_their_links(tmp_path, stub_extraction, files_by_id, monkeypatch):
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_pages", lambda course_id: [{"url": "intro", "title": "Intro", "updated_at": "1"}])
+    monkeypatch.setattr(course_sync.canvas, "get_page", lambda course_id, u: {"url": u, "title": "Intro", "body": _link(444)})
+    run(1, tmp_path)
+    run(1, tmp_path)  # unchanged page: its links are still read, so the file isn't taken as deleted
+    assert {"page:intro", "file:444"} <= _manifest_ids(tmp_path)
+
+
+def test_files_tab_files_are_indexed_without_a_lookup_each(tmp_path, stub_extraction, files_by_id, monkeypatch):
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_course_files", lambda course_id: [dict(READING), dict(SLIDES)])
+    run(1, tmp_path)
+    assert {"file:333", "file:444"} <= _manifest_ids(tmp_path)
+    assert files_by_id == []
+
+
+def test_a_file_in_modules_the_files_tab_and_a_link_is_indexed_once(tmp_path, stub_extraction, files_by_id, monkeypatch):
+    monkeypatch.setattr(
+        course_sync.canvas,
+        "get_course_structure",
+        lambda course_id: [{"name": "W1", "items": [{"type": "File", "title": "Koskela", "content_id": 333}]}],
+    )
+    monkeypatch.setattr(course_sync.canvas, "list_course_files", lambda course_id: [dict(READING)])
+    monkeypatch.setattr(course_sync.canvas, "get_syllabus", lambda course_id: _link(333))
+    events = run(1, tmp_path)
+    assert [e["item"] for e in events if e.get("item") == "Koskela Ch1.pdf"] == ["Koskela Ch1.pdf"]
+    assert files_by_id == []  # the Files tab already gave its details
+
+
+def test_a_linked_file_that_cant_be_opened_is_not_deleted(tmp_path, stub_extraction, files_by_id, monkeypatch):
+    _module_page_with_body(monkeypatch, _link(333))
+    run(1, tmp_path)
+    monkeypatch.setattr(course_sync.canvas, "get_file", lambda file_id: None)
+    run(1, tmp_path)
+    assert "file:333" in _manifest_ids(tmp_path)
+
+
+def test_a_file_no_longer_linked_anywhere_is_removed(tmp_path, stub_extraction, files_by_id, monkeypatch):
+    _module_page_with_body(monkeypatch, _link(333) + _link(444))
+    run(1, tmp_path)
+    _module_page_with_body(monkeypatch, _link(444) + "<p>edited</p>")
+    run(1, tmp_path)
+    ids = _manifest_ids(tmp_path)
+    assert "file:444" in ids and "file:333" not in ids
+
+
+def test_announcements_are_indexed_with_their_posted_date(tmp_path, stub_extraction, monkeypatch):
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_pages", lambda course_id: [])
+    added = []
+    monkeypatch.setattr(course_sync.indexing, "add_nodes", lambda nodes, db_path, table_name: added.extend(nodes))
+    monkeypatch.setattr(
+        course_sync.canvas,
+        "list_announcements",
+        lambda course_id: [{"id": 7, "title": "Class This Tuesday", "message": "<p>We meet in room 101.</p>", "posted_at": "2026-10-26T07:49:06Z"}],
+    )
+    events = run(1, tmp_path)
+    assert events[-1]["new"] == 1
+    assert "announcement:7" in _manifest_ids(tmp_path)
+    text = " ".join(n.get_content() for n in added)
+    assert "room 101" in text and "Oct 26, 2026" in text
+    assert {n.metadata["item_type"] for n in added} == {"announcement"}
+    assert added[0].metadata["source"] == "Class This Tuesday"
+
+
+def test_an_edited_announcement_is_resynced_and_a_removed_one_deleted(tmp_path, stub_extraction, monkeypatch):
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_pages", lambda course_id: [])
+    one = {"id": 7, "title": "Room", "message": "<p>Room 101</p>"}
+    two = {"id": 8, "title": "Speaker", "message": "<p>Guest on Tuesday</p>"}
+    monkeypatch.setattr(course_sync.canvas, "list_announcements", lambda course_id: [one, two])
+    run(1, tmp_path)
+    assert run(1, tmp_path)[-1] == {"done": True, "new": 0, "changed": 0, "removed": 0, "failed": 0}
+    edited = {**one, "message": "<p>Room 202</p>"}
+    monkeypatch.setattr(course_sync.canvas, "list_announcements", lambda course_id: [edited])
+    summary = run(1, tmp_path)[-1]
+    assert (summary["changed"], summary["removed"]) == (1, 1)
+    assert "announcement:8" not in _manifest_ids(tmp_path)
+
+
+def test_an_empty_announcement_listing_deletes_nothing(tmp_path, stub_extraction, monkeypatch):
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_pages", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_announcements", lambda course_id: [{"id": 7, "title": "Room", "message": "<p>Room 101</p>"}])
+    run(1, tmp_path)
+    monkeypatch.setattr(course_sync.canvas, "list_announcements", lambda course_id: [])
+    run(1, tmp_path)
+    assert "announcement:7" in _manifest_ids(tmp_path)
+
+
+def test_discussions_are_indexed_and_empty_ones_skipped(tmp_path, stub_extraction, monkeypatch):
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_pages", lambda course_id: [])
+    monkeypatch.setattr(
+        course_sync.canvas,
+        "list_discussions",
+        lambda course_id: [{"id": 5, "title": "Updates", "message": "<p>Post weekly updates</p>"}, {"id": 6, "title": "Empty", "message": ""}],
+    )
+    run(1, tmp_path)
+    ids = _manifest_ids(tmp_path)
+    assert "discussion:5" in ids and "discussion:6" not in ids
+
+
+def test_discussion_attachments_are_indexed_as_files(tmp_path, stub_extraction, monkeypatch):
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_pages", lambda course_id: [])
+    monkeypatch.setattr(
+        course_sync.canvas,
+        "list_announcements",
+        lambda course_id: [{"id": 7, "title": "Slides", "message": "<p>Attached.</p>", "attachments": [dict(SLIDES)]}],
+    )
+    run(1, tmp_path)
+    assert {"announcement:7", "file:444"} <= _manifest_ids(tmp_path)
+
+
+def test_outline_lists_linked_files_under_their_page_and_the_rest_in_their_own_groups(tmp_path, stub_extraction, files_by_id, monkeypatch):
+    _module_page_with_body(monkeypatch, _link(333))
+    monkeypatch.setattr(course_sync.canvas, "list_course_files", lambda course_id: [dict(SLIDES)])
+    monkeypatch.setattr(course_sync.canvas, "list_announcements", lambda course_id: [{"id": 7, "title": "Room", "message": "<p>Room 101</p>"}])
+    monkeypatch.setattr(course_sync.canvas, "list_discussions", lambda course_id: [{"id": 5, "title": "Updates", "message": "<p>x</p>"}])
+    run(1, tmp_path)
+    conn = course_sync.sync.open_manifest(tmp_path / "courses" / "1" / "manifest.db")
+    rows = [(r["module"], r["section"], r["title"], r["item_type"]) for r in course_sync.course_items.load_outline(conn)]
+    conn.close()
+    assert rows == [
+        ("Week 1", "", "Task 1 Resources", "page"),
+        ("Week 1", "Linked from Task 1 Resources", "Koskela Ch1.pdf", "file"),
+        ("Other course files", "", "Lecture 2.pptx", "file"),
+        ("Announcements", "", "Room", "announcement"),
+        ("Discussions", "", "Updates", "discussion"),
+    ]

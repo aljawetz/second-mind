@@ -45,7 +45,7 @@ DIFFICULTIES = ("easy", "medium", "hard")
 # Leaves room in a 64k context (DeepSeek) for the instructions and the reply.
 MATERIAL_BUDGET_CHARS = 120_000
 # About the course rather than its subject: left out unless chosen by hand.
-NOT_STUDIED_BY_DEFAULT = ("syllabus", "assignment")
+NOT_STUDIED_BY_DEFAULT = ("syllabus", "assignment", "announcement", "discussion")
 MAX_TOPIC_CHARS = 500
 
 

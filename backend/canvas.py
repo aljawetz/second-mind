@@ -175,6 +175,23 @@ def get_syllabus(course_id: int) -> str | None:
         return r.json().get("syllabus_body") if r else None
 
 
+def list_announcements(course_id: int) -> list[dict]:
+    """Every announcement in the course, newest first. Not /announcements,
+    which returns only the last 14 days unless given a date range (2 of
+    56350's 13)."""
+    with _client() as client:
+        return _get_all(
+            client, f"/courses/{course_id}/discussion_topics", params={"only_announcements": "true", "per_page": 50}
+        )
+
+
+def list_discussions(course_id: int) -> list[dict]:
+    """The course's discussion topics (announcements left out): the opening
+    post's HTML in "message", not the replies."""
+    with _client() as client:
+        return _get_all(client, f"/courses/{course_id}/discussion_topics", params={"per_page": 50})
+
+
 def get_course_structure(course_id: int) -> list[dict]:
     """Modules + items — navigation metadata and the file-discovery path
     (list_course_files 403s under a student token; individual files stay
@@ -188,10 +205,11 @@ def get_course_structure(course_id: int) -> list[dict]:
 
 
 def list_course_files(course_id: int) -> list[dict]:
-    """The bulk Files-tab listing — known to 403 under a student token
-    (canvas-integration.md §2). Not used for real file discovery (that's
-    get_course_structure + get_file below); kept so the known failure mode
-    has real code and a real fixture to test against."""
+    """The bulk Files-tab listing. It 403s (degrading to []) when the
+    course hides its Files tab from students (canvas-integration.md §2);
+    when the tab is shown it lists files no module does (24 of 56350's 31).
+    One of course_sync's three ways to find files, with module items and
+    links in the course's own pages."""
     with _client() as client:
         return _get_all(client, f"/courses/{course_id}/files", params={"per_page": 50})
 
