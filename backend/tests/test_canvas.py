@@ -175,3 +175,28 @@ def test_download_raises_on_an_error_status_instead_of_returning_the_error_page(
     respx.get("https://canvas.example/files/9/download").mock(return_value=httpx.Response(403, text="<html>denied</html>"))
     with pytest.raises(httpx.HTTPStatusError):
         canvas.download("https://canvas.example/files/9/download")
+
+
+# --- plugin config: env wins over the app's keychain and config.json -------
+
+
+def test_plugin_token_from_env_wins_over_keychain(monkeypatch):
+    monkeypatch.setenv("SM_CANVAS_TOKEN", "from-plugin")
+    monkeypatch.setattr(credentials, "get", lambda key: "from-keychain")
+
+    assert canvas._token() == "from-plugin"
+
+
+def test_empty_plugin_token_falls_back_to_keychain(monkeypatch):
+    monkeypatch.setenv("SM_CANVAS_TOKEN", "")
+    monkeypatch.setattr(credentials, "get", lambda key: "from-keychain")
+
+    assert canvas._token() == "from-keychain"
+
+
+def test_plugin_url_from_env_wins_and_is_normalized(tmp_path, monkeypatch):
+    monkeypatch.setattr(canvas, "SM_HOME", tmp_path)
+    (tmp_path / "config.json").write_text('{"canvas_base_url": "https://other.example.edu"}')
+    monkeypatch.setenv("SM_CANVAS_URL", "canvas.example.edu/api/v1/")
+
+    assert canvas._api_base() == "https://canvas.example.edu/api/v1"

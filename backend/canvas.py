@@ -10,6 +10,7 @@ degrades to an empty result rather than raising — canvas-integration.md §2/§
 A 429 means rate-limited and gets retried with backoff — §5.
 """
 
+import os
 import re
 import time
 from pathlib import Path
@@ -33,14 +34,17 @@ class CanvasError(Exception):
 
 
 def _token() -> str:
-    token = credentials.get("canvas-token")
+    # The Claude Code plugin passes its own token (userConfig, stored in the
+    # system keychain by Claude Code); the app's own keychain entry is the
+    # fallback. Plan docs/plans/2026-11-13-claude-code-plugin.md, Decision 3.
+    token = os.environ.get("SM_CANVAS_TOKEN") or credentials.get("canvas-token")
     if not token:
         raise CanvasError("no Canvas token stored — onboarding hasn't completed")
     return token
 
 
 def _api_base() -> str:
-    origin = config.read_config(SM_HOME).get("canvas_base_url")
+    origin = config.normalize_canvas_base_url(os.environ.get("SM_CANVAS_URL") or "") or config.read_config(SM_HOME).get("canvas_base_url")
     return f"{origin}/api/v1" if origin else CANVAS_API_URL
 
 

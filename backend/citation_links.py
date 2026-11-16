@@ -10,6 +10,7 @@ comes off before the id goes into the URL. Class recordings made in the app
 ("transcript", "notes") are local and have no Canvas page.
 """
 
+import os
 from pathlib import Path
 
 import config
@@ -20,7 +21,8 @@ NO_CANVAS_PAGE = {"transcript", "notes"}
 
 
 def canvas_origin(sm_home: Path) -> str:
-    raw = config.read_config(sm_home).get("canvas_base_url") or ""
+    # The plugin's userConfig URL (env) wins, as in canvas._api_base.
+    raw = os.environ.get("SM_CANVAS_URL") or config.read_config(sm_home).get("canvas_base_url") or ""
     return config.normalize_canvas_base_url(raw) or DEFAULT_ORIGIN
 
 

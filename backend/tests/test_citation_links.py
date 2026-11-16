@@ -40,3 +40,10 @@ def test_origin_comes_from_config_and_is_normalized(tmp_path):
 
 def test_origin_defaults_like_canvas_py(tmp_path):
     assert citation_links.canvas_origin(tmp_path) == "https://canvas.cmu.edu"
+
+
+def test_origin_from_the_plugin_env_wins(tmp_path, monkeypatch):
+    (tmp_path / "config.json").write_text('{"canvas_base_url": "https://other.example.edu"}')
+    monkeypatch.setenv("SM_CANVAS_URL", "https://canvas.example.edu/")
+
+    assert citation_links.canvas_origin(tmp_path) == ORIGIN

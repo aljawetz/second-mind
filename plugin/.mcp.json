@@ -8,7 +8,10 @@
         "sm-mcp"
       ],
       "env": {
-        "SM_MODELS_DIR": "${SM_MODELS_DIR:-}"
+        "SM_HOME": "${SM_HOME:-${CLAUDE_PLUGIN_DATA}}",
+        "SM_MODELS_DIR": "${SM_MODELS_DIR:-${CLAUDE_PLUGIN_DATA}/models}",
+        "SM_CANVAS_URL": "${user_config.canvas_base_url}",
+        "SM_CANVAS_TOKEN": "${user_config.canvas_token}"
       }
     }
   }
