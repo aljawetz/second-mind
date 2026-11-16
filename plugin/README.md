@@ -11,6 +11,10 @@ What it has:
   knowledge, and doesn't do graded work.
 - `evals/`: the tool and skill suite (`claude plugin eval plugin/`).
 
+Search uses only the bge-small embedding model (no reranker). The server downloads it from Hugging Face
+on first use (pinned revision, sha256-checked) into the plugin's data folder; `sm-mcp --download-model`
+does the same up front.
+
 For now it reads the index the app built in `~/.secondmind`; setup and sync inside the plugin are next.
 
 ## Try it

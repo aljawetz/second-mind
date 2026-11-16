@@ -9,7 +9,7 @@
 # stack: tests/test_plugin_imports.py fails if the server ever imports it.
 [project]
 name = "second-mind-mcp"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Second Mind for Claude Code: search and deadlines from your own Canvas courses"
 license = "MIT"
 requires-python = ">=3.13"
@@ -37,6 +37,12 @@ sm-mcp = "mcp_server:main"
 requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
+[tool.hatch.version]
+# 0.1.0+<hash of the backend code>: uvx reuses an env by name and version, so
+# without the hash a code change would keep running the old build.
+source = "code"
+path = "version.py"
+
 [tool.hatch.build.targets.wheel]
 bypass-selection = true
 
@@ -52,7 +58,13 @@ bypass-selection = true
 "../../backend/generation.py" = "generation.py"
 "../../backend/indexing.py" = "indexing.py"
 "../../backend/ingestion.py" = "ingestion.py"
+"../../backend/model_download.py" = "model_download.py"
 "../../backend/query_dates.py" = "query_dates.py"
 "../../backend/reranker.py" = "reranker.py"
 "../../backend/study.py" = "study.py"
 "../../backend/sync.py" = "sync.py"
+
+[tool.uv]
+# The code lives in ../../backend, outside this folder, so uv must watch it
+# too; otherwise `uvx --from ./plugin/server` keeps running a stale build.
+cache-keys = [{ file = "pyproject.toml" }, { file = "../../backend/*.py" }]

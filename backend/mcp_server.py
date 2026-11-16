@@ -4,9 +4,10 @@ docs/plans/2026-11-13-claude-code-plugin.md).
 Claude Code is the LLM. This server only searches: no tool here calls a
 model. Two tools for now:
 - list_courses: the courses indexed on this machine, with their last sync.
-- search_course_material: the same HybridRetriever the app's chat uses
-  (chat.make_search: hybrid search, rank fusion, reranker, 0.5 cutoff),
-  returning whole chunks with their citation labels.
+- search_course_material: the app chat's HybridRetriever (hybrid search,
+  rank fusion, 0.5 cutoff) without the reranker, returning whole chunks
+  with their citation labels. The reranker added about 0.2 s a search and
+  no hit@5 on the heldout set, and it is one less model to download.
 
 It reads the index the app already built (SM_HOME, default ~/.secondmind,
 the same rule as main.py). Models load on the first search, not at
@@ -125,16 +126,21 @@ def list_courses_result(home: Path, names_for: Callable[[], dict[int, str]] = ca
 
 
 def make_retriever(index):
-    """The app's chat retriever for one index. It returns MAX_K, not its
-    default 5, so search's [:k] can reach MAX_K; fusion and the reranker
-    order before they cut, so the first 5 of 10 are the same top 5."""
+    """The app's chat retriever for one index, without the reranker. It
+    returns MAX_K, not its default 5, so search's [:k] can reach MAX_K;
+    fusion orders before it cuts, so the first 5 of 10 are the same top 5."""
     import generation  # lazy: it loads model code that list_courses never needs
 
-    return generation.HybridRetriever(index, similarity_top_k=MAX_K, similarity_cutoff=generation.SIMILARITY_CUTOFF)
+    return generation.HybridRetriever(
+        index, similarity_top_k=MAX_K, similarity_cutoff=generation.SIMILARITY_CUTOFF, reranker=None
+    )
 
 
 def _retriever_factory(home: Path):
     def make(course_id: int):
+        import model_download
+
+        model_download.ensure_embedding_model()
         return make_retriever(indexing.load_index(home / "index.lancedb", _table(course_id)))
 
     return make
@@ -161,7 +167,7 @@ def _log_query(course_id: int, query: str, results: list[dict], seconds: float) 
 
 class Searcher:
     """One retriever per course, built on first use: loading the index opens
-    the embedding model and the reranker, which is the slow part."""
+    the embedding model (downloaded first if missing), the slow part."""
 
     def __init__(self, home: Path, make_retriever=None, today_fn: Callable[[], datetime.date] = today):
         self._home = home
@@ -315,6 +321,11 @@ def main() -> None:
             print(version("second-mind-mcp"))
         except PackageNotFoundError:
             print("dev")
+        return
+    if "--download-model" in sys.argv[1:]:
+        import model_download
+
+        model_download.main()
         return
     logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     build_server().run("stdio")

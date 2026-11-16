@@ -137,6 +137,14 @@ def test_search_caps_k_and_builds_the_retriever_once(tmp_path):
     assert calls == [COURSE]
 
 
+def test_the_plugin_searches_without_the_reranker(tmp_path):
+    # Measured on heldout: same hit@5 without it, about 0.2 s faster, and one
+    # less model for the student to download.
+    retriever = mcp_server.make_retriever(_build_index(tmp_path))
+
+    assert retriever._reranker is None
+
+
 def test_search_returns_more_than_five_when_k_asks(tmp_path):
     # Eight chunks share "rubric", so FTS alone finds them all.
     pages = [(f"The rubric for lab {i} counts style and tests.", "rubric.pdf", i) for i in range(1, 9)]
