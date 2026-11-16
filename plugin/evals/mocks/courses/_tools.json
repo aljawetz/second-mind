@@ -10,7 +10,7 @@
   "tools": [
     {
       "name": "list_courses",
-      "description": "List the student's courses indexed on this machine: course_id, name, last sync time.",
+      "description": "List the student's Canvas courses: course_id, name, whether it is indexed (searchable) on this\nmachine, and its last sync time.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -81,6 +81,45 @@
           "course_id"
         ],
         "title": "list_assignmentsArguments"
+      }
+    },
+    {
+      "name": "sync_course",
+      "description": "Download one course's materials from Canvas and index them so search_course_material can find them.\nRuns in the background (a few minutes the first time, faster after) and returns at once; check it\nwith sync_status. Ask the student before syncing a course.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "course_id": {
+            "title": "Course Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "course_id"
+        ],
+        "title": "sync_courseArguments"
+      }
+    },
+    {
+      "name": "sync_status",
+      "description": "How a course sync is going (running, done, failed, interrupted) with item counts. Without\ncourse_id: every course synced on this machine.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "course_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Course Id"
+          }
+        },
+        "title": "sync_statusArguments"
       }
     }
   ],

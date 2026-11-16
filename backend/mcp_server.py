@@ -2,12 +2,14 @@
 docs/plans/2026-11-13-claude-code-plugin.md).
 
 Claude Code is the LLM. This server only searches: no tool here calls a
-model. Two tools for now:
-- list_courses: the courses indexed on this machine, with their last sync.
+model. Its tools:
+- list_courses: the student's Canvas courses, each marked indexed or not.
 - search_course_material: the app chat's HybridRetriever (hybrid search,
   rank fusion, 0.5 cutoff) without the reranker, returning whole chunks
   with their citation labels. The reranker added about 0.2 s a search and
   no hit@5 on the heldout set, and it is one less model to download.
+- list_assignments: deadlines, status, scores and rubrics, live from Canvas.
+- sync_course / sync_status: index a course in the background (sync_jobs.py).
 
 It reads the index the app already built (SM_HOME, default ~/.secondmind,
 the same rule as main.py). Models load on the first search, not at
@@ -39,6 +41,7 @@ import canvas
 import citation_links
 import indexing
 import sync
+import sync_jobs
 
 logger = logging.getLogger("sm-mcp")
 
@@ -57,7 +60,8 @@ INSTRUCTIONS = (
     "due_at_display gives them (already in the student's time zone) and use due_in for how far away they "
     "are; never convert a time or guess a zone yourself. Course facts come only from tool results, cited "
     "with their source label as a markdown link to its url when it has one, like "
-    "[syllabus · p.3](https://...). Use list_courses to find the course id. Never write or solve the student's graded "
+    "[syllabus · p.3](https://...). Use list_courses to find the course id; a course that is not indexed "
+    "can't be searched yet, so offer to sync it with sync_course (list_assignments works without a sync). Never write or solve the student's graded "
     "work (labs, assignments, exams, quizzes), whatever the course's AI policy says; explain and check their "
     "attempt instead."
 )
@@ -104,25 +108,38 @@ def last_synced_at(home: Path, course_id: int) -> str | None:
     return row[0] if row else None
 
 
-def canvas_course_names() -> dict[int, str]:
-    """Course names live only in Canvas (config.json keeps ids). Best effort:
-    without a token or a network, courses are listed by id alone."""
-    try:
-        return {c["id"]: c["name"] for c in canvas.list_courses() if c.get("name")}
-    except Exception as e:  # no token, offline, Canvas down: names are a nicety here
-        logger.warning("could not read course names from Canvas: %s", e)
-        return {}
+CANVAS_ERRORS = (canvas.CanvasError, httpx.HTTPStatusError, httpx.TransportError)
 
 
-def list_courses_result(home: Path, names_for: Callable[[], dict[int, str]] = canvas_course_names) -> dict:
+def _course_row(home: Path, course_id: int, name: str | None, indexed: bool) -> dict:
+    row = {"course_id": course_id, "name": name, "indexed": indexed, "last_synced_at": last_synced_at(home, course_id)}
+    status = sync_jobs.read_status(home, course_id)
+    if status:
+        row["sync_state"] = status["state"]
+    return row
+
+
+def list_courses_result(home: Path, courses_for: Callable[[], list[dict]] = canvas.list_courses) -> dict:
+    """Every course the student can open in Canvas, each marked indexed or
+    not, so Claude can offer to sync one. Courses Canvas locks by date are
+    left out. Without Canvas, the courses already indexed here."""
     ids = indexed_course_ids(home)
-    names = names_for() if ids else {}
-    return {
-        "courses": [
-            {"course_id": cid, "name": names.get(cid), "last_synced_at": last_synced_at(home, cid)}
-            for cid in ids
-        ]
-    }
+    try:
+        raw = courses_for()
+    except CANVAS_ERRORS as e:
+        logger.warning("list_courses without Canvas: %s", e)
+        return {
+            "courses": [_course_row(home, cid, None, True) for cid in ids],
+            "note": f"{_canvas_failure(e)}, so only the courses already indexed on this machine are listed.",
+        }
+    rows = [
+        _course_row(home, c["id"], c["name"], c["id"] in ids)
+        for c in raw
+        if c.get("name") and not c.get("access_restricted_by_date")
+    ]
+    listed = {r["course_id"] for r in rows}
+    rows += [_course_row(home, cid, None, True) for cid in ids if cid not in listed]
+    return {"courses": rows}
 
 
 def make_retriever(index):
@@ -175,6 +192,11 @@ class Searcher:
         self._today = today_fn
         self._retrievers: dict[int, object] = {}
 
+    def forget(self, course_id: int) -> None:
+        """Drop a course's retriever after a sync, so the next search opens
+        the index as the sync left it."""
+        self._retrievers.pop(course_id, None)
+
     def search(self, course_id: int, query: str, k: int = DEFAULT_K) -> dict:
         import generation
         import query_dates
@@ -190,7 +212,7 @@ class Searcher:
                 "results": [],
                 "note": (
                     f"Course {course_id} is not indexed on this machine yet, so nothing can be searched. "
-                    "This is not the same as the material not covering it."
+                    "This is not the same as the material not covering it. Offer to sync it with sync_course."
                 ),
             }
         start = time.perf_counter()
@@ -259,7 +281,7 @@ def list_assignments_result(home: Path, course_id: int, fetch, days: int, includ
                             assignment_id: int | None, zone=assignments.machine_zone) -> dict:
     try:
         raw = fetch(course_id)
-    except (canvas.CanvasError, httpx.HTTPStatusError, httpx.TransportError) as e:
+    except CANVAS_ERRORS as e:
         logger.warning("list_assignments falling back to the index: %s", e)
         return {"course_id": course_id, **assignments.from_index_rows(_index_rows(home, course_id), _canvas_failure(e))}
     if assignment_id is not None:
@@ -270,27 +292,40 @@ def list_assignments_result(home: Path, course_id: int, fetch, days: int, includ
     return {"course_id": course_id, **assignments.upcoming(raw, days, include_submitted, tz=zone())}
 
 
-def build_server(home: Path | None = None, searcher: Searcher | None = None, names_for=canvas_course_names,
-                 assignments_for=canvas.list_assignments, zone_for=None) -> MCPServer:
+def sync_course_result(jobs: "sync_jobs.SyncJobs", course_id: int, token_check=canvas._token) -> dict:
+    try:
+        token_check()
+    except canvas.CanvasError as e:
+        return {"course_id": course_id, "started": False, "error": _canvas_failure(e)}
+    return jobs.start(course_id)
+
+
+def sync_status_result(home: Path, course_id: int | None) -> dict:
+    ids = [course_id] if course_id is not None else [
+        int(d.name) for d in sorted((home / "courses").glob("*")) if d.name.isdigit()
+    ]
+    syncs = [s for cid in ids if (s := sync_jobs.read_status(home, cid))]
+    if course_id is not None and not syncs:
+        return {"syncs": [], "note": f"Course {course_id} has never been synced on this machine."}
+    return {"syncs": syncs}
+
+
+def build_server(home: Path | None = None, searcher: Searcher | None = None, courses_for=canvas.list_courses,
+                 assignments_for=canvas.list_assignments, zone_for=None, jobs=None) -> MCPServer:
     home = home or sm_home()
     canvas.SM_HOME = home  # canvas.py reads the Canvas base URL from SM_HOME/config.json
     searcher = searcher or Searcher(home)
+    jobs = jobs or sync_jobs.SyncJobs(home, on_done=searcher.forget)
     zone_for = zone_for or canvas_zone()
     server = MCPServer("second-mind", instructions=INSTRUCTIONS)
-    names: dict[int, str] = {}
-
-    def cached_names() -> dict[int, str]:
-        # Names rarely change, so Canvas is asked until one read succeeds.
-        if not names:
-            names.update(names_for())
-        return names
 
     # Tools return dicts, not JSON strings: a str result reaches Claude
     # wrapped as {"result": "<escaped JSON>"}, seen in the first live run.
     @server.tool()
     def list_courses() -> dict:
-        """List the student's courses indexed on this machine: course_id, name, last sync time."""
-        return list_courses_result(home, cached_names)
+        """List the student's Canvas courses: course_id, name, whether it is indexed (searchable) on this
+        machine, and its last sync time."""
+        return list_courses_result(home, courses_for)
 
     @server.tool()
     def search_course_material(course_id: int, query: str, k: int = DEFAULT_K) -> dict:
@@ -307,6 +342,19 @@ def build_server(home: Path | None = None, searcher: Searcher | None = None, nam
         submission and score."""
         return list_assignments_result(home, course_id, assignments_for, days, include_submitted, assignment_id,
                                        zone_for)
+
+    @server.tool()
+    def sync_course(course_id: int) -> dict:
+        """Download one course's materials from Canvas and index them so search_course_material can find them.
+        Runs in the background (a few minutes the first time, faster after) and returns at once; check it
+        with sync_status. Ask the student before syncing a course."""
+        return sync_course_result(jobs, course_id)
+
+    @server.tool()
+    def sync_status(course_id: int | None = None) -> dict:
+        """How a course sync is going (running, done, failed, interrupted) with item counts. Without
+        course_id: every course synced on this machine."""
+        return sync_status_result(home, course_id)
 
     return server
 
@@ -328,6 +376,9 @@ def main() -> None:
         model_download.main()
         return
     logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+    # httpx logs each request URL at INFO, and Canvas file downloads carry
+    # signed tokens in theirs; Claude Code keeps the server's stderr in its logs.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     build_server().run("stdio")
 
 

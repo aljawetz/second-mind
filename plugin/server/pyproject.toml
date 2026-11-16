@@ -63,6 +63,7 @@ bypass-selection = true
 "../../backend/reranker.py" = "reranker.py"
 "../../backend/study.py" = "study.py"
 "../../backend/sync.py" = "sync.py"
+"../../backend/sync_jobs.py" = "sync_jobs.py"
 
 [tool.uv]
 # The code lives in ../../backend, outside this folder, so uv must watch it

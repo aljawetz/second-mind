@@ -27,7 +27,7 @@ class Block(importlib.abc.MetaPathFinder):
         if any(name == b or name.startswith(b + ".") for b in BLOCKED):
             raise ImportError(f"plugin path imported app-only module {{name}}")
 sys.meta_path.insert(0, Block())
-import mcp_server, course_sync, generation, assignments, citation_links, query_dates, model_download
+import mcp_server, course_sync, generation, assignments, citation_links, query_dates, model_download, sync_jobs
 mcp_server.build_server()
 print("ok")
 """

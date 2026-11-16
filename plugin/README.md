@@ -6,7 +6,7 @@ What it has:
 
 - `.mcp.json`: the `courses` MCP server, started with `uvx` from the `second-mind-mcp` package in
   `server/` (on GitHub at the release tag; `SM_SERVER_SOURCE` overrides it). Tools: `list_courses`,
-  `search_course_material`, `list_assignments`.
+  `search_course_material`, `list_assignments`, `sync_course`, `sync_status`.
 - `skills/ask`: picks the tool, cites every course fact as a link to its Canvas page, labels general
   knowledge, and doesn't do graded work.
 - `evals/`: the tool and skill suite (`claude plugin eval plugin/`).
@@ -15,7 +15,8 @@ Search uses only the bge-small embedding model (no reranker). The server downloa
 on first use (pinned revision, sha256-checked) into the plugin's data folder; `sm-mcp --download-model`
 does the same up front.
 
-For now it reads the index the app built in `~/.secondmind`; setup and sync inside the plugin are next.
+`sync_course` indexes a Canvas course in the background (about 30 s for a small course, including the
+first model download); `sync_status` reports progress. The `/second-mind:setup` skill is next.
 
 ## Try it
 

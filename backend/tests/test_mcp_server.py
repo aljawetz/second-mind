@@ -104,19 +104,19 @@ def _call(server, name: str, arguments: dict | None = None) -> dict:
 
 def test_tools_and_instructions_are_listed():
     async def go():
-        async with Client(mcp_server.build_server(Path("/nonexistent"), names_for=dict)) as client:
+        async with Client(mcp_server.build_server(Path("/nonexistent"), courses_for=list)) as client:
             tools = {t.name for t in (await client.list_tools()).tools}
             return tools, client.instructions
 
     tools, instructions = anyio.run(go)
-    assert tools == {"list_courses", "search_course_material", "list_assignments"}
+    assert tools == {"list_courses", "search_course_material", "list_assignments", "sync_course", "sync_status"}
     assert "search_course_material before answering" in instructions
 
 
 def test_search_returns_chunks_with_citation_labels(tmp_path):
     index = _build_index(tmp_path)
     searcher, _ = _searcher(tmp_path, index)
-    server = mcp_server.build_server(tmp_path, searcher=searcher, names_for=dict)
+    server = mcp_server.build_server(tmp_path, searcher=searcher, courses_for=list)
 
     out = _call(server, "search_course_material", {"course_id": COURSE, "query": "late work penalty"})
 
@@ -211,36 +211,59 @@ def test_search_with_no_match_returns_the_no_results_note(tmp_path):
     assert out["note"] == "No matching course material found for this search."
 
 
-def test_list_courses_reports_indexed_courses_names_and_last_sync(tmp_path):
+def _canvas_course(cid, name, **extra):
+    return {"id": cid, "name": name, **extra}
+
+
+def test_list_courses_lists_canvas_courses_and_marks_the_indexed_ones(tmp_path):
     _build_index(tmp_path, COURSE)
-    _build_index(tmp_path, 56350)
     (tmp_path / "courses" / str(COURSE)).mkdir(parents=True)
     conn = sync.open_manifest(tmp_path / "courses" / str(COURSE) / "manifest.db")
     sync.mark_synced(conn, "file:1", "file", "a.pdf", "2026-10-01T00:00:00Z", "h1")
     conn.close()
+    canvas_courses = [
+        _canvas_course(COURSE, "Requirements"),
+        _canvas_course(56350, "Advanced AI"),
+        _canvas_course(52701, None, access_restricted_by_date=True),
+    ]
 
-    out = _call(mcp_server.build_server(tmp_path, names_for=lambda: {COURSE: "Requirements"}), "list_courses")
+    out = _call(mcp_server.build_server(tmp_path, courses_for=lambda: canvas_courses), "list_courses")
 
-    by_id = {c["course_id"]: c for c in out["courses"]}
-    assert set(by_id) == {COURSE, 56350}
-    assert by_id[COURSE]["name"] == "Requirements"
-    assert by_id[COURSE]["last_synced_at"] is not None
-    assert by_id[56350] == {"course_id": 56350, "name": None, "last_synced_at": None}
-
-
-def test_list_courses_skips_canvas_when_nothing_is_indexed(tmp_path):
-    out = mcp_server.list_courses_result(tmp_path, names_for=lambda: pytest.fail("no courses, no Canvas call"))
-
-    assert out == {"courses": []}
+    assert out["courses"][0]["course_id"] == COURSE
+    assert out["courses"][0]["indexed"] is True
+    assert out["courses"][0]["last_synced_at"] is not None
+    assert out["courses"][1] == {"course_id": 56350, "name": "Advanced AI", "indexed": False, "last_synced_at": None}
+    assert len(out["courses"]) == 2  # the date-locked course is left out
 
 
-def test_canvas_failure_lists_courses_without_names(monkeypatch):
-    def boom():
-        raise RuntimeError("no token")
+def test_list_courses_keeps_an_indexed_course_canvas_no_longer_lists(tmp_path):
+    _build_index(tmp_path, 56350)
 
-    monkeypatch.setattr(mcp_server.canvas, "list_courses", boom)
+    out = mcp_server.list_courses_result(tmp_path, courses_for=lambda: [_canvas_course(COURSE, "Requirements")])
 
-    assert mcp_server.canvas_course_names() == {}
+    assert [(c["course_id"], c["indexed"]) for c in out["courses"]] == [(COURSE, False), (56350, True)]
+
+
+def test_without_canvas_list_courses_shows_the_indexed_ones_and_says_why(tmp_path):
+    _build_index(tmp_path, COURSE)
+
+    def no_token():
+        raise mcp_server.canvas.CanvasError("no token")
+
+    out = mcp_server.list_courses_result(tmp_path, courses_for=no_token)
+
+    assert [c["course_id"] for c in out["courses"]] == [COURSE]
+    assert out["note"].startswith("No Canvas token is set up")
+
+
+def test_list_courses_shows_a_course_sync_state(tmp_path):
+    jobs = mcp_server.sync_jobs.SyncJobs(tmp_path, run=lambda cid, home: iter([{"done": True, "error": "boom"}]),
+                                         ensure_model=lambda: None)
+    jobs.start(56350, wait=True)
+
+    out = mcp_server.list_courses_result(tmp_path, courses_for=lambda: [_canvas_course(56350, "Advanced AI")])
+
+    assert out["courses"][0]["sync_state"] == "failed"
 
 
 def test_stdio_subprocess_speaks_only_protocol_on_stdout(tmp_path, caplog):
@@ -251,7 +274,8 @@ def test_stdio_subprocess_speaks_only_protocol_on_stdout(tmp_path, caplog):
     params = StdioServerParameters(
         command=sys.executable,
         args=[str(BACKEND / "mcp_server.py")],
-        env={**os.environ, "SM_HOME": str(tmp_path)},
+        # A closed local port: list_courses falls back without reaching a real Canvas.
+        env={**os.environ, "SM_HOME": str(tmp_path), "SM_CANVAS_TOKEN": "x", "SM_CANVAS_URL": "http://127.0.0.1:9"},
         cwd=str(BACKEND),
     )
 
@@ -264,24 +288,9 @@ def test_stdio_subprocess_speaks_only_protocol_on_stdout(tmp_path, caplog):
     with caplog.at_level(logging.ERROR, logger="mcp.client.stdio"):
         courses, missing = anyio.run(go)
     assert [r.getMessage() for r in caplog.records if r.name == "mcp.client.stdio"] == []
-    assert courses == {"courses": []}
+    assert courses["courses"] == []
+    assert courses["note"].startswith("Canvas could not be reached")
     assert "not indexed" in missing["note"]
-
-
-def test_course_names_are_read_from_canvas_until_one_read_succeeds(tmp_path):
-    _build_index(tmp_path, COURSE)
-    replies = iter([{}, {COURSE: "Requirements"}, {COURSE: "renamed"}])
-    calls = []
-
-    def names():
-        calls.append(1)
-        return next(replies)
-
-    server = mcp_server.build_server(tmp_path, names_for=names)
-    first, second, third = (_call(server, "list_courses")["courses"][0]["name"] for _ in range(3))
-
-    assert (first, second, third) == (None, "Requirements", "Requirements")
-    assert len(calls) == 2
 
 
 # --- list_assignments --------------------------------------------------------
@@ -304,7 +313,7 @@ LA = ZoneInfo("America/Los_Angeles")
 
 
 def _assignments_server(tmp_path, fetch, zone=lambda: LA):
-    return mcp_server.build_server(tmp_path, names_for=dict, assignments_for=fetch, zone_for=zone)
+    return mcp_server.build_server(tmp_path, courses_for=list, assignments_for=fetch, zone_for=zone)
 
 
 def test_list_assignments_returns_upcoming_work(tmp_path):
