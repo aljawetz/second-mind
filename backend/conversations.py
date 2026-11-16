@@ -55,7 +55,8 @@ def exists(sm_home: Path, course_id: int, cid: str) -> bool:
 
 
 def append_turn(sm_home: Path, course_id: int, cid: str, turn: dict, *, create_if_missing: bool = True) -> int | None:
-    """turn: {question, answer, citations, grounded, asked_at}. The first
+    """turn: {question, answer, citations, grounded, asked_at}, plus
+    memory_ids when the answer drew on agent memory. The first
     turn creates the conversation, titled by its question.
 
     When create_if_missing is False, a missing file means the chat was deleted

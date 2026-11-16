@@ -1,0 +1,10 @@
+# Raw answers, the grading page and the judge's reasons quote course text;
+# the key and the CSV are only useful next to them, and the CSV's notes are
+# free text. human-grades.json and agreement-*.json (grades and counts only,
+# written by grader_check.py agree) are what's shared.
+answers.json
+answers-grades.json
+grading.html
+key.json
+grades.csv
+judge-*.json

@@ -53,6 +53,7 @@ bypass-selection = true
 "../../backend/citation_links.py" = "citation_links.py"
 "../../backend/config.py" = "config.py"
 "../../backend/course_sync.py" = "course_sync.py"
+"../../backend/course_items.py" = "course_items.py"
 "../../backend/credentials.py" = "credentials.py"
 "../../backend/embeddings.py" = "embeddings.py"
 "../../backend/generation.py" = "generation.py"

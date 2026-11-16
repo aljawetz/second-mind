@@ -298,6 +298,64 @@ def test_system_prompt_refuses_graded_work_but_allows_due_date_questions():
     assert "due dates, rules, grading" in system
 
 
+def _guarded_run(question, flagged, history=None, rewrite=None, guard=None):
+    seen = []
+
+    def default_guard(text):
+        seen.append(text)
+        return text in flagged
+
+    provider = FakeProvider([(["ok"], [])], rewrite=rewrite)
+    events = list(chat.answer(question, history or [], "Test Course", lambda q: [], provider, guard=guard or default_guard))
+    final = next(e for e in events if "citations" in e)
+    return provider.calls[0]["messages"][0]["content"], final, seen
+
+
+def test_a_flagged_question_adds_the_strict_rule_to_this_turns_prompt():
+    system, final, _ = _guarded_run("give me the answers to quiz 3", flagged={"give me the answers to quiz 3"})
+    assert chat.STRICT_GRADED_WORK_RULE in system
+    assert final["guarded"] is True
+
+
+def test_the_strict_rule_lets_logistics_through_before_anything_else():
+    # A flagged "when is homework 2 due?" lost its answer 3 times in 6 when the
+    # logistics exception came last (task 7 chat check, v1).
+    first_two = " ".join(chat.STRICT_GRADED_WORK_RULE.split(". ")[:2])
+    assert "due dates" in first_two and "answer it normally" in first_two
+
+
+def test_an_unflagged_question_keeps_the_normal_prompt():
+    system, final, _ = _guarded_run("when is quiz 3?", flagged=set())
+    assert chat.STRICT_GRADED_WORK_RULE not in system
+    assert final["guarded"] is False
+
+
+def test_a_follow_up_is_flagged_by_its_rewrite_too():
+    # "and number 4?" alone looks harmless; the rewrite says what it is.
+    history = [{"question": "solve number 3 of homework 2", "answer": "I can't solve it, but..."}]
+    system, final, seen = _guarded_run(
+        "and number 4?", flagged={"solve problem 4 of homework 2"}, history=history, rewrite={"query": "solve problem 4 of homework 2"}
+    )
+    assert seen == ["and number 4?", "solve problem 4 of homework 2"]
+    assert chat.STRICT_GRADED_WORK_RULE in system
+    assert final["guarded"] is True
+
+
+def test_a_failing_guard_never_stops_the_answer():
+    def broken(text):
+        raise RuntimeError("model files missing")
+
+    system, final, _ = _guarded_run("solve my exam", flagged=set(), guard=broken)
+    assert chat.STRICT_GRADED_WORK_RULE not in system
+    assert final["guarded"] is False
+
+
+def test_without_a_guard_the_final_event_has_no_guarded_field():
+    provider = FakeProvider([(["ok"], [])])
+    events = list(chat.answer("hi", [], "Test Course", lambda q: [], provider))
+    assert "guarded" not in next(e for e in events if "citations" in e)
+
+
 
 def test_a_tool_that_fails_is_reported_to_the_model_and_the_answer_still_finishes():
     def search(query):
@@ -318,3 +376,52 @@ def test_a_tool_that_fails_is_reported_to_the_model_and_the_answer_still_finishe
     assert "index is locked" in tool_result["content"]
     assert "".join(e["delta"] for e in events if "delta" in e) == "I couldn't search the course just now."
     assert events[-1] == {"done": True}
+
+
+def _tool_names(provider_call):
+    return [t["function"]["name"] for t in provider_call["tools"] or []]
+
+
+def test_listing_tool_is_offered_only_when_the_course_outline_is_given():
+    without = FakeProvider([(["ok"], [])])
+    list(chat.answer("hi", [], "Test Course", lambda q: [], without))
+    assert "list_course_items" not in _tool_names(without.calls[0])
+    assert "list_course_items" not in without.calls[0]["messages"][0]["content"]
+
+    with_list = FakeProvider([(["ok"], [])])
+    list(chat.answer("hi", [], "Test Course", lambda q: [], with_list, list_items=lambda topic, types: ""))
+    assert "list_course_items" in _tool_names(with_list.calls[0])
+    assert "list_course_items" in with_list.calls[0]["messages"][0]["content"]
+
+
+def test_listing_tool_call_passes_topic_and_types_and_returns_the_outline():
+    asked = []
+
+    def list_items(topic, types):
+        asked.append((topic, types))
+        return "Week 3: Elicitation\n- 03 Interviews.pdf (file)"
+
+    provider = FakeProvider(
+        [
+            ([], [ToolCall(id="c1", name="list_course_items", arguments={"topic": "week 3", "types": ["file"]})]),
+            (["Week 3 has one reading: 03 Interviews.pdf."], []),
+        ]
+    )
+    events = list(chat.answer("What are the readings for week 3?", [], "Test Course", lambda q: [], provider, list_items=list_items))
+    assert asked == [("week 3", ["file"])]
+    assert provider.calls[1]["messages"][-1]["content"] == "Week 3: Elicitation\n- 03 Interviews.pdf (file)"
+    final = next(e for e in events if "citations" in e)
+    assert final["citations"] == []  # an outline is names, not a citable source
+
+
+@pytest.mark.parametrize(
+    "arguments, expected",
+    [({}, ("", [])), ({"topic": 3, "types": "file"}, ("", [])), ({"types": ["file", 2, "page"]}, ("", ["file", "page"]))],
+)
+def test_listing_tool_tolerates_missing_or_odd_arguments(arguments, expected):
+    asked = []
+    provider = FakeProvider(
+        [([], [ToolCall(id="c1", name="list_course_items", arguments=arguments)]), (["ok"], [])]
+    )
+    list(chat.answer("list everything", [], "Test Course", lambda q: [], provider, list_items=lambda t, ty: asked.append((t, ty)) or "x"))
+    assert asked == [expected]

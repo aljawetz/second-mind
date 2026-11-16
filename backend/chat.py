@@ -45,6 +45,7 @@ from typing import Callable, Iterator
 
 from llama_index.core.schema import NodeWithScore
 
+import course_items
 import generation
 from query_dates import expand_relative_dates
 from llm import LLMProvider, ToolCall, TurnEnd
@@ -83,6 +84,21 @@ works are not graded work and get a normal answer.
 - Today is {today}. Use it to work out what "today", "tomorrow", "this week" and "next week" mean. Only \
 the course materials say what is due and when, and an assignment already past is not due next week.
 - Answer first, be concise."""
+
+# Added to one turn's system prompt when the graded-work guard (guard.py)
+# flags the question or its follow-up rewrite. The general rule above held on
+# 5 of 6 misuse prompts in Sprint 8; this is the stricter version for the
+# turns that look like misuse (RAG gaps plan, task 7).
+STRICT_GRADED_WORK_RULE = """\
+A check flagged this question as possibly asking for graded work. If it only asks about due dates, rules, \
+grading or where to find something, ignore this note and answer it normally from the course materials, \
+searching as usual. Otherwise, if it asks you to solve, write or answer an exam, quiz, graded assignment, \
+lab or project deliverable: do not give the solution, the final answer, working code, or a filled-in \
+version, not even partly or "as an example" on the same problem. When the graded question itself asks for \
+an explanation, that explanation is the answer: don't write it, give a hint or point to the course material \
+instead. Start by saying in one sentence that you can't do graded work for them. Then help them learn: \
+explain the concept behind it in general, point to the course material that covers it, or offer to give \
+feedback on their own attempt."""
 
 SEARCH_TOOL = {
     "type": "function",
@@ -171,6 +187,42 @@ PAST_CHATS_TOOL = {
             "type": "object",
             "properties": {"query": {"type": "string", "description": "What to look for."}},
             "required": ["query"],
+        },
+    },
+}
+
+LIST_RULES = """
+- list_course_items lists what's in the course on Canvas: the items in its modules (with the files each page \
+links to), other course files, announcements and discussions. Names and kinds only, grouped by module and \
+section, no content. Use it when the student asks for all of something (every reading for week 3, all the \
+lecture slides, what's in a module), since a search only returns the closest few passages. You may list names \
+from it without citations. For what an item says, use search_course and cite it as usual."""
+
+LIST_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "list_course_items",
+        "description": (
+            "List what's in this course on Canvas, grouped by module and section: files, pages, assignments, "
+            "quizzes, discussions and links in its modules (with the files each page links to), then other course "
+            "files, announcements and discussions. Names and kinds only, not content."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "description": (
+                        "Words a module, section or item name must contain, like 'week 3', 'readings' or "
+                        "'unit testing'. Leave out to list everything."
+                    ),
+                },
+                "types": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": course_items.TYPE_NAMES},
+                    "description": "Only these kinds of items. Leave out for all kinds.",
+                },
+            },
         },
     },
 }
@@ -335,6 +387,8 @@ def answer(
     memory=None,
     summary: str = "",
     today: datetime.date | None = None,
+    guard: Callable[[str], bool] | None = None,
+    list_items: Callable[[str, list[str]], str] | None = None,
 ) -> Iterator[dict]:
     """Yields /ask's stream events: {"delta"} text pieces, then one
     {"citations", "grounded"}, then {"done": True}. With `memory` (a
@@ -342,7 +396,13 @@ def answer(
     memories recalled this turn and not forgotten, [{id, text}], so the app
     can show what the answer drew on. The profile isn't listed: it's there
     on every question. `summary` is the conversation's running summary when
-    `history` is only its last few turns (memory.compress).
+    `history` is only its last few turns (memory.compress). `guard` says
+    whether a text looks like a graded-work request (guard.Guard.flags);
+    when it flags the question or its follow-up rewrite, the turn's system
+    prompt gets STRICT_GRADED_WORK_RULE and the final event says
+    "guarded": True.
+    With `list_items` (topic, types -> text, course_items.list_for_course), the
+    model can also list the course's module outline.
 
     Nothing is yielded until the model starts writing its answer, so errors
     from searching or the first model calls surface before the caller has
@@ -410,6 +470,11 @@ def answer(
             for turn in turns:
                 past_used.setdefault(turn.conversation_id, turn.title)
             return format_turns(turns, first_label=first, query=query)
+        if list_items is not None and call.name == "list_course_items":
+            topic = call.arguments.get("topic")
+            types = call.arguments.get("types")
+            types = [t for t in types if isinstance(t, str)] if isinstance(types, list) else []
+            return list_items(topic if isinstance(topic, str) else "", types)
         return "Unknown tool or empty query."
 
     # A tool the model calls runs after the answer may have started
@@ -432,8 +497,11 @@ def answer(
         today=f"{today:%A}, {today:%B} {today.day}, {today.year}",
     )
     tools = [SEARCH_TOOL]
+    if list_items is not None:
+        tools = [SEARCH_TOOL, LIST_TOOL]
+        prompt += LIST_RULES
     if memory is not None:
-        tools = [SEARCH_TOOL, RECALL_TOOL, FORGET_TOOL, PAST_CHATS_TOOL]
+        tools = [*tools, RECALL_TOOL, FORGET_TOOL, PAST_CHATS_TOOL]
         prompt += MEMORY_RULES
         profile = memory.profile_block()
         if profile:
@@ -446,6 +514,11 @@ def answer(
     # rewritten to stand alone (their exact words again if the rewrite fails).
     rewritten = standalone_query(question, history, provider) if history else None
     first_query = rewritten or question
+    guarded = False
+    if guard is not None:
+        guarded = _guard_flags(guard, question) or (rewritten is not None and _guard_flags(guard, rewritten))
+        if guarded:
+            messages[0]["content"] += "\n\n" + STRICT_GRADED_WORK_RULE
     messages.append({"role": "assistant", "content": None, "tool_calls": [_call("search-0", "search_course", {"query": first_query})]})
     messages.append({"role": "tool", "tool_call_id": "search-0", "content": run_search(first_query)})
     # Memory too, for the same reason: left to the model, it would often not
@@ -503,6 +576,8 @@ def answer(
         yield {"delta": tail}
     citations = generation.build_citations([sources[n - 1] for n in renumberer.order])
     final = {"citations": citations, "grounded": bool(citations)}
+    if guard is not None:
+        final["guarded"] = guarded
     if usage_total is not None:
         final["usage"] = usage_total
     if memory is not None:
@@ -510,6 +585,16 @@ def answer(
         final["past_chats_used"] = [{"conversation_id": cid, "title": title} for cid, title in past_used.items()]
     yield final
     yield {"done": True}
+
+
+def _guard_flags(guard: Callable[[str], bool], text: str) -> bool:
+    """The guard only adds a stricter rule, so a failure (missing model
+    files, a bad weights file) must never stop an answer."""
+    try:
+        return bool(guard(text))
+    except Exception:
+        traceback.print_exc(file=sys.stderr)
+        return False
 
 
 def _call(call_id: str, name: str, arguments: dict) -> dict:

@@ -66,11 +66,20 @@
   - Chunk counts before and after on the two local courses.
   - `--retrieval-only` on `sprint8` showing facts found didn't drop.
 
-### 4. One retry when a model reply isn't valid JSON (beta)
+### 4. One retry when a model reply isn't valid JSON (beta) — built on branch `json-retry`
 
 - **Why:** `llm.complete_json` returns `None` on bad JSON. Memory extraction then saves nothing for that turn. Consolidation falls back to adding a memory, which can create duplicates. Copilot has no JSON mode, so it's more exposed.
 - **Build:** on a parse failure or a reply of the wrong shape, one retry that adds "Return exactly one valid JSON object." Count retries in the log.
 - **Proof:** tests for retry-then-success and retry-then-give-up.
+- **Built (2026-11-13):**
+  - `json_retry.complete_json(llm, messages, valid=..., label=...)` wraps any provider, so OpenAI, DeepSeek and Copilot all get it. A reply that is `None` (not JSON) or fails the caller's `valid` check gets one more call with a reminder appended. A second failure returns `None`, which every caller already handles.
+  - Provider errors (network, auth) aren't retried.
+  - Each retry is logged with its caller and outcome (recovered or gave up), and counted. `memory_eval.py` prints the counts at the end of a run.
+  - It lives in its own module so the `memory/` package doesn't import the OpenAI client.
+  - Used by memory extraction (needs a `memories` list), consolidation (needs a known decision and a valid target), and quiz/flashcard writing and checking in `study.py`. Bad items inside a usable list are still dropped one by one, not retried.
+  - **Not used by the follow-up rewrite** (`chat.standalone_query`). It runs while the student waits, a retry would add about a second, and a failed rewrite already falls back to the student's own words plus the forced search.
+  - 18 new tests. All 681 backend tests pass (9 skipped).
+- **Left:** how often retries happen with real models isn't measured. A cached `memory_eval.py` run doesn't call extraction, so it needs a run that writes memories afresh.
 
 ### 5. Build the memory evaluation (final) — development sample done, in PR #56
 
@@ -100,7 +109,7 @@
   4. The report in `docs/evaluations/`. The results so far are in PR #56's description and commit messages.
 - **Proof so far:** PR #56.
 
-### 6. A grader you can trust (final)
+### 6. A grader you can trust (final) — steps 1 to 3 done on branch `grader-check`
 
 - **Why:** Sprint 8 called the automatic grader "too noisy to trust", and "have a person grade a fixed sample" is still open. The final needs believable answer-quality numbers.
 - **Build:**
@@ -109,8 +118,20 @@
   3. Try the course's pairwise format (old answer vs new answer, verdict first) and keep whichever agrees with people more.
   4. Add generated questions that need two documents, to grow the 60-question set.
 - **Proof:** the agreement numbers and the chosen grading method, written up in `docs/evaluations/`.
+- **Done (2026-11-13), [report](../evaluations/2026-11-grader-check/report.md):**
+  - **Sample:** 20 `sprint9-chat` turns, each with two answers: the shipped chat and the no-search baseline, both on gpt-4o-mini. Graded blind by one person, split into a tuning half and a reporting half.
+  - **Picks:** the judge picked the same better answer on 20 of 20 turns, in both formats.
+  - **Grades:** pointwise grades matched on 32 of 40 answers (kappa 0.82 on the tuning half, 0.52 on the reporting half). All 8 misses are the judge one step stricter.
+  - **Order:** the pairwise verdict never changed with the order of the answers.
+  - **Decision:** keep the pointwise judge, prompt unchanged. Trust it for comparisons against a baseline, and read its "good" counts as a lower bound.
+  - **Code:** `backend/scripts/grader_check.py`, and `--model` in `ask_modes_eval.py`. Mode G also no longer sends a temperature that gpt-5-mini rejects.
+- **Left:**
+  - Step 4 (two-document questions).
+  - A second grader.
+  - A close pair (two versions of the chat) to test the judge where Sprint 8 found it noisy.
+  - Flagged answers from task 2, once the outside tester has used it.
 
-### 7. A classifier guard for graded-work requests (final)
+### 7. A classifier guard for graded-work requests (final) — built, on branch `classifier-guard`
 
 - **Why:** the "don't do graded work" rule is prompt-only, and it held on 5 of 6 misuse prompts in Sprint 8. The course's method is a logistic regression on question embeddings that switches to a stricter prompt instead of refusing outright. It costs one local embedding, which the bge model already loaded can do.
 - **Build:**
@@ -118,9 +139,40 @@
   - The classifier, loaded at startup.
   - A high score adds a stricter instruction to that turn's system prompt.
 - **Proof:** held-out accuracy and false-alarm rate. Misuse prompts refused before and after. Normal study questions still answered.
+- **Proof so far:** `docs/evaluations/2026-11-classifier-guard/report.md`. Held-out: 26 of 32 misuse caught, 4 of 65 false alarms (2 of 113 on frozen turns). Chat on gpt-4o-mini, graded by hand: a clear refusal on 29 of 32 misuse requests with the guard vs 23 without, work handed over 1 vs 2. The flagged "when is homework 2 due?" still gets its date 6 of 6. The guard loads on the first question, not at startup.
 
 ### 8. Listing questions (final, if time)
 
 - **Why:** "What are all the readings for week 3?" can't be answered from five search results. The course adds an "available documents" overview for this.
 - **Build:** decide with the generative UI plan first. Its `show_deadlines` covers assignments and due dates. What's left is files, pages and lectures. A `list_course_items` tool built from the synced Canvas data would cover them.
 - **Proof:** a few listing questions added to the eval, answered before and after.
+- **Decided (2026-11-15):** `show_deadlines` is still only proposed, so due dates stay with it. Task 8 saves the course outline at sync (module, sub-header section, title, kind) in each course's `manifest.db`, and chat gets a `list_course_items` tool (topic in whole words, item types). Names from it need no citation.
+- **Found on the way: the sync only read Modules.** 18-658 lists no files in its Modules; all 46 of its readings are links in its pages and syllabus, so none were searchable. 56350's Files tab has 24 files no module lists, and 13 announcements nothing read. The sync now covers the whole course menu: files from module items, the Files tab and links in every text it reads (Home, Syllabus, pages, assignments, announcements, discussions), plus announcements and discussion posts as their own kinds. Exam-like files are indexed like any other, by choice.
+- **Live sync into a copy of `~/.secondmind` (the frozen-eval index untouched):**
+
+  | | 18-658 (55016) | 56350 |
+  | --- | --- | --- |
+  | Files indexed, before → after | 0 → 37 (8 images skipped) | 7 → 29 (3 unsupported skipped) |
+  | New announcements / discussions | 0 / 2 | 13 / 0 |
+  | Failures | 0 | 0 |
+  | First-sync time | 14.4 min (two whole textbooks took ~7.5) | 76 s |
+
+  Index on disk: 3.0 MB → 17 MB for both courses. The outline lists each Task page's readings under it ("Linked from Task 3 Resources": 8 files).
+- **Next, as its own change:** a faster first sync. Names and outline first (seconds), content indexed in the background with pages and small files first, and files over a size limit last, with an opt-out per file. Syncing costs no money: Canvas API, local extraction, OCR and embeddings.
+- **Faster first sync, rule agreed:** a PDF over 150 pages (page count read from the PDF's header after download, 0.25 s for 722 pages), any other file whose text is longer than a 150-page PDF (about 450,000 characters), or any file over 50 MB (from Canvas's size, before download) waits until the student turns it on. Decided: a long PDF's first 150 pages are indexed as a preview, labeled ("About Face: 150 of 722 pages indexed") in the outline and for the model, so chat says it has only part of the book instead of "not covered". The pages a course assigns are often later (Cooper p507–554, p655–659), so indexing the page ranges the course pages cite is a later option.
+- **Listing eval (`scripts/listing_eval.py`, 2026-11-15):** 8 questions with full answers taken from the outline, on the synced copy, `gpt-4o-mini`, 2 runs per variant. Answers kept in `~/second-mind-local/2026-11-listing/` (they quote course text).
+
+  | Question | Without tool | With tool | Tool called |
+  | --- | --- | --- | --- |
+  | L1 Task 3 readings (hand key, 11) | 11, 11 | 11, 11 | no |
+  | L2 Task 4 resources (hand key, 19) | 12, 12 | 12, 12 | no |
+  | L3 class preparation readings (hand key, 18) | 4, 5 | 4, 5 | yes, list ignored |
+  | L4 pages in the Task 1 module (5) | 0, 0 | 5, 5 | yes |
+  | L5 Field Project assignments (3) | 3, 3 | 3, 3 | yes |
+  | L6 week 2 literature review materials (5) | 2, 2 | 2, 5 | yes |
+  | L7 all announcements (13) | 3, 3 | 13, 13 | yes |
+  | L8 all sprint deliverables (9) | 5, 5 | 9, 9 | yes |
+
+  Median time 5.0 s against 5.2 s; about 40% more tokens. The first run found the model asking for "sprint deliverables" when "Sprint" is in the item names and "Deliverables" in the module's: a topic now falls back to every word anywhere when the phrase matches nothing, with a plural "s" ignored.
+- **What the listing tool doesn't fix:** a list held inside one long page. Task 4 Resources is two search chunks and only the first came back (L2); Class Preparation is about 45 chunks over 14 weeks (L3), and the answers mixed in page numbers from other pages. That needs a tool that reads a whole page or file by name: a candidate next task.
+- **Left:** the faster first sync (its own change). The frozen Sprint 8/9 sets were written against the old index, so a re-synced index changes what they measure; re-sync the real index after this merges.

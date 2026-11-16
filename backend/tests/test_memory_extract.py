@@ -194,12 +194,34 @@ def test_task_ref_hint_is_a_name_or_nothing():
     [None, "not json at all", [], {}, {"memories": "oops"}, {"memories": [5, "x", None]}, {"summary": 42}],
 )
 def test_a_malformed_reply_gives_no_memories_and_keeps_the_old_summary(reply):
-    # Runs in the background worker: a strange reply must not crash it, and
-    # must not wipe out the summary the conversation already has.
-    result = extract.extract(TURN, at=AT, summary="Old summary.", llm=ScriptedLLM(reply))
+    # Runs in the background worker: a strange reply (given again on the
+    # retry) must not crash it, and must not wipe out the summary the
+    # conversation already has.
+    result = extract.extract(TURN, at=AT, summary="Old summary.", llm=ScriptedLLM(reply, reply))
 
     assert result.memories == []
     assert result.summary == "Old summary."
+
+
+@pytest.mark.parametrize("bad", [None, "not json at all", {}, {"memories": "oops"}, {"summary": "only a summary"}])
+def test_an_unusable_reply_is_asked_for_once_more(bad):
+    llm = ScriptedLLM(bad, {"memories": [_mem()], "summary": "Talked about teams."})
+
+    result = extract.extract(TURN, at=AT, summary="Old summary.", llm=llm)
+
+    assert len(llm.calls) == 2
+    assert "valid JSON object" in llm.calls[1][-1]["content"]
+    assert [m.text for m in result.memories] == ["The student is on team 4 with Priya."]
+    assert result.summary == "Talked about teams."
+
+
+def test_bad_items_in_a_memories_list_are_dropped_not_retried():
+    llm = ScriptedLLM({"memories": [5, _mem()], "summary": "s"})
+
+    result = extract.extract(TURN, at=AT, summary="", llm=llm)
+
+    assert len(llm.calls) == 1
+    assert len(result.memories) == 1 and result.dropped == [("", "malformed")]
 
 
 def test_the_summary_is_kept_to_150_words():

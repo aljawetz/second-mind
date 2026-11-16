@@ -104,6 +104,33 @@ def test_list_course_files_403_degrades_to_empty():
     assert files == []
 
 
+@respx.mock
+def test_list_announcements_reads_every_one_not_just_the_last_two_weeks():
+    """/announcements returns only the last 14 days by default (56350 showed
+    2 of its 13); discussion_topics with only_announcements returns them all."""
+    route = respx.get(f"{BASE}/courses/56350/discussion_topics").mock(
+        return_value=httpx.Response(200, json=[{"id": 1, "title": "Class This Tuesday", "message": "<p>Room 101</p>"}])
+    )
+    assert [a["id"] for a in canvas.list_announcements(56350)] == [1]
+    assert route.calls[0].request.url.params["only_announcements"] == "true"
+
+
+@respx.mock
+def test_list_discussions_leaves_announcements_out():
+    route = respx.get(f"{BASE}/courses/55016/discussion_topics").mock(
+        return_value=httpx.Response(200, json=[{"id": 838803, "title": "Updates", "message": "<p>Post weekly</p>"}])
+    )
+    assert [d["title"] for d in canvas.list_discussions(55016)] == ["Updates"]
+    assert "only_announcements" not in route.calls[0].request.url.params
+
+
+@respx.mock
+def test_discussion_listing_403_degrades_to_empty():
+    respx.get(f"{BASE}/courses/1/discussion_topics").mock(return_value=httpx.Response(403, json={}))
+    assert canvas.list_discussions(1) == []
+    assert canvas.list_announcements(1) == []
+
+
 # --- Retries on transient failures -------------------------------------------
 # A real sync lost a file to one "_ssl.c: The handshake operation timed out"
 # on get_file; the same request succeeded moments later.
