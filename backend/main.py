@@ -1,5 +1,6 @@
 """Sidecar backend — see docs/architecture/implementation-plan.md."""
 
+import collections
 import errno
 import itertools
 import json
@@ -78,10 +79,14 @@ class _MemoryWorkerProxy:
 
 MEMORY_WORKER = _MemoryWorkerProxy()
 
+_SYNC_LOCKS: "collections.defaultdict[int, threading.Lock]" = collections.defaultdict(threading.Lock)
+
 COURSE_PATH = re.compile(r"^/courses/(\d+)$")
 UNSELECT_PATH = re.compile(r"^/courses/(\d+)/unselect$")
 ASK_PATH = re.compile(r"^/courses/(\d+)/ask$")
 SYNC_PATH = re.compile(r"^/courses/(\d+)/sync$")
+LARGE_FILES_PATH = re.compile(r"^/courses/(\d+)/large-files$")
+LARGE_FILE_PATH = re.compile(r"^/courses/(\d+)/large-files/(\d+)$")
 ASSIGNMENTS_PATH = re.compile(r"^/courses/(\d+)/assignments$")
 EXPLAIN_PATH = re.compile(r"^/courses/(\d+)/assignments/(\d+)/explain$")
 SESSION_LIST_PATH = re.compile(r"^/courses/(\d+)/sessions$")
@@ -321,6 +326,10 @@ class Handler(BaseHTTPRequestHandler):
             if conversation_list_match:
                 self._handle_list_conversations(conversation_list_match.group(1))
                 return
+            large_files_match = LARGE_FILES_PATH.match(path)
+            if large_files_match:
+                self._handle_list_large_files(large_files_match.group(1))
+                return
             feedback_list_match = FEEDBACK_LIST_PATH.match(path)
             if feedback_list_match:
                 self._handle_list_feedback(feedback_list_match.group(1))
@@ -546,6 +555,11 @@ class Handler(BaseHTTPRequestHandler):
         feedback_match = TURN_FEEDBACK_PATH.match(path)
         if feedback_match:
             self._handle_turn_feedback(*feedback_match.groups())
+            return
+
+        large_file_match = LARGE_FILE_PATH.match(path)
+        if large_file_match:
+            self._handle_set_large_file(*large_file_match.groups())
             return
 
         sync_match = SYNC_PATH.match(path)
@@ -1082,10 +1096,61 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Transfer-Encoding", "chunked")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
-        for event in course_sync.sync_course(int(course_id), SM_HOME):
-            self._write_chunk(event)
+        # One sync per course at a time: the launch sync and a "sync whole
+        # file" from Manage courses can otherwise write one manifest at once.
+        with _SYNC_LOCKS[int(course_id)]:
+            for event in course_sync.sync_course(int(course_id), SM_HOME):
+                self._write_chunk(event)
         self.wfile.write(b"0\r\n\r\n")
         self.wfile.flush()
+
+    def _large_files_conn(self, course_id: int):
+        """The course's manifest, or None when it was never synced (nothing
+        is created just by asking)."""
+        import sync
+
+        path = SM_HOME / "courses" / str(course_id) / "manifest.db"
+        return sync.open_manifest(path) if path.exists() else None
+
+    def _handle_list_large_files(self, course_id: str):
+        import large_files
+
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        conn = self._large_files_conn(int(course_id))
+        if conn is None:
+            self._send_json(200, {"files": []})
+            return
+        try:
+            self._send_json(200, {"files": large_files.rows(conn)})
+        finally:
+            conn.close()
+
+    def _handle_set_large_file(self, course_id: str, file_id: str):
+        """{"full": true} indexes the whole file on the next sync; false goes
+        back to the preview (large_files.py)."""
+        import large_files
+
+        data = self._read_json_body()
+        if data is None:
+            return
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        if not isinstance(data.get("full"), bool):
+            self._send_json(400, {"error": {"code": "bad_request", "message": "full must be true or false"}})
+            return
+        conn = self._large_files_conn(int(course_id))
+        try:
+            found = conn is not None and large_files.set_want_full(conn, file_id, data["full"])
+        finally:
+            if conn is not None:
+                conn.close()
+        if not found:
+            self._not_found("no such large file")
+            return
+        self._send_json(200, {"file_id": file_id, "want_full": data["full"]})
 
     def _handle_explain(self, course_id: str, assignment_id: str):
         import explain

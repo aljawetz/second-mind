@@ -100,6 +100,15 @@ def group_rows(group: str, titles: list[str], item_type: str) -> list[dict]:
     ]
 
 
+def label_files(rows: list[dict], labels: dict[str, str]) -> list[dict]:
+    """Adds large_files.py's note after a file's name ("About Face.pdf
+    (first 150 of 722 pages synced)"), so a listing shows what's searchable."""
+    return [
+        {**r, "title": f"{r['title']} ({labels[r['title']]})"} if r["item_type"] == "file" and labels.get(r["title"]) else r
+        for r in rows
+    ]
+
+
 def save_outline(conn: sqlite3.Connection, rows: list[dict]) -> None:
     """Replaces the whole outline: modules have no ids or dates worth
     diffing, and the listing is cheap to rewrite."""
