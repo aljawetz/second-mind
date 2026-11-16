@@ -1,13 +1,10 @@
 {
   "mcpServers": {
     "courses": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "${SM_SERVER_SOURCE:-git+https://github.com/aljawetz/second-mind@plugin-v0.1.0#subdirectory=plugin/server}",
-        "sm-mcp"
-      ],
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/sm-mcp",
+      "args": [],
       "env": {
+        "SM_SERVER_SOURCE": "${SM_SERVER_SOURCE:-}",
         "SM_HOME": "${SM_HOME:-${CLAUDE_PLUGIN_DATA}}",
         "SM_MODELS_DIR": "${SM_MODELS_DIR:-${CLAUDE_PLUGIN_DATA}/models}",
         "SM_CANVAS_URL": "${user_config.canvas_base_url}",

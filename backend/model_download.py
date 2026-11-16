@@ -93,9 +93,13 @@ def _download(client: httpx.Client, name: str, model_dir: Path, progress) -> Non
 
 
 def _print_progress(name: str, done: int, total: int | None) -> None:
-    mb = done / 1e6
-    line = f"{name}: {mb:.0f} MB" + (f" of {total / 1e6:.0f} MB" if total else "")
-    print(f"\r{line}", end="", file=sys.stderr, flush=True)
+    """One line per 25 MB, not a redrawn bar: the setup skill reads this
+    through Claude's Bash tool, where every redraw would be a line."""
+    step = 25_000_000
+    if done != total and done // step == (done - CHUNK) // step:
+        return
+    line = f"{name}: {done / 1e6:.0f} MB" + (f" of {total / 1e6:.0f} MB" if total else "")
+    print(line, file=sys.stderr, flush=True)
 
 
 def main() -> None:
@@ -106,6 +110,6 @@ def main() -> None:
     try:
         path = ensure_embedding_model(progress=_print_progress)
     except ModelDownloadError as e:
-        print(f"\n{e}", file=sys.stderr)
+        print(e, file=sys.stderr)
         raise SystemExit(1)
-    print(f"\nEmbedding model ready in {path}", file=sys.stderr)
+    print(f"Embedding model ready in {path}", file=sys.stderr)

@@ -253,9 +253,10 @@ def _index_rows(home: Path, course_id: int) -> list[dict]:
 def _canvas_failure(error: Exception) -> str:
     """Why Canvas gave nothing, in the words of plan Decision 14."""
     if isinstance(error, httpx.HTTPStatusError) and error.response.status_code == 401:
-        return "Your Canvas token no longer works (run /config and paste a new one)"
+        return ("Your Canvas token no longer works (make a new one in Canvas and paste it in /plugin > Installed > "
+                "second-mind > Configure options, then run /reload-plugins)")
     if isinstance(error, canvas.CanvasError):
-        return "No Canvas token is set up"
+        return "No Canvas token is set up (run /second-mind:setup)"
     return "Canvas could not be reached"
 
 
