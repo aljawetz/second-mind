@@ -1,30 +1,28 @@
-# Second Mind plugin for Claude Code (M0 spike)
+# Second Mind plugin for Claude Code
 
-This is the spike from `docs/plans/2026-11-13-claude-code-plugin.md`. It is not installable yet: the
-MCP server runs from `../backend` with `uv`, so it only works from a checkout of this repo. Packaging
-(`uvx` from a git tag) is M1.
+Work in progress toward a release (`docs/plans/2026-11-13-claude-code-plugin.md`).
 
 What it has:
 
-- `.mcp.json`: the `courses` MCP server (`backend/mcp_server.py`) with `list_courses` and
-  `search_course_material`.
-- `skills/ask`: search first, cite every course fact with its source label, label general knowledge,
-  and don't do graded work.
+- `.mcp.json`: the `courses` MCP server, started with `uvx` from the `second-mind-mcp` package in
+  `server/` (on GitHub at the release tag; `SM_SERVER_SOURCE` overrides it). Tools: `list_courses`,
+  `search_course_material`, `list_assignments`.
+- `skills/ask`: picks the tool, cites every course fact as a link to its Canvas page, labels general
+  knowledge, and doesn't do graded work.
+- `evals/`: the tool and skill suite (`claude plugin eval plugin/`).
 
-It reads the index the app already built in `~/.secondmind` (set `SM_HOME` to read another one), so
-sync your courses in the app first.
+For now it reads the index the app built in `~/.secondmind`; setup and sync inside the plugin are next.
 
 ## Try it
 
 From the repo root, with `uv` installed:
 
 ```bash
-cd backend && uv sync --inexact --extra mcp && cd ..
-claude --plugin-dir ./plugin
+./plugin/dev.sh
 ```
 
-Then ask a course question, or run `/second-mind:ask When is the final exam?`. Run `/mcp` to check that
-`plugin:second-mind:courses` is connected.
+It runs this checkout's server and plugin with nothing else loaded. The first run downloads the
+server's dependencies (about 250 MB, under a minute); later starts take about 2 seconds.
 
 ## Evaluate it
 

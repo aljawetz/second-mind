@@ -80,6 +80,8 @@ def test_environment_turns_off_claude_ai_connectors_and_pins_the_date(eval_mod, 
         "ENABLE_CLAUDEAI_MCP_SERVERS": "false",
         "SM_QUERY_LOG": str(tmp_path / "q.jsonl"),
         "SM_TODAY": "2026-10-21",
+        "SM_SERVER_SOURCE": str(eval_mod.PLUGIN_DIR / "server"),
+        "SM_MODELS_DIR": str(eval_mod.PLUGIN_DIR.parent / "backend" / "models"),
     }
 
 

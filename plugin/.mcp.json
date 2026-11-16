@@ -1,17 +1,15 @@
 {
   "mcpServers": {
     "courses": {
-      "command": "uv",
+      "command": "uvx",
       "args": [
-        "run",
-        "--inexact",
-        "--extra",
-        "mcp",
-        "--directory",
-        "${CLAUDE_PLUGIN_ROOT}/../backend",
-        "python",
-        "mcp_server.py"
-      ]
+        "--from",
+        "${SM_SERVER_SOURCE:-git+https://github.com/aljawetz/second-mind@plugin-v0.1.0#subdirectory=plugin/server}",
+        "sm-mcp"
+      ],
+      "env": {
+        "SM_MODELS_DIR": "${SM_MODELS_DIR:-}"
+      }
     }
   }
 }

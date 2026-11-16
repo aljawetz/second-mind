@@ -43,6 +43,10 @@ logger = logging.getLogger("sm-mcp")
 
 DEFAULT_K = 5
 MAX_K = 10
+# Whole chunks, as the app's chat shows them (chat.SNIPPET_CHARS: chunks top
+# out near 3,800 characters and answers often sit past the first 1,500).
+SNIPPET_CHARS = 4000
+NO_RESULTS = "No matching course material found for this search."
 
 INSTRUCTIONS = (
     "Second Mind answers from the student's own Canvas courses. What the material says (slides, readings, "
@@ -166,8 +170,8 @@ class Searcher:
         self._retrievers: dict[int, object] = {}
 
     def search(self, course_id: int, query: str, k: int = DEFAULT_K) -> dict:
-        import chat
         import generation
+        import query_dates
 
         k = max(1, min(int(k), MAX_K))
         # Checked only until the course's retriever exists: a missing course
@@ -186,7 +190,7 @@ class Searcher:
         start = time.perf_counter()
         if course_id not in self._retrievers:
             self._retrievers[course_id] = self._make(course_id)
-        expanded = chat.expand_relative_dates(query, self._today())
+        expanded = query_dates.expand_relative_dates(query, self._today())
         nodes = list(self._retrievers[course_id].retrieve(expanded))[:k]
         citations = generation.build_citations(nodes)
         origin = citation_links.canvas_origin(self._home)
@@ -195,7 +199,7 @@ class Searcher:
                 "n": n,
                 "source": citation["label"],
                 "url": citation_links.canvas_url(origin, course_id, citation["source_type"], citation["item_id"]),
-                "text": node_with_score.node.get_content()[: chat.SNIPPET_CHARS],
+                "text": node_with_score.node.get_content()[:SNIPPET_CHARS],
             }
             for n, (citation, node_with_score) in enumerate(zip(citations, nodes), start=1)
         ]
@@ -204,7 +208,7 @@ class Searcher:
         _log_query(course_id, query, results, seconds)
         out = {"course_id": course_id, "query": expanded, "results": results}
         if not results:
-            out["note"] = chat.NO_RESULTS
+            out["note"] = NO_RESULTS
         return out
 
 
@@ -302,6 +306,16 @@ def build_server(home: Path | None = None, searcher: Searcher | None = None, nam
 
 
 def main() -> None:
+    if "--version" in sys.argv[1:]:
+        # Used to warm uvx's cache before Claude Code's first start (plan
+        # Decision 4): installs everything, imports nothing heavy.
+        from importlib.metadata import PackageNotFoundError, version
+
+        try:
+            print(version("second-mind-mcp"))
+        except PackageNotFoundError:
+            print("dev")
+        return
     logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     build_server().run("stdio")
 

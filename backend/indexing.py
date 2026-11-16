@@ -42,8 +42,16 @@ CHUNK_OVERLAP = 60  # ~15%, same ratio as before
 # tiktoken's count could exceed BGE's real 512-token limit (which is what
 # originally crashed onnxruntime — embeddings.py's truncation stays as a
 # safety net, but this is the correct fix at the source).
-_bge_tokenizer = Tokenizer.from_file(str(MODEL_DIR / "tokenizer.json"))
-_tokenize = lambda text: _bge_tokenizer.encode(text).tokens
+# Loaded on first use, not at import: the plugin's server imports this
+# module before setup has downloaded the models (tests/test_plugin_imports.py).
+_bge_tokenizer: Tokenizer | None = None
+
+
+def _tokenize(text: str) -> list[str]:
+    global _bge_tokenizer
+    if _bge_tokenizer is None:
+        _bge_tokenizer = Tokenizer.from_file(str(MODEL_DIR / "tokenizer.json"))
+    return _bge_tokenizer.encode(text).tokens
 
 # Real finding (Step 9, only caught by actually running the frozen binary,
 # not `uv run python3`): tiktoken isn't just SentenceSplitter's default —

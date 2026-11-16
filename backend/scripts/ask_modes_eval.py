@@ -996,12 +996,16 @@ def plugin_command(question: str, course_id: int, course_name: str, session_id: 
 def plugin_env(query_log: Path, today: datetime.date = EVAL_TODAY, base: dict | None = None) -> dict:
     """claude.ai connectors (Gmail, Drive, ...) would add their tools to every
     request: about 8x the tokens in a first try, and unrelated tools. The MCP
-    server reads SM_QUERY_LOG and SM_TODAY (mcp_server.py)."""
+    server reads SM_QUERY_LOG and SM_TODAY (mcp_server.py), and plugin/.mcp.json
+    reads SM_SERVER_SOURCE and SM_MODELS_DIR."""
     return {
         **(os.environ if base is None else base),
         "ENABLE_CLAUDEAI_MCP_SERVERS": "false",
         "SM_QUERY_LOG": str(query_log),
         "SM_TODAY": today.isoformat(),
+        # This checkout's server and models, not the release on GitHub.
+        "SM_SERVER_SOURCE": str(PLUGIN_DIR / "server"),
+        "SM_MODELS_DIR": str(PLUGIN_DIR.parent / "backend" / "models"),
     }
 
 

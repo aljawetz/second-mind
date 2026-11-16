@@ -18,13 +18,16 @@ load_reranker() returns None and search falls back to rank fusion only.
 """
 
 import logging
+import os
 from pathlib import Path
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
-MODEL_DIR = Path(__file__).parent / "models" / "ms-marco-MiniLM-L-6-v2-onnx"
+# SM_MODELS_DIR: where the plugin keeps downloaded models (the installed
+# package has no models/ next to it). Unset: the repo's models/, as before.
+MODEL_DIR = Path(os.environ.get("SM_MODELS_DIR") or Path(__file__).parent / "models") / "ms-marco-MiniLM-L-6-v2-onnx"
 MAX_SEQ_LENGTH = 512  # the model's own tokenizer_config.json model_max_length
 BATCH_SIZE = 8
 

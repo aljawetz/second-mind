@@ -83,6 +83,11 @@ jobs:
             uv run python3 scripts/convert_embedding_model.py
           fi
 
+      - name: Plugin server package builds and starts
+        # The package students install with uvx: builds from plugin/server
+        # (backend modules copied in) and starts without the app's LLM stack.
+        run: uvx --from ./plugin/server sm-mcp --version
+
       - name: Run tests
         working-directory: backend
         run: |

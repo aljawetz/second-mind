@@ -13,7 +13,6 @@ from llama_index.core.query_engine import CitationQueryEngine
 from llama_index.core.schema import NodeRelationship, NodeWithScore, QueryBundle
 from llama_index.core.vector_stores.utils import metadata_dict_to_node
 
-import providers
 import reranker as reranker_module
 
 # Shown when grounded=False (design spec §7: "if indexed material does not
@@ -204,6 +203,11 @@ def rerank(reranker, query: str, nodes: list[NodeWithScore], top_n: int, min_sco
 
 
 def build_query_engine(index, streaming: bool = True) -> CitationQueryEngine:
+    # Imported here, not at the top: retrieval (HybridRetriever, rerank,
+    # citations) is also the Claude Code plugin's search, which must not pull
+    # in the LLM providers and openai (tests/test_plugin_imports.py).
+    import providers
+
     llm = providers.llama_llm()
     return CitationQueryEngine.from_args(
         index,
