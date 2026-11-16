@@ -1,0 +1,14 @@
+{
+  "name": "second-mind",
+  "owner": {
+    "name": "Second Mind team"
+  },
+  "description": "Second Mind: your Canvas courses inside Claude Code.",
+  "plugins": [
+    {
+      "name": "second-mind",
+      "source": "./plugin",
+      "description": "Answers questions about your Canvas courses from your own course materials, with citations."
+    }
+  ]
+}

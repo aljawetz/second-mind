@@ -10,7 +10,16 @@
 set -eu
 
 UV_VERSION=0.9.28
-SOURCE="${SM_SERVER_SOURCE:-git+https://github.com/aljawetz/second-mind@plugin-v0.1.0#subdirectory=plugin/server}"
+# Run from a repo checkout (dev.sh, or a marketplace added from a local path,
+# which Claude Code loads in place): that checkout's server. Installed from
+# GitHub, the plugin is a copy without the backend: the release tag.
+PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+if [ -f "$PLUGIN_DIR/../backend/mcp_server.py" ]; then
+  DEFAULT_SOURCE="$PLUGIN_DIR/server"
+else
+  DEFAULT_SOURCE="git+https://github.com/aljawetz/second-mind@plugin-v0.1.0#subdirectory=plugin/server"
+fi
+SOURCE="${SM_SERVER_SOURCE:-$DEFAULT_SOURCE}"
 DATA="${CLAUDE_PLUGIN_DATA:-$HOME/.second-mind-plugin}"
 UV_DIR="$DATA/uv"
 

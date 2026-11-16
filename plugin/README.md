@@ -22,6 +22,22 @@ does the same up front.
 first model download); `sync_status` reports progress. On a machine with nothing installed, setup takes about
 a minute and a half for a small course.
 
+## Install
+
+```text
+/plugin install second-mind --marketplace aljawetz/second-mind
+```
+
+Then run `/second-mind:setup`. (Not published yet: the release tag `plugin-v0.1.0` doesn't exist.)
+
+To test the install flow before publishing, add this checkout as a local marketplace. Claude Code runs the
+plugin from the checkout, with its own fresh data folder, as a student would:
+
+```text
+/plugin marketplace add /path/to/second-mind
+/plugin install second-mind@second-mind
+```
+
 ## Try it
 
 From the repo root, with `uv` installed:
