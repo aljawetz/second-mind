@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { getStudy, saveStudyProgress, type Citation, type QuizQuestion, type StudyArtifact } from "../../sidecar";
+import {
+  exportQuizForKahoot,
+  getStudy,
+  saveStudyProgress,
+  type Citation,
+  type QuizQuestion,
+  type StudyArtifact,
+} from "../../sidecar";
 
 // A quiz the way NotebookLM runs one: one question at a time, a hint before
 // answering, a short explanation of the right and the chosen answer after,
@@ -37,6 +44,8 @@ export default function QuizView({
   const [position, setPosition] = useState(0);
   const [finished, setFinished] = useState(false);
   const [hintOpen, setHintOpen] = useState(false);
+  const [exported, setExported] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +89,23 @@ export default function QuizView({
   function finish() {
     setFinished(true);
     save({ finished: true });
+  }
+
+  async function exportForKahoot(format: "xlsx" | "pdf") {
+    setExporting(true);
+    // The first export may rewrite long questions with the LLM, which takes a while.
+    setExported("Preparing the file for Kahoot, shortening anything over its limits…");
+    try {
+      const { path, shortened } = await exportQuizForKahoot(courseId, artifactId, format);
+      const note = shortened.length
+        ? ` Shortened question ${shortened.join(", ")} to fit Kahoot's limits (120 characters per question, 75 per answer).`
+        : "";
+      setExported(`Saved to ${path}.${note}`);
+    } catch (err) {
+      setExported(err instanceof Error ? err.message : "Couldn't save the file");
+    } finally {
+      setExporting(false);
+    }
   }
 
   function restart(keepAnswers: boolean) {
@@ -133,7 +159,16 @@ export default function QuizView({
             <span className="study-sub">
               Quiz · {quiz.options.difficulty[0].toUpperCase() + quiz.options.difficulty.slice(1)} · {questions.length} questions
             </span>
+            <div className="study-tools">
+              <button type="button" className="text-btn" disabled={exporting} onClick={() => void exportForKahoot("xlsx")}>
+                Kahoot spreadsheet
+              </button>
+              <button type="button" className="text-btn" disabled={exporting} onClick={() => void exportForKahoot("pdf")}>
+                Kahoot PDF
+              </button>
+            </div>
           </div>
+          {exported && <p className="study-note">{exported}</p>}
 
           {finished ? (
             <div className="study-card quiz-results">

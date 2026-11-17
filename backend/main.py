@@ -1411,20 +1411,40 @@ class Handler(BaseHTTPRequestHandler):
         import study
 
         length = int(self.headers.get("Content-Length", 0))
-        if length:
-            self.rfile.read(length)
+        try:
+            body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+        except ValueError:
+            body = {}
         if not self._course_selected(int(course_id)):
             self._not_found()
             return
+        # {"format": "kahoot-xlsx" | "kahoot-pdf"} for a quiz to upload to Kahoot; CSV otherwise.
+        fmt = body.get("format") if isinstance(body, dict) else None
+        kahoot = fmt in ("kahoot-xlsx", "kahoot-pdf")
+        model = None
+        if kahoot:
+            import llm
+
+            # Shortens what Kahoot would refuse; without a provider the
+            # export still works, cutting the text instead.
+            try:
+                model = llm.current_provider()
+            except LLM_ERRORS:
+                model = None
         try:
-            path = study.export_csv(SM_HOME, int(course_id), artifact_id, DOWNLOADS_DIR)
+            if kahoot:
+                path, shortened = study.export_kahoot(
+                    SM_HOME, int(course_id), artifact_id, DOWNLOADS_DIR, fmt.removeprefix("kahoot-"), llm=model
+                )
+            else:
+                path, shortened = study.export_csv(SM_HOME, int(course_id), artifact_id, DOWNLOADS_DIR), None
         except KeyError:
-            self._not_found("no such quiz or deck")
+            self._not_found("no such quiz" if kahoot else "no such quiz or deck")
             return
         except OSError as e:
             self._send_json(500, {"error": {"code": "export_failed", "message": f"couldn't save the file: {e.strerror}"}})
             return
-        self._send_json(200, {"path": str(path)})
+        self._send_json(200, {"path": str(path)} | ({"shortened": shortened} if kahoot else {}))
 
     def _handle_study_delete(self, course_id: str, artifact_id: str):
         import study

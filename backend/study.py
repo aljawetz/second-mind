@@ -579,14 +579,61 @@ def export_csv(sm_home: Path, course_id: int, artifact_id: str, out_dir: Path) -
         for i, card in enumerate(artifact["items"]):
             if i not in removed:
                 writer.writerow([card["front"], card["back"], card["citation"]["label"]])
+    path = _free_path(out_dir, artifact, "csv")
+    path.write_text(buffer.getvalue(), encoding="utf-8-sig")  # the BOM lets Excel read it as UTF-8
+    return path
+
+
+def export_kahoot(
+    sm_home: Path, course_id: int, artifact_id: str, out_dir: Path, extension: str, *, llm=None
+) -> tuple[Path, list[int]]:
+    """Write a quiz to out_dir for Kahoot (kahoot_export), never over an
+    existing file: "xlsx" in Kahoot's spreadsheet template, "pdf" for its AI
+    "Extract questions from the PDF". Kahoot refuses a question over 120
+    characters or an answer over 75, so those are shortened first (with llm
+    when there is one) and their numbers returned. The quiz the student sees
+    is left as it is; the shortened copy is kept beside it ("kahoot"), so
+    exporting again, or the other format, only asks the LLM again about the
+    questions it couldn't rewrite last time (cut until then). KeyError if
+    there's no such quiz."""
+    import hashlib
+
+    import kahoot_export
+
+    artifact = get_artifact(sm_home, course_id, artifact_id)
+    if artifact is None or artifact["kind"] != "quiz":
+        raise KeyError(artifact_id)
+    source = hashlib.sha256(json.dumps(artifact["items"], sort_keys=True).encode()).hexdigest()
+    kept = artifact.get("kahoot") or {}
+    if kept.get("source") != source:
+        items, shortened, failed = kahoot_export.fit(artifact["items"], llm)
+    elif kept.get("failed") and llm is not None:
+        retried, shortened, failed = kahoot_export.fit(artifact["items"], llm, only=kept["failed"])
+        items = [retried[n - 1] if n in kept["failed"] else item for n, item in enumerate(kept["items"], 1)]
+    else:
+        items, shortened, failed = kept["items"], kept["shortened"], kept.get("failed", [])
+    if (kept.get("source"), kept.get("items"), kept.get("failed")) != (source, items, failed):
+        path = _path(sm_home, course_id, artifact_id)
+        kahoot = {"source": source, "items": items, "shortened": shortened, "failed": failed}
+        with _lock:
+            current = _read(path)
+            if current is not None:
+                _write(path, {**current, "kahoot": kahoot})
+    data = kahoot_export.render_xlsx(items) if extension == "xlsx" else kahoot_export.render(artifact["title"], items)
+    path = _free_path(out_dir, artifact, extension)
+    path.write_bytes(data)
+    return path, shortened
+
+
+def _free_path(out_dir: Path, artifact: dict, extension: str) -> Path:
+    """out_dir/<title>.<extension>, numbered if that's taken."""
     stem = re.sub(r'[\\/:*?"<>|]+', " ", artifact["title"]).strip() or _DEFAULT_TITLE[artifact["kind"]]
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"{stem}.csv"
+    path = out_dir / f"{stem}.{extension}"
     n = 2
     while path.exists():
-        path = out_dir / f"{stem} ({n}).csv"
+        path = out_dir / f"{stem} ({n}).{extension}"
         n += 1
-    path.write_text(buffer.getvalue(), encoding="utf-8-sig")  # the BOM lets Excel read it as UTF-8
     return path
 
 
