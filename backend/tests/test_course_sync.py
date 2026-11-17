@@ -914,3 +914,44 @@ def test_a_large_file_removed_from_canvas_is_forgotten(tmp_path, book_course, mo
     monkeypatch.setattr(course_sync.canvas, "list_course_files", lambda course_id: [dict(NOTES)])
     run(1, tmp_path)
     assert set(_large(tmp_path)) == set()
+
+
+# --- The Home page is called Home ---------------------------------------------
+# 18-658's Home is a page titled "Welcome to Software Requirements and
+# Interaction Design (18-658)!". Indexed under that title only, "what's on
+# the Home page?" found nothing (seen in the app, 2026-11-17).
+
+WELCOME = {"url": "welcome", "title": "Welcome to 18-658!", "body": "<p>Office hours are on Fridays.</p>", "updated_at": "1"}
+
+
+@pytest.fixture
+def home_course(stub_extraction, monkeypatch):
+    added = []
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "list_pages", lambda course_id: [])
+    monkeypatch.setattr(course_sync.canvas, "get_front_page", lambda course_id: dict(WELCOME))
+    monkeypatch.setattr(course_sync.indexing, "add_nodes", lambda nodes, db_path, table_name: added.extend(nodes))
+    return added
+
+
+def test_the_front_page_is_indexed_as_home(tmp_path, home_course):
+    run(1, tmp_path)
+    assert {n.metadata["source"] for n in home_course} == {"Home: Welcome to 18-658!"}
+    assert all(n.get_content().startswith("Home: Welcome to 18-658!") for n in home_course)
+
+
+def test_a_front_page_synced_before_this_is_resynced_once_as_home(tmp_path, home_course):
+    (tmp_path / "courses" / "1").mkdir(parents=True)
+    conn = course_sync.sync.open_manifest(tmp_path / "courses" / "1" / "manifest.db")
+    course_sync.sync.mark_synced(conn, "page:welcome", "page", "Welcome to 18-658!", "1", "old")
+    conn.close()
+    assert run(1, tmp_path)[-1]["changed"] == 1
+    assert run(1, tmp_path)[-1]["changed"] == 0
+
+
+def test_the_outline_lists_the_home_page_first(tmp_path, home_course):
+    run(1, tmp_path)
+    conn = course_sync.sync.open_manifest(tmp_path / "courses" / "1" / "manifest.db")
+    rows = course_sync.course_items.load_outline(conn)
+    conn.close()
+    assert (rows[0]["module"], rows[0]["title"], rows[0]["item_type"]) == ("Home", "Welcome to 18-658!", "page")
