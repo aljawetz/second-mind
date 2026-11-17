@@ -593,8 +593,9 @@ def export_kahoot(
     characters or an answer over 75, so those are shortened first (with llm
     when there is one) and their numbers returned. The quiz the student sees
     is left as it is; the shortened copy is kept beside it ("kahoot"), so
-    exporting again, or the other format, needs no LLM. KeyError if there's
-    no such quiz."""
+    exporting again, or the other format, only asks the LLM again about the
+    questions it couldn't rewrite last time (cut until then). KeyError if
+    there's no such quiz."""
     import hashlib
 
     import kahoot_export
@@ -604,16 +605,20 @@ def export_kahoot(
         raise KeyError(artifact_id)
     source = hashlib.sha256(json.dumps(artifact["items"], sort_keys=True).encode()).hexdigest()
     kept = artifact.get("kahoot") or {}
-    if kept.get("source") == source:
-        items, shortened = kept["items"], kept["shortened"]
+    if kept.get("source") != source:
+        items, shortened, failed = kahoot_export.fit(artifact["items"], llm)
+    elif kept.get("failed") and llm is not None:
+        retried, shortened, failed = kahoot_export.fit(artifact["items"], llm, only=kept["failed"])
+        items = [retried[n - 1] if n in kept["failed"] else item for n, item in enumerate(kept["items"], 1)]
     else:
-        items, shortened, complete = kahoot_export.fit(artifact["items"], llm)
-        if complete:  # a cut stand-in for a failed rewrite isn't worth keeping
-            path = _path(sm_home, course_id, artifact_id)
-            with _lock:
-                current = _read(path)
-                if current is not None:
-                    _write(path, {**current, "kahoot": {"source": source, "items": items, "shortened": shortened}})
+        items, shortened, failed = kept["items"], kept["shortened"], kept.get("failed", [])
+    if (kept.get("source"), kept.get("items"), kept.get("failed")) != (source, items, failed):
+        path = _path(sm_home, course_id, artifact_id)
+        kahoot = {"source": source, "items": items, "shortened": shortened, "failed": failed}
+        with _lock:
+            current = _read(path)
+            if current is not None:
+                _write(path, {**current, "kahoot": kahoot})
     data = kahoot_export.render_xlsx(items) if extension == "xlsx" else kahoot_export.render(artifact["title"], items)
     path = _free_path(out_dir, artifact, extension)
     path.write_bytes(data)

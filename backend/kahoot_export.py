@@ -250,22 +250,24 @@ def _rewrite(q: dict, llm) -> dict | None:
     return reply if isinstance(reply, dict) else None
 
 
-def fit(questions: list[dict], llm) -> tuple[list[dict], list[int], bool]:
-    """questions with every one Kahoot would refuse (over_limit) shortened to
-    fit, those questions' numbers, and whether the LLM rewrote all of them.
-    One LLM call per question, all at once (a reasoning model took minutes
-    over one call for all of them). Whatever the LLM leaves too long, or
-    every one if it fails or there's no llm, is cut at a word boundary
-    instead, so an export always fits."""
+def fit(questions: list[dict], llm, only: list[int] | None = None) -> tuple[list[dict], list[int], list[int]]:
+    """questions with every one Kahoot would refuse (over_limit), or just
+    those numbered in `only`, shortened to fit; the numbers of all the
+    questions Kahoot would refuse; and those the LLM didn't manage to rewrite,
+    to try again later. One LLM call per question, all at once (a reasoning
+    model took minutes over one call for all of them). Whatever the LLM
+    leaves too long, or doesn't rewrite, is cut at a word boundary instead,
+    so an export always fits."""
     from concurrent.futures import ThreadPoolExecutor
 
     long = over_limit(questions)
-    if not long:
-        return questions, [], True
-    rewrites: dict[int, dict | None] = {n: None for n in long}
+    targets = [n for n in long if only is None or n in only]
+    if not targets:
+        return questions, long, []
+    rewrites: dict[int, dict | None] = {n: None for n in targets}
     if llm is not None:
-        with ThreadPoolExecutor(max_workers=min(8, len(long))) as pool:
-            rewrites = dict(zip(long, pool.map(lambda n: _rewrite(questions[n - 1], llm), long)))
+        with ThreadPoolExecutor(max_workers=min(8, len(targets))) as pool:
+            rewrites = dict(zip(targets, pool.map(lambda n: _rewrite(questions[n - 1], llm), targets)))
     fitted = []
     for n, q in enumerate(questions, 1):
         if n not in rewrites:
@@ -279,4 +281,4 @@ def fit(questions: list[dict], llm) -> tuple[list[dict], list[int], bool]:
                 "options": [{**o, "text": _cut(a, ANSWER_LIMIT)} for o, a in zip(q["options"], new["answers"])],
             }
         )
-    return fitted, long, all(rewrites.values())
+    return fitted, long, [n for n, rewrite in rewrites.items() if rewrite is None]

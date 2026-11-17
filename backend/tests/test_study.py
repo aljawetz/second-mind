@@ -756,9 +756,9 @@ def test_kahoot_fit_shortens_only_what_kahoot_would_refuse():
 
     model = ScriptedLLM({"question": "Why so long?", "answers": ["w", "right", "y", "z"]})
 
-    fitted, shortened, complete = kahoot_export.fit(_long_quiz(), model)
+    fitted, shortened, failed = kahoot_export.fit(_long_quiz(), model)
 
-    assert shortened == [2] and complete
+    assert shortened == [2] and failed == []
     assert len(model.calls) == 1
     assert fitted[0] == _long_quiz()[0]
     assert fitted[1]["question"] == "Why so long?"
@@ -771,9 +771,9 @@ def test_kahoot_fit_cuts_at_a_word_when_the_llm_fails_or_runs_long():
 
     # No LLM, an LLM that fails, and one whose rewrite is the wrong shape (twice).
     for model in [None, ScriptedLLM(RuntimeError("no key")), ScriptedLLM(*[{"question": "y", "answers": ["a"]}] * 2)]:
-        fitted, shortened, complete = kahoot_export.fit(_long_quiz(), model)
+        fitted, shortened, failed = kahoot_export.fit(_long_quiz(), model)
 
-        assert shortened == [2] and not complete
+        assert shortened == failed == [2]
         assert kahoot_export.over_limit(fitted) == []
         assert fitted[1]["question"].endswith("…") and "  " not in fitted[1]["question"]
         assert [o["correct"] for o in fitted[1]["options"]] == [False, True, False, False]
@@ -782,9 +782,9 @@ def test_kahoot_fit_cuts_at_a_word_when_the_llm_fails_or_runs_long():
 def test_kahoot_fit_cuts_a_rewrite_that_still_runs_long():
     import kahoot_export
 
-    fitted, _, complete = kahoot_export.fit(_long_quiz(), ScriptedLLM({"question": "y " * 100, "answers": ["a", "b", "c", "d"]}))
+    fitted, _, failed = kahoot_export.fit(_long_quiz(), ScriptedLLM({"question": "y " * 100, "answers": ["a", "b", "c", "d"]}))
 
-    assert complete
+    assert failed == []
     assert kahoot_export.over_limit(fitted) == []
     assert fitted[1]["question"].startswith("y y") and fitted[1]["question"].endswith("…")
 
@@ -801,3 +801,33 @@ def test_kahoot_export_keeps_the_shortened_quiz_so_the_next_export_needs_no_llm(
     assert first == second == [1]
     assert len(rewrite.calls) == 1
     assert study.get_artifact(tmp_path, COURSE, summary["id"])["items"][0]["question"].startswith("Why very")
+
+
+def test_kahoot_export_asks_again_only_about_the_questions_the_llm_missed(tmp_path, db):
+    long = "Why " + "very " * 30 + "long?"
+    model = ScriptedLLM(
+        {"title": "Doubles", "questions": [_q(long + " A", "c1"), _q(long + " B", "c2")]}, {"supported": [1, 2]}
+    )
+    summary = _run(tmp_path, db, model, kind="quiz")
+    out = tmp_path / "Downloads"
+    good = {"question": "Short A?", "answers": ["a", "b", "c", "d"]}
+
+    class OnlyA:
+        """Rewrites question A; question B gets unusable replies. By content,
+        since the questions are asked in parallel."""
+
+        def complete_json(self, messages, **kwargs):
+            return good if " A" in messages[1]["content"] else {}
+
+    study.export_kahoot(tmp_path, COURSE, summary["id"], out, "xlsx", llm=OnlyA())
+    kept = study.get_artifact(tmp_path, COURSE, summary["id"])["kahoot"]
+    assert kept["failed"] == [2] and kept["items"][1]["question"].endswith("…")
+
+    retry = ScriptedLLM({"question": "Short B?", "answers": ["a", "b", "c", "d"]})
+    _, shortened = study.export_kahoot(tmp_path, COURSE, summary["id"], out, "pdf", llm=retry)
+
+    assert shortened == [1, 2]
+    assert len(retry.calls) == 1 and "B" in retry.calls[0][1]["content"]
+    kept = study.get_artifact(tmp_path, COURSE, summary["id"])["kahoot"]
+    assert kept["failed"] == []
+    assert [q["question"] for q in kept["items"]] == ["Short A?", "Short B?"]
