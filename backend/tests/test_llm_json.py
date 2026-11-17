@@ -3,6 +3,7 @@ extraction and consolidation use (design spec §8) — and what the same class
 sends to DeepSeek. Provider HTTP endpoints are mocked with respx, so no key
 or network is needed."""
 
+import dataclasses
 import json
 
 import httpx
@@ -26,11 +27,15 @@ def _completion(content):
     }
 
 
+# A model that takes a temperature, as gpt-4o-mini did when it was the default.
+TUNABLE = dataclasses.replace(providers.OPENAI, model="gpt-4o-mini", fixed_temperature=False)
+
+
 @respx.mock
 def test_complete_json_asks_for_json_at_temperature_zero_and_parses_the_reply():
     route = respx.post(COMPLETIONS).mock(return_value=httpx.Response(200, json=_completion('{"memories": [], "summary": "s"}')))
 
-    reply = llm.OpenAIProvider(providers.OPENAI, api_key="sk-test").complete_json([{"role": "user", "content": "hi"}])
+    reply = llm.OpenAIProvider(TUNABLE, api_key="sk-test").complete_json([{"role": "user", "content": "hi"}])
 
     assert reply == {"memories": [], "summary": "s"}
     sent = json.loads(route.calls[0].request.content)
@@ -97,3 +102,26 @@ def test_deepseek_stream_with_a_required_tool_call():
     sent = json.loads(route.calls[0].request.content)
     assert sent["tool_choice"] == "required"
     assert sent["thinking"] == {"type": "disabled"}
+
+
+def test_the_default_openai_model_is_gpt_5_mini_which_takes_no_temperature():
+    # Chosen from the memory evaluation (PR #56): it answered 7 to 9 more of
+    # 58 questions than gpt-4o-mini in every run. A reasoning model: it
+    # rejects any temperature but its default.
+    assert providers.OPENAI.model == "gpt-5-mini"
+    assert providers.OPENAI.fixed_temperature is True
+
+
+@respx.mock
+def test_no_temperature_is_sent_to_a_model_that_rejects_one():
+    route = respx.post(COMPLETIONS).mock(return_value=httpx.Response(200, json=_completion('{"ok": true}')))
+
+    llm.OpenAIProvider(providers.OPENAI, api_key="sk-test").complete_json([{"role": "user", "content": "hi"}], temperature=0.7)
+
+    assert "temperature" not in json.loads(route.calls[0].request.content)
+
+
+def test_the_chat_call_leaves_temperature_out_for_such_a_model_and_sends_it_otherwise():
+    assert "temperature" not in llm.OpenAIProvider(providers.OPENAI, api_key="sk-test").chat_request([], None)
+    assert llm.OpenAIProvider(TUNABLE, api_key="sk-test").chat_request([], None)["temperature"] == 0.1
+

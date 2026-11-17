@@ -17,6 +17,7 @@ from types import SimpleNamespace
 import pytest
 from llama_index.vector_stores.lancedb.base import TableNotFoundError
 
+import chat
 import config
 import conversations
 import indexing
@@ -25,8 +26,10 @@ import main
 import memory_jobs
 from llm import TurnEnd
 from memory import MemoryService
+from memory.store import MemoryStore
 
 COURSE = 55710
+REAL_LOAD_INDEX = indexing.load_index
 
 
 def embed(text):
@@ -43,11 +46,13 @@ def _extraction(text, kind="fact", summary=""):  # no summary memory unless a te
 
 class FakeModel:
     """Stands in for llm.current_provider(): scripted streamed replies for /ask,
-    scripted JSON replies for the memory worker."""
+    scripted JSON replies for the memory worker. /ask's follow-up rewrite
+    (chat.standalone_query) also calls complete_json; it gets "no rewrite"
+    and is kept apart, so json_calls and json_replies stay the worker's."""
 
     def __init__(self):
         self.chat_replies, self.json_replies = [], []
-        self.chat_calls, self.json_calls = [], []
+        self.chat_calls, self.json_calls, self.rewrite_calls = [], [], []
 
     def stream_chat(self, messages, tools, require_tool=False):
         self.chat_calls.append([dict(m) for m in messages])
@@ -58,6 +63,9 @@ class FakeModel:
         yield TurnEnd()
 
     def complete_json(self, messages):
+        if messages[0]["content"] == chat.REWRITE_PROMPT:
+            self.rewrite_calls.append(messages)
+            return None
         self.json_calls.append(messages)
         reply = self.json_replies.pop(0)
         if isinstance(reply, Exception):
@@ -127,7 +135,7 @@ def test_a_new_chat_gets_an_id_and_its_turn_is_saved(app):
 
     cid = events[0]["conversation_id"]
     assert re.fullmatch(r"c-[0-9a-f]{12}", cid)
-    assert events[-1] == {"done": True}
+    assert events[-1] == {"done": True, "turn_index": 0}
     [turn] = conversations.get_conversation(app.home, COURSE, cid)["turns"]
     assert (turn["question"], turn["answer"], turn["citations"], turn["grounded"]) == (
         "When is the midterm?",
@@ -169,6 +177,32 @@ def test_what_one_chat_told_memory_shapes_the_next_chat(app):
     assert "The student is on team 4 with Priya." in app.model.chat_calls[-1][0]["content"]  # profile
     assert [m["text"] for m in _final(events)["memories_used"]] == ["The student is on team 4 with Priya."]
 
+
+
+def test_a_reopened_chat_still_shows_the_memories_its_answers_used(app):
+    _say(app, "I'm on team 4 with Priya.", remembers="The student is on team 4 with Priya.")
+    app.model.chat_replies.append(["Team 4."])
+    _, events = _ask(app, "Which team am I on?")
+    assert main.MEMORY_WORKER.wait_idle(10)
+    cid = events[0]["conversation_id"]
+    [used] = _final(events)["memories_used"]
+
+    # Only the id is saved; the text comes from the memory store on open.
+    [saved] = conversations.get_conversation(app.home, COURSE, cid)["turns"]
+    assert saved["memory_ids"] == [used["id"]] and "memories_used" not in saved
+
+    _, chat_json = _json(app, "GET", f"/courses/{COURSE}/conversations/{cid}")
+    assert chat_json["turns"][0]["memories_used"] == [used]
+    assert "memory_ids" not in chat_json["turns"][0]
+
+    # An edit shows its new text; a forgotten memory is no longer shown.
+    _json(app, "POST", f"/courses/{COURSE}/memories/{used['id']}/edit", {"text": "The student is on team 5."})
+    _, chat_json = _json(app, "GET", f"/courses/{COURSE}/conversations/{cid}")
+    assert [m["text"] for m in chat_json["turns"][0]["memories_used"]] == ["The student is on team 5."]
+
+    _request(app, "DELETE", f"/courses/{COURSE}/memories/{used['id']}")
+    _, chat_json = _json(app, "GET", f"/courses/{COURSE}/conversations/{cid}")
+    assert chat_json["turns"][0]["memories_used"] == []
 
 def test_memories_can_be_listed_and_deleted(app):
     _say(app, "I'm auditing the course.", remembers="The student is auditing the course.")
@@ -232,6 +266,11 @@ def test_memory_edit_returns_not_found_for_unknown_id(app):
     assert body["error"]["code"] == "not_found"
 
 
+def _indexed_turns(app):
+    with MemoryStore(app.home / "courses" / str(COURSE) / "memory.db") as store:
+        return store.list_turns()
+
+
 def test_chats_can_be_listed_read_and_deleted_taking_their_memories_along(app):
     cid = _say(app, "I'm auditing the course.", remembers="The student is auditing the course.")[0]["conversation_id"]
 
@@ -240,8 +279,12 @@ def test_chats_can_be_listed_read_and_deleted_taking_their_memories_along(app):
     status, body = _json(app, "GET", f"/courses/{COURSE}/conversations/{cid}")
     assert status == 200 and body["turns"][0]["question"] == "I'm auditing the course."
 
+    assert main.MEMORY_WORKER.wait_idle(10)
+    assert [t.question for t in _indexed_turns(app)] == ["I'm auditing the course."]
+
     assert _json(app, "DELETE", f"/courses/{COURSE}/conversations/{cid}") == (200, {"status": "deleted"})
 
+    assert _indexed_turns(app) == []  # no longer searchable from other chats
     assert _json(app, "GET", f"/courses/{COURSE}/memories?include_inactive=1") == (200, {"memories": []})
     assert _json(app, "GET", f"/courses/{COURSE}/conversations/{cid}")[0] == 404
     assert _json(app, "DELETE", f"/courses/{COURSE}/conversations/{cid}")[0] == 404
@@ -402,7 +445,7 @@ def test_a_memory_failure_never_reaches_the_answer(app):
 
     status, events = _ask(app, "I'm on team 4.")
 
-    assert status == 200 and events[-1] == {"done": True} and not any("error" in e for e in events)
+    assert status == 200 and events[-1] == {"done": True, "turn_index": 0} and not any("error" in e for e in events)
     assert main.MEMORY_WORKER.wait_idle(10)
     c = conversations.get_conversation(app.home, COURSE, events[0]["conversation_id"])
     assert c["memory_processed_upto"] == 0  # read again after the next restart
@@ -497,3 +540,129 @@ def test_forgetting_a_memory_clears_its_chats_running_summary(app):
 
     assert _json(app, "GET", f"/courses/{COURSE}/memories?include_inactive=1") == (200, {"memories": []})
     assert conversations.get_conversation(app.home, COURSE, cid)["summary"] == ""
+
+
+def _feedback_path(cid, index=0, course=COURSE):
+    return f"/courses/{course}/conversations/{cid}/turns/{index}/feedback"
+
+
+def test_feedback_http_save_reload_replace_clear_and_no_model_calls(app):
+    cid = _say(app, "Question", answer="Answer")[0]["conversation_id"]
+    model_calls = (len(app.model.chat_calls), len(app.model.json_calls))
+    status, body = _json(app, "POST", _feedback_path(cid), {"rating": "up", "note": "x" * 500})
+    assert status == 200
+    feedback = body["feedback"]
+    assert feedback["rating"] == "up" and feedback["note"] == "x" * 500
+    status, saved = _json(app, "GET", f"/courses/{COURSE}/conversations/{cid}")
+    assert status == 200 and saved["turns"][0]["feedback"] == feedback
+    assert _json(app, "GET", f"/courses/{COURSE}/feedback") == (200, {"turns": []})
+    status, body = _json(app, "POST", _feedback_path(cid), {"rating": "down"})
+    assert status == 200 and body["feedback"]["note"] == ""
+    status, review = _json(app, "GET", f"/courses/{COURSE}/feedback")
+    assert status == 200
+    assert review["turns"] == [{**saved["turns"][0], "feedback": body["feedback"], "conversation_id": cid, "title": "Question", "turn_index": 0}]
+    assert _json(app, "POST", _feedback_path(cid), {"rating": None}) == (200, {"feedback": None})
+    assert "feedback" not in _json(app, "GET", f"/courses/{COURSE}/conversations/{cid}")[1]["turns"][0]
+    assert _json(app, "GET", f"/courses/{COURSE}/feedback") == (200, {"turns": []})
+    assert (len(app.model.chat_calls), len(app.model.json_calls)) == model_calls
+
+
+@pytest.mark.parametrize("body", [[], "down", 1, {}, {"note": "missing rating"}, {"rating": "other"}, {"rating": True}, {"rating": []}, {"rating": {}}, {"rating": "up", "note": None}, {"rating": "up", "note": 4}, {"rating": "down", "note": "x" * 501}, {"rating": "up", "extra": True}])
+def test_feedback_http_rejects_invalid_bodies_without_writing(app, body):
+    conversations.append_turn(app.home, COURSE, "c-test", {"question": "Q", "answer": "A", "asked_at": "2026-11-10T00:00:00Z", "citations": [], "grounded": False})
+    status, response = _json(app, "POST", _feedback_path("c-test"), body)
+    assert status == 400 and response["error"]["code"] == "bad_request"
+    assert "feedback" not in conversations.get_conversation(app.home, COURSE, "c-test")["turns"][0]
+
+
+@pytest.mark.parametrize("raw", ["null", "{", ""])
+def test_feedback_http_rejects_invalid_or_missing_json(app, raw):
+    conn = http.client.HTTPConnection("127.0.0.1", app.port, timeout=10)
+    conn.request("POST", _feedback_path("c-test"), raw)
+    response = conn.getresponse()
+    assert response.status == 400
+    assert json.loads(response.read())["error"]["code"] == "bad_request"
+    conn.close()
+
+
+@pytest.mark.parametrize("course,cid,index", [(COURSE + 1, "c-test", 0), (COURSE, "c-missing", 0), (COURSE, "c-test", 1), (COURSE, "c-test", -1)])
+def test_feedback_http_missing_targets_return_404(app, course, cid, index):
+    conversations.append_turn(app.home, COURSE, "c-test", {"question": "Q", "answer": "A", "asked_at": "2026-11-10T00:00:00Z"})
+    status, body = _json(app, "POST", _feedback_path(cid, index, course), {"rating": "down"})
+    assert status == 404 and body["error"]["code"] == "not_found"
+    assert _json(app, "GET", f"/courses/{COURSE + 1}/feedback")[0] == 404
+
+
+def test_stream_indices_count_saved_turns_and_exclude_failed_answers(app):
+    events = _say(app, "First")
+    cid = events[0]["conversation_id"]
+    assert events[-1] == {"done": True, "turn_index": 0}
+    assert all("turn_index" not in e for e in events[:-1])
+    app.model.chat_replies.append(["Partial", ConnectionError("dropped")])
+    _, failed = _ask(app, "Failed", conversation_id=cid)
+    assert failed[-1] == {"done": True}
+    assert all("turn_index" not in e for e in failed)
+    events = _say(app, "Third", conversation_id=cid)
+    assert events[-1] == {"done": True, "turn_index": 1}
+    assert [t["question"] for t in conversations.get_conversation(app.home, COURSE, cid)["turns"]] == ["First", "Third"]
+
+
+def test_saved_feedback_is_not_sent_to_chat_or_memory_models(app):
+    cid = _say(app, "First", answer="Answer")[0]["conversation_id"]
+    assert _json(app, "POST", _feedback_path(cid), {"rating": "down", "note": "PRIVATE FEEDBACK NOTE"})[0] == 200
+    conversations.set_memory_progress(app.home, COURSE, cid, processed_upto=0, summary="")
+    app.model.json_replies.append({"memories": [], "summary": ""})
+    _say(app, "Next", conversation_id=cid)
+    sent = json.dumps([app.model.chat_calls, app.model.json_calls, app.model.rewrite_calls])
+    assert "PRIVATE FEEDBACK NOTE" not in sent
+    assert '"feedback"' not in sent
+
+
+def test_ask_offers_the_course_listing_tool(app):
+    """The listing tool (course_items.py) is wired into /ask for the course
+    asked about; its outline lives in that course's manifest.db."""
+    events = _say(app, "What are all the readings for week 3?", answer="None found.")
+    assert events[-1]["done"] is True
+    assert "list_course_items" in app.model.chat_calls[0][0]["content"]
+
+
+def test_large_files_are_listed_and_can_be_turned_on(app):
+    """GET /courses/{id}/large-files lists files kept to a preview or not
+    synced; POST /courses/{id}/large-files/{file_id} records the student's
+    choice for the next sync (large_files.py)."""
+    import large_files
+    import sync
+
+    assert _json(app, "GET", f"/courses/{COURSE}/large-files") == (200, {"files": []})  # never synced: nothing to list
+    path = app.home / "courses" / str(COURSE) / "manifest.db"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sync.open_manifest(path)
+    large_files.record(conn, "555", "About Face.pdf", 33_000_000, pages=722, chars=None, long=True, state="preview")
+    conn.close()
+
+    status, listed = _json(app, "GET", f"/courses/{COURSE}/large-files")
+    assert status == 200
+    assert listed["files"] == [{"file_id": "555", "name": "About Face.pdf", "size": 33_000_000, "pages": 722, "chars": None,
+                       "state": "preview", "want_full": False}]
+    assert _json(app, "POST", f"/courses/{COURSE}/large-files/555", {"full": True}) == (200, {"file_id": "555", "want_full": True})
+    assert _json(app, "GET", f"/courses/{COURSE}/large-files")[1]["files"][0]["want_full"] is True
+    assert _json(app, "POST", f"/courses/{COURSE}/large-files/999", {"full": True})[0] == 404
+    assert _json(app, "POST", f"/courses/{COURSE}/large-files/555", {"full": "yes"})[0] == 400
+    assert _json(app, "GET", "/courses/1/large-files")[0] == 404  # not a selected course
+
+
+def test_a_selected_course_that_was_never_synced_still_gets_an_answer(app, monkeypatch):
+    # Found by the Sprint 9 test run: the real load_index opens a missing
+    # table lazily, so the error used to surface only at the first search,
+    # outside the handler's catch, and the connection dropped with no reply.
+    # Here the index database exists (another course is synced) but this
+    # course's table does not.
+    import lancedb
+
+    lancedb.connect(str(app.home / "index.lancedb")).create_table("course_1", data=[{"x": 1}])
+    monkeypatch.setattr(indexing, "load_index", REAL_LOAD_INDEX)
+
+    events = _say(app, "When is the midterm?", answer="I couldn't find that in the course materials.")
+
+    assert _final(events)["grounded"] is False
+    assert events[-1]["done"] is True

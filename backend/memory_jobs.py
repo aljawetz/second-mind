@@ -43,10 +43,40 @@ def _summary_for_progress(summary_before: str, summary_now: str, extracted: str)
     return extracted
 
 
+def index_conversation(sm_home: Path, course_id: int, cid: str, service: MemoryService) -> int:
+    """Puts the turns of this chat that aren't there yet into the past-chat
+    index (memory/past_chats.py), so other chats can search them. No model
+    call, so it works without a key, and a chat saved before the index
+    existed is caught up in one pass. Returns how many turns it went through."""
+    c = conversations.get_conversation(sm_home, course_id, cid)
+    if c is None:
+        return 0
+    start = c.get("turns_indexed_upto", 0)
+    turns = c["turns"][start:]
+    for index, turn in enumerate(turns, start=start):
+        service.index_turn(
+            conversation_id=cid,
+            turn_index=index,
+            title=c["title"],
+            at=datetime.fromisoformat(turn["asked_at"]),
+            question=turn["question"],
+            answer=turn["answer"],
+        )
+    conversations.set_turns_indexed(sm_home, course_id, cid, start + len(turns))
+    # Deleted while being indexed: the delete's own cascade may already have
+    # run, so take out what this pass added.
+    if not conversations.exists(sm_home, course_id, cid):
+        service.forget_conversation(cid)
+    return len(turns)
+
+
 def observe_conversation(sm_home: Path, course_id: int, cid: str, service: MemoryService) -> int:
     """Reads the turns of this chat memory hasn't read yet, one turn per
     call, each dated when it was asked. Progress is saved after every turn,
-    so a failure repeats at most that turn. Returns how many were read."""
+    so a failure repeats at most that turn. Returns how many were read.
+    The past-chat index is brought up to date first: it needs no model, so
+    a failing model call doesn't hold it back."""
+    index_conversation(sm_home, course_id, cid, service)
     c = conversations.get_conversation(sm_home, course_id, cid)
     if c is None:
         return 0

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { explainAssignment, type AssignmentExplanation, type CanvasAssignment } from "../../sidecar";
 import { openCitation } from "../../citations";
-import { statusPill } from "../../assignmentStatus";
+import { statusText } from "../../assignmentStatus";
+import { SOURCE_KIND } from "./Answer";
 
 type ExplainState =
   | { status: "closed" }
@@ -48,29 +49,32 @@ export default function AssignmentView({
       <div className="assign-head">
         <h2>{assignment.name}</h2>
       </div>
-      <div className="assign-pills">
-        {(() => {
-          const pill = statusPill(assignment);
-          return <span className={`pill ${pill.cls}`}>{pill.text}</span>;
-        })()}
-        {assignment.points_possible != null && (
-          <span className="pill pill-neutral">{assignment.points_possible} pts</span>
-        )}
-      </div>
+      {(() => {
+        const status = statusText(assignment);
+        const dueLong = assignment.due_at
+          ? new Date(assignment.due_at).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+          : null;
+        return (
+          <p className="assign-meta">
+            <span className={status.tone}>{status.text}</span>
+            {dueLong && <span>{dueLong}</span>}
+          </p>
+        );
+      })()}
       <div className="panel">
         <h3>Prompt</h3>
         <div className="assign-prompt">{assignment.description || "No description provided."}</div>
       </div>
       <button className="explain-btn" onClick={toggleExplain}>
-        {open ? "✦ Hide explanation" : "✦ Explain this assignment"}
+        {open ? "Hide explanation" : "Explain this assignment"}
       </button>
       {open && (
         <div className="panel explain-panel">
           <div className="explain-flag">
-            <span className="pill">◆ grounded explanation</span>
-            <span className="cav">Explains the prompt & points to source material — won't draft your answer.</span>
+            <h3>Grounded explanation</h3>
+            <span className="cav">Explains the prompt and points to source material. It won't draft your answer.</span>
           </div>
-          {explain.status === "loading" && <p className="qa-thinking">Thinking…</p>}
+          {explain.status === "loading" && <p className="qa-thinking">Reading the prompt and searching your course</p>}
           {explain.status === "error" && <p className="qa-a-error">{explain.message}</p>}
           {explain.status === "done" && (
             <>
@@ -84,18 +88,22 @@ export default function AssignmentView({
               </div>
               <div>
                 <h3>Where to start</h3>
-                <div className="explain-tips">
-                  {explain.data.pointers.length === 0 && (
-                    <div className="qa-empty">Nothing in your indexed course material came up as relevant.</div>
-                  )}
-                  {explain.data.pointers.map((p, i) => (
-                    <div className="explain-tip" key={i}>
-                      <button className="cite cite-link" onClick={() => openCitation(canvasBaseUrl, courseId, p, onOpenSession)}>
-                        {p.label}
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                {explain.data.pointers.length === 0 && (
+                  <div className="qa-empty">Nothing in your indexed course material came up as relevant.</div>
+                )}
+                {explain.data.pointers.length > 0 && (
+                  <ol className="qa-notes" aria-label="Where to start">
+                    {explain.data.pointers.map((p, i) => (
+                      <li key={i}>
+                        <button type="button" onClick={() => openCitation(canvasBaseUrl, courseId, p, onOpenSession)}>
+                          <span className="n">{i + 1}</span>
+                          <span className="src">{p.label}</span>
+                          <span className="kind">{SOURCE_KIND[p.source_type] ?? "Source"}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                )}
               </div>
             </>
           )}

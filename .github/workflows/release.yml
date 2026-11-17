@@ -38,6 +38,12 @@ jobs:
 
   build:
     runs-on: macos-latest
+    # The runner's newest Python (3.15 since November 2026) has no
+    # onnxruntime wheel, so uv's default pick broke the v0.2.0 build at
+    # "Generate the embedding model". 3.14 is what the app is developed
+    # and tested on.
+    env:
+      UV_PYTHON: "3.14"
     steps:
       - uses: actions/checkout@v4
 
@@ -67,6 +73,9 @@ jobs:
         run: |
           uv sync --group convert
           uv run python3 scripts/convert_embedding_model.py
+          # sm-backend.spec bundles the reranker too (Sprint 8); without
+          # this the PyInstaller step can't find it and the build fails.
+          uv run python3 scripts/convert_reranker_model.py
 
       - name: Fetch the session-transcription model
         working-directory: backend

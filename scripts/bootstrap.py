@@ -37,9 +37,7 @@ def check_prerequisites() -> None:
         missing.append(node_hint)
     if not shutil.which("npm"):
         missing.append("npm (comes with node)")
-    sys.path.insert(0, str(backend))
-    from native_tools import tesseract_executable
-    if not tesseract_executable():
+    if not shutil.which("tesseract"):
         missing.append(tesseract_hint)
     if not find_cargo():
         missing.append("rust (https://rustup.rs)")
@@ -63,14 +61,29 @@ step("Backend: installing Python dependencies (uv sync --all-groups)",
      backend, "uv", "sync", "--all-groups", "--frozen")
 step("Backend: generating the local embedding model (one-time, needs network access to Hugging Face)",
      backend, "uv", "run", "--no-sync", "python", "scripts/convert_embedding_model.py")
+step("Backend: generating the local reranker model (one-time, needs network access to Hugging Face)",
+     backend, "uv", "run", "--no-sync", "python", "scripts/convert_reranker_model.py")
 step("Backend: fetching the session-transcription model (one-time, needs network access to Hugging Face)",
      backend, "uv", "run", "--no-sync", "python", "scripts/fetch_whisper_model.py")
 step("Backend: running the test suite to confirm the environment is sound",
      backend, "uv", "run", "--no-sync", "pytest", "tests/", "-q")
-# After the model steps: the spec bundles both models into the build.
+# After the model steps: the spec bundles all three models into the build.
 step("Backend: building it for the app (PyInstaller, in its own .venv-build)",
      backend, "uv", "run", "--no-project", "python", "scripts/build_sidecar.py")
 step("Frontend: installing npm dependencies", app, "npm", "install")
+
+
+if sys.platform == "darwin":
+    # Dev builds are signed with this certificate so the Keychain's "Always
+    # Allow" survives rebuilds. Idempotent. Asks for the login password once.
+    print("==> macOS: one-time signing certificate for dev builds (asks for your login password once)", flush=True)
+    made = subprocess.run(["bash", str(repo_root / "scripts" / "make-signing-cert.sh")], cwd=repo_root)
+    if made.returncode != 0:
+        print(
+            "    Skipped. Run scripts/make-signing-cert.sh later. Until then macOS asks for your\n"
+            "    password again after every rebuild.",
+            file=sys.stderr,
+        )
 
 if is_windows:
     start = "    cd app\n    npm run tauri dev"

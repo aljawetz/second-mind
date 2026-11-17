@@ -91,6 +91,9 @@ def main():
     )
     args = parser.parse_args()
     rng = random.Random(args.seed)
+    from eval_key import use_eval_key
+
+    print("OpenAI key: " + ("the evaluation key" if use_eval_key() else "the app's (no evaluation key stored)"), flush=True)
     client = providers.openai_client(providers.OPENAI)
     model = llm.OpenAIProvider(providers.OPENAI)
 

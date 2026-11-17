@@ -462,7 +462,7 @@ export default function AppShell({
                   courses={[pendingIndexCourse]}
                   onNext={handleCourseIndexed}
                   title={`Indexing ${pendingIndexCourse.code}`}
-                  subtitle="This runs once for this course — after this, everything stays local."
+                  subtitle="This runs once for this course. After this, everything stays local."
                   showSteps={false}
                   continueLabel="Done →"
                 />

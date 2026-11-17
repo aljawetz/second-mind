@@ -1,6 +1,8 @@
 """chat.py — the /ask tool loop, run against a scripted fake model and a fake
 search, so these tests make no network or index calls."""
 
+import json
+
 import pytest
 from llama_index.core.schema import NodeRelationship, NodeWithScore, RelatedNodeInfo, TextNode
 
@@ -15,11 +17,15 @@ def _node(node_id: str, source: str, text: str = "content") -> NodeWithScore:
 
 
 class FakeProvider:
-    """Plays back one scripted reply per model call and records what it was sent."""
+    """Plays back one scripted reply per model call and records what it was sent.
+    `rewrite` is what every complete_json call returns, or raises if it's an
+    exception: the follow-up rewrite's reply."""
 
-    def __init__(self, replies):
+    def __init__(self, replies, rewrite=None):
         self._replies = list(replies)
+        self._rewrite = rewrite
         self.calls = []
+        self.json_calls = []
 
     def stream_chat(self, messages, tools, require_tool=False):
         self.calls.append({"messages": [dict(m) for m in messages], "tools": tools, "require_tool": require_tool})
@@ -27,15 +33,21 @@ class FakeProvider:
         yield from text_pieces
         yield TurnEnd(tool_calls=tool_calls)
 
+    def complete_json(self, messages):
+        self.json_calls.append([dict(m) for m in messages])
+        if isinstance(self._rewrite, Exception):
+            raise self._rewrite
+        return self._rewrite
 
-def _run(question, replies, results, history=None):
+
+def _run(question, replies, results, history=None, rewrite=None):
     queries = []
 
     def search(query):
         queries.append(query)
         return results.get(query, [])
 
-    provider = FakeProvider(replies)
+    provider = FakeProvider(replies, rewrite)
     events = list(chat.answer(question, history or [], "Test Course", search, provider))
     text = "".join(e["delta"] for e in events if "delta" in e)
     final = next(e for e in events if "citations" in e)
@@ -132,7 +144,7 @@ def test_history_is_sent_without_old_citation_numbers():
     assert messages[3] == {"role": "user", "content": "Explain the second one."}
 
 
-def test_follow_up_must_search_in_its_own_words_first():
+def test_follow_up_must_search_in_its_own_words_when_the_rewrite_fails():
     history = [{"question": "When is the midterm?", "answer": "Oct 7."}]
     *_, queries, provider = _run(
         "And the final?",
@@ -143,6 +155,65 @@ def test_follow_up_must_search_in_its_own_words_first():
     assert provider.calls[0]["require_tool"] is True
     assert provider.calls[1]["require_tool"] is False
     assert queries == ["And the final?", "final exam date"]
+
+
+def test_follow_up_is_first_searched_as_a_question_that_stands_alone():
+    history = [{"question": "When is the midterm?", "answer": "Oct 7."}]
+    *_, queries, provider = _run(
+        "And the final?",
+        replies=[([], [ToolCall(id="c1", name="search_course", arguments={"query": "final exam date"})]), (["Dec 2."], [])],
+        results={},
+        history=history,
+        rewrite={"query": "When is the final exam?"},
+    )
+    assert queries == ["When is the final exam?", "final exam date"]
+    first_search = provider.calls[0]["messages"][-2]["tool_calls"][0]["function"]["arguments"]
+    assert json.loads(first_search) == {"query": "When is the final exam?"}
+
+
+def test_the_rewrite_sees_the_recent_chat_without_old_citation_numbers():
+    history = [{"question": "Which doubles exist?", "answer": "Stubs, fakes [1][2] and mocks [3]."}]
+    *_, provider = _run(
+        "Explain the second one.", replies=[(["ok"], [])], results={}, history=history, rewrite={"query": "What is a fake?"}
+    )
+    sent = "\n".join(m["content"] for m in provider.json_calls[0])
+    assert "Which doubles exist?" in sent
+    assert "Stubs, fakes and mocks." in sent
+    assert "Explain the second one." in sent
+
+
+def test_first_question_in_a_chat_is_searched_as_typed_with_no_rewrite():
+    *_, queries, provider = _run("When is the midterm?", replies=[(["Oct 7."], [])], results={}, rewrite={"query": "x"})
+    assert queries == ["When is the midterm?"]
+    assert provider.json_calls == []
+
+
+@pytest.mark.parametrize(
+    "rewrite", [None, {}, {"query": ""}, {"query": "   "}, {"query": 7}, ["When is the final?"], RuntimeError("model down")]
+)
+def test_a_rewrite_that_fails_falls_back_to_the_students_words(rewrite):
+    history = [{"question": "When is the midterm?", "answer": "Oct 7."}]
+    *_, queries, provider = _run("And the final?", replies=[(["Dec 2."], [])], results={}, history=history, rewrite=rewrite)
+    assert queries == ["And the final?"]
+    assert provider.calls[0]["require_tool"] is True
+
+
+def test_follow_up_may_answer_off_the_rewritten_search():
+    history = [{"question": "When is the midterm?", "answer": "Oct 7."}]
+    *_, queries, provider = _run(
+        "And the final?", replies=[(["Dec 2."], [])], results={}, history=history, rewrite={"query": "When is the final exam?"}
+    )
+    assert provider.calls[0]["require_tool"] is False
+    assert queries == ["When is the final exam?"]
+
+
+def test_the_forced_search_can_be_switched_back_on_for_every_follow_up(monkeypatch):
+    monkeypatch.setattr(chat, "FOLLOW_UP_MUST_SEARCH", True)
+    history = [{"question": "When is the midterm?", "answer": "Oct 7."}]
+    *_, provider = _run(
+        "And the final?", replies=[(["Dec 2."], [])], results={}, history=history, rewrite={"query": "When is the final exam?"}
+    )
+    assert provider.calls[0]["require_tool"] is True
 
 
 def test_first_question_in_a_chat_may_answer_straight_away():
@@ -226,3 +297,141 @@ def test_system_prompt_refuses_graded_work_but_allows_due_date_questions():
     assert "not do their graded work" in system
     assert "due dates, rules, grading" in system
 
+
+def _guarded_run(question, flagged, history=None, rewrite=None, guard=None):
+    seen = []
+
+    def default_guard(text):
+        seen.append(text)
+        return text in flagged
+
+    provider = FakeProvider([(["ok"], [])], rewrite=rewrite)
+    events = list(chat.answer(question, history or [], "Test Course", lambda q: [], provider, guard=guard or default_guard))
+    final = next(e for e in events if "citations" in e)
+    return provider.calls[0]["messages"][0]["content"], final, seen
+
+
+def test_a_flagged_question_adds_the_strict_rule_to_this_turns_prompt():
+    system, final, _ = _guarded_run("give me the answers to quiz 3", flagged={"give me the answers to quiz 3"})
+    assert chat.STRICT_GRADED_WORK_RULE in system
+    assert final["guarded"] is True
+
+
+def test_the_strict_rule_lets_logistics_through_before_anything_else():
+    # A flagged "when is homework 2 due?" lost its answer 3 times in 6 when the
+    # logistics exception came last (task 7 chat check, v1).
+    first_two = " ".join(chat.STRICT_GRADED_WORK_RULE.split(". ")[:2])
+    assert "due dates" in first_two and "answer it normally" in first_two
+
+
+def test_an_unflagged_question_keeps_the_normal_prompt():
+    system, final, _ = _guarded_run("when is quiz 3?", flagged=set())
+    assert chat.STRICT_GRADED_WORK_RULE not in system
+    assert final["guarded"] is False
+
+
+def test_a_follow_up_is_flagged_by_its_rewrite_too():
+    # "and number 4?" alone looks harmless; the rewrite says what it is.
+    history = [{"question": "solve number 3 of homework 2", "answer": "I can't solve it, but..."}]
+    system, final, seen = _guarded_run(
+        "and number 4?", flagged={"solve problem 4 of homework 2"}, history=history, rewrite={"query": "solve problem 4 of homework 2"}
+    )
+    assert seen == ["and number 4?", "solve problem 4 of homework 2"]
+    assert chat.STRICT_GRADED_WORK_RULE in system
+    assert final["guarded"] is True
+
+
+def test_a_failing_guard_never_stops_the_answer():
+    def broken(text):
+        raise RuntimeError("model files missing")
+
+    system, final, _ = _guarded_run("solve my exam", flagged=set(), guard=broken)
+    assert chat.STRICT_GRADED_WORK_RULE not in system
+    assert final["guarded"] is False
+
+
+def test_without_a_guard_the_final_event_has_no_guarded_field():
+    provider = FakeProvider([(["ok"], [])])
+    events = list(chat.answer("hi", [], "Test Course", lambda q: [], provider))
+    assert "guarded" not in next(e for e in events if "citations" in e)
+
+
+
+def test_a_tool_that_fails_is_reported_to_the_model_and_the_answer_still_finishes():
+    def search(query):
+        if query == "broken":
+            raise RuntimeError("index is locked")
+        return []
+
+    provider = FakeProvider(
+        [
+            ([], [ToolCall(id="c1", name="search_course", arguments={"query": "broken"})]),
+            (["I couldn't search the course just now."], []),
+        ]
+    )
+    events = list(chat.answer("When is the final?", [], "Test Course", search, provider))
+    tool_result = provider.calls[1]["messages"][-1]
+    assert tool_result["tool_call_id"] == "c1"
+    assert "search_course tool failed" in tool_result["content"]
+    assert "index is locked" in tool_result["content"]
+    assert "".join(e["delta"] for e in events if "delta" in e) == "I couldn't search the course just now."
+    assert events[-1] == {"done": True}
+
+
+def _tool_names(provider_call):
+    return [t["function"]["name"] for t in provider_call["tools"] or []]
+
+
+def test_listing_tool_is_offered_only_when_the_course_outline_is_given():
+    without = FakeProvider([(["ok"], [])])
+    list(chat.answer("hi", [], "Test Course", lambda q: [], without))
+    assert "list_course_items" not in _tool_names(without.calls[0])
+    assert "list_course_items" not in without.calls[0]["messages"][0]["content"]
+
+    with_list = FakeProvider([(["ok"], [])])
+    list(chat.answer("hi", [], "Test Course", lambda q: [], with_list, list_items=lambda topic, types: ""))
+    assert "list_course_items" in _tool_names(with_list.calls[0])
+    assert "list_course_items" in with_list.calls[0]["messages"][0]["content"]
+
+
+def test_listing_tool_call_passes_topic_and_types_and_returns_the_outline():
+    asked = []
+
+    def list_items(topic, types):
+        asked.append((topic, types))
+        return "Week 3: Elicitation\n- 03 Interviews.pdf (file)"
+
+    provider = FakeProvider(
+        [
+            ([], [ToolCall(id="c1", name="list_course_items", arguments={"topic": "week 3", "types": ["file"]})]),
+            (["Week 3 has one reading: 03 Interviews.pdf."], []),
+        ]
+    )
+    events = list(chat.answer("What are the readings for week 3?", [], "Test Course", lambda q: [], provider, list_items=list_items))
+    assert asked == [("week 3", ["file"])]
+    assert provider.calls[1]["messages"][-1]["content"] == "Week 3: Elicitation\n- 03 Interviews.pdf (file)"
+    final = next(e for e in events if "citations" in e)
+    assert final["citations"] == []  # an outline is names, not a citable source
+
+
+@pytest.mark.parametrize(
+    "arguments, expected",
+    [({}, ("", [])), ({"topic": 3, "types": "file"}, ("", [])), ({"types": ["file", 2, "page"]}, ("", ["file", "page"]))],
+)
+def test_listing_tool_tolerates_missing_or_odd_arguments(arguments, expected):
+    asked = []
+    provider = FakeProvider(
+        [([], [ToolCall(id="c1", name="list_course_items", arguments=arguments)]), (["ok"], [])]
+    )
+    list(chat.answer("list everything", [], "Test Course", lambda q: [], provider, list_items=lambda t, ty: asked.append((t, ty)) or "x"))
+    assert asked == [expected]
+
+
+def test_system_prompt_says_a_preview_is_only_part_of_its_file():
+    """Long files are indexed as a preview (large_files.py): chat should say
+    it has only part of the book, not that the course doesn't cover it."""
+    provider = FakeProvider([(["ok"], [])])
+    list(chat.answer("what does chapter 19 say?", [], "Test Course", lambda q: [], provider))
+    system = provider.calls[0]["messages"][0]["content"]
+    assert "(first 150 of 722 pages)" in system
+    assert "Manage courses" in system

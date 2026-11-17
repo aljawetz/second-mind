@@ -20,6 +20,11 @@ VECTOR_CANDIDATES = 20
 KEYWORD_CANDIDATES = 5
 RRF_K = 60  # the usual constant: dampens the gap between rank 1 and rank 2
 RECENCY_DAYS = 30
+# How many memories one recall returns. 5 until the memory evaluation: a
+# counting question ("how many kits have I bought?") needs every matching
+# memory, and on 60 multi-chat questions 10 answered about three more in
+# each of four runs, with no loss on the other question types.
+TOP_K = 10
 
 NO_MEMORIES = "Nothing about this in what the student has told you before."
 PROFILE_HEADER = (
@@ -44,7 +49,7 @@ def recall(
     store: MemoryStore,
     embed: Callable[[str], list[float]],
     now: datetime,
-    k: int = 5,
+    k: int = TOP_K,
     include_history: bool = False,
     skip_conversation: str | None = None,
 ) -> list[Hit]:

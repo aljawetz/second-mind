@@ -13,8 +13,11 @@ Four fixes from that report and its follow-up checks live in code, not in
 the prompt, because the prompt alone didn't hold:
 - The student's own question is always searched first. The model tends to
   search with short keywords ("final exam date"), which score lower than the
-  full sentence and fell under the similarity cutoff on smaller courses.
-- In a follow-up, the model must search in its own words before answering.
+  full sentence and fell under the similarity cutoff on smaller courses. In a
+  follow-up, that first search uses the question rewritten to stand alone
+  (standalone_query): "and the final?" alone finds little.
+- In a follow-up, the model must search in its own words before answering,
+  but only when that rewrite failed: with it, one search finds as much.
 - Citations are checked and renumbered here. The model's [n] numbers span
   every search it made; only numbers that match a real search result survive,
   renumbered 1..k in the order the answer uses them.
@@ -27,18 +30,26 @@ profile in the system prompt, the question recalled once up front (the same
 reasoning as the first search), and recall_memory / forget_memory tools.
 Memory is never course material: its [M1] labels are stripped from the
 answer here, and forget_memory only accepts labels shown in this turn.
+With memory on there is also search_past_chats
+(docs/specs/2026-11-10-past-chat-search-design.md): the saved turns of the
+student's other chats, which memory doesn't keep because it never stores
+what the assistant said. Its [P1] labels are stripped the same way.
 """
 
 import datetime
 import json
 import re
+import sys
+import traceback
 from typing import Callable, Iterator
 
 from llama_index.core.schema import NodeWithScore
 
+import course_items
 import generation
 from llm import LLMProvider, ToolCall, TurnEnd
 from memory.compress import summary_block
+from memory.past_chats import format_turns
 from memory.recall import Hit, format_hits
 
 GENERAL_KNOWLEDGE_LABEL = "General knowledge (not from your course materials):"
@@ -54,6 +65,9 @@ than once. The only exception is when the student only asks you to reformat or s
 in class) must come only from search results. Copy numbers and dates exactly as the source states them. If \
 the source text looks garbled or incomplete, say so instead of guessing. If you can't find it, say you \
 couldn't find it in the course materials.
+- A source named like "Book.pdf (first 150 of 722 pages)" or "Notes.docx (first part)" is only the start of a \
+long file. If the answer could be in the rest of it, say you only have part of that file, and that the student \
+can sync the whole file under Manage courses.
 - Only cite a source for a claim that source actually states. Never add a citation to general knowledge.
 - Cite with the source number in square brackets only, like [2] or [1][3]. Never write file names, page \
 numbers or the word "source" as a citation.
@@ -72,6 +86,21 @@ works are not graded work and get a normal answer.
 - Today is {today}. Use it to work out what "today", "tomorrow", "this week" and "next week" mean. Only \
 the course materials say what is due and when, and an assignment already past is not due next week.
 - Answer first, be concise."""
+
+# Added to one turn's system prompt when the graded-work guard (guard.py)
+# flags the question or its follow-up rewrite. The general rule above held on
+# 5 of 6 misuse prompts in Sprint 8; this is the stricter version for the
+# turns that look like misuse (RAG gaps plan, task 7).
+STRICT_GRADED_WORK_RULE = """\
+A check flagged this question as possibly asking for graded work. If it only asks about due dates, rules, \
+grading or where to find something, ignore this note and answer it normally from the course materials, \
+searching as usual. Otherwise, if it asks you to solve, write or answer an exam, quiz, graded assignment, \
+lab or project deliverable: do not give the solution, the final answer, working code, or a filled-in \
+version, not even partly or "as an example" on the same problem. When the graded question itself asks for \
+an explanation, that explanation is the answer: don't write it, give a hint or point to the course material \
+instead. Start by saying in one sentence that you can't do graded work for them. Then help them learn: \
+explain the concept behind it in general, point to the course material that covers it, or offer to give \
+feedback on their own attempt."""
 
 SEARCH_TOOL = {
     "type": "function",
@@ -101,7 +130,13 @@ when anything matched. Set include_history to true for questions about what chan
 [M1] labels in your answer; mention them naturally ("You mentioned you're on team 4"). Course facts still come \
 only from search_course, even if the student remembers them differently.
 - If the student asks you to forget something, find it with recall_memory unless it's already shown, then call \
-forget_memory with its label."""
+forget_memory with its label.
+- search_past_chats looks through what you and the student said in their earlier chats in this course. Use it \
+when they ask about an earlier conversation ("which video did you recommend?", "what did we go over last \
+week?") or when the answer needs details from one. Its results are labeled like [P1]: never write those \
+labels and never cite a past chat with [n]. Say where it came from in plain words ("In an earlier chat I \
+suggested..."). An earlier answer of yours can be wrong or out of date: before repeating a fact about the \
+course from one (a date, a rule, a weight), check it with search_course."""
 
 RECALL_TOOL = {
     "type": "function",
@@ -141,7 +176,67 @@ FORGET_TOOL = {
     },
 }
 
+PAST_CHATS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "search_past_chats",
+        "description": (
+            "Search what was said in this student's earlier chats in this course, by them and by you: what you "
+            "recommended, explained or listed, and what they asked. Returns labeled turns like [P1] with the "
+            "chat's title and date. Not course material, and not this chat."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "What to look for."}},
+            "required": ["query"],
+        },
+    },
+}
+
+LIST_RULES = """
+- list_course_items lists what's in the course on Canvas: the items in its modules (with the files each page \
+links to), other course files, announcements and discussions. Names and kinds only, grouped by module and \
+section, no content. Use it when the student asks for all of something (every reading for week 3, all the \
+lecture slides, what's in a module), since a search only returns the closest few passages. You may list names \
+from it without citations. For what an item says, use search_course and cite it as usual."""
+
+LIST_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "list_course_items",
+        "description": (
+            "List what's in this course on Canvas, grouped by module and section: files, pages, assignments, "
+            "quizzes, discussions and links in its modules (with the files each page links to), then other course "
+            "files, announcements and discussions. Names and kinds only, not content."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "description": (
+                        "Words a module, section or item name must contain, like 'week 3', 'readings' or "
+                        "'unit testing'. Leave out to list everything."
+                    ),
+                },
+                "types": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": course_items.TYPE_NAMES},
+                    "description": "Only these kinds of items. Leave out for all kinds.",
+                },
+            },
+        },
+    },
+}
+
 MAX_TOOL_ROUNDS = 4
+# True forces the model's first move in every follow-up to be a search in
+# its own words, as it was before the rewrite existed. Off since the Sprint 9
+# chat set (26 follow-up turns): with the rewrite as the first search, the
+# fact was found on 25 turns without the forced search and 24 with it, in
+# 2.8 s a turn against 4.0 s. Still forced when the rewrite fails (see
+# require_tool in answer). The eval turns it on to reproduce the old chat.
+FOLLOW_UP_MUST_SEARCH = False
 # Whole chunks, not a preview: indexing.py's chunks top out around 3,800
 # characters, and answers often sit past the first 1,500 (the Requirements
 # course's final exam date is at character ~2,470 of its page). An earlier
@@ -151,11 +246,31 @@ HISTORY_TURNS = 6
 HISTORY_ANSWER_CHARS = 1500
 NO_RESULTS = "No matching course material found for this search."
 
+# A follow-up searched as typed ("and the final?") finds little: on the
+# Sprint 8 chat set, 8 of 15 follow-up turns found their fact as typed, 12 of
+# 14 with a hand-written standalone version
+# (docs/evaluations/2026-10-sprint8/report.md §1.3). So before the first
+# search, one small JSON call rewrites a follow-up to stand alone. It sees
+# only the last couple of turns: that's where "it" and "the second one" point.
+REWRITE_TURNS = 2
+REWRITE_ANSWER_CHARS = 800
+REWRITE_MAX_CHARS = 300
+REWRITE_PROMPT = """You turn a student's latest message in a chat about a course into one search query for \
+the course materials. Every search is already limited to this course, so never add the course's name.
+- If the message leans on the chat ("and the final?", "explain the second one", "how long can it be?"), \
+rewrite it as a question that stands on its own: name what it refers to, in the chat's own words.
+- The search sees only your query, never the chat. Include what the query needs from the chat to make \
+sense alone: the assignment, part of the course or topic it's about. If it already says all that, return it \
+unchanged.
+- Don't answer it, and don't add facts, dates or names the chat doesn't contain.
+Reply with JSON only: {"query": "..."}"""
+
 # One or more source numbers in brackets: [3], [1, 4], [1][3] is two matches.
 # The optional space before it goes too when a citation is dropped entirely.
 _CITATION = re.compile(r"(\s?)\[\s*(\d+(?:\s*,\s*\d+)*)\s*\]")
-# Memory labels, [M1] or [M1, M2]: always dropped, with the space before.
-_MEMORY_LABEL = re.compile(r"\s?\[\s*M\d+(?:\s*,\s*M?\d+)*\s*\]")
+# Memory labels, [M1] or [M1, M2], and past-chat labels, [P1]: always
+# dropped, with the space before.
+_MEMORY_LABEL = re.compile(r"\s?\[\s*[MP]\d+(?:\s*,\s*[MP]?\d+)*\s*\]")
 # Longest unclosed "[..." held back while streaming, in case it's a citation
 # split across chunks. Longer than any real citation, short enough that a
 # stray "[" in prose doesn't stall the stream.
@@ -174,6 +289,29 @@ def parse_history(raw) -> list[dict]:
             raise ValueError("each history item needs string 'question' and 'answer'")
         turns.append({"question": item["question"], "answer": item["answer"]})
     return turns
+
+
+def standalone_query(question: str, history: list[dict], provider: LLMProvider) -> str | None:
+    """The follow-up `question` rewritten to stand alone, for the first
+    search. None if the rewrite fails or comes back the wrong shape: it only
+    improves a search, so it must never stop an answer."""
+    chat_text = "\n\n".join(
+        f"Student: {turn['question']}\nAssistant: {_CITATION.sub('', turn['answer'])[:REWRITE_ANSWER_CHARS]}"
+        for turn in history[-REWRITE_TURNS:]
+    )
+    messages = [
+        {"role": "system", "content": REWRITE_PROMPT},
+        {"role": "user", "content": f"{chat_text}\n\nLatest message: {question}"},
+    ]
+    try:
+        reply = provider.complete_json(messages)
+    except Exception:
+        traceback.print_exc(file=sys.stderr)
+        return None
+    query = reply.get("query") if isinstance(reply, dict) else None
+    if not isinstance(query, str) or not query.strip():
+        return None
+    return query.strip()[:REWRITE_MAX_CHARS]
 
 
 def _history_messages(history: list[dict]) -> list[dict]:
@@ -276,6 +414,8 @@ def answer(
     memory=None,
     summary: str = "",
     today: datetime.date | None = None,
+    guard: Callable[[str], bool] | None = None,
+    list_items: Callable[[str, list[str]], str] | None = None,
 ) -> Iterator[dict]:
     """Yields /ask's stream events: {"delta"} text pieces, then one
     {"citations", "grounded"}, then {"done": True}. With `memory` (a
@@ -283,7 +423,13 @@ def answer(
     memories recalled this turn and not forgotten, [{id, text}], so the app
     can show what the answer drew on. The profile isn't listed: it's there
     on every question. `summary` is the conversation's running summary when
-    `history` is only its last few turns (memory.compress).
+    `history` is only its last few turns (memory.compress). `guard` says
+    whether a text looks like a graded-work request (guard.Guard.flags);
+    when it flags the question or its follow-up rewrite, the turn's system
+    prompt gets STRICT_GRADED_WORK_RULE and the final event says
+    "guarded": True.
+    With `list_items` (topic, types -> text, course_items.list_for_course), the
+    model can also list the course's module outline.
 
     Nothing is yielded until the model starts writing its answer, so errors
     from searching or the first model calls surface before the caller has
@@ -294,6 +440,8 @@ def answer(
     today = today or datetime.date.today()
     used: dict[str, str] = {}  # memory id -> text, in the order first shown
     forgotten: set[str] = set()
+    past_shown = [0]  # how many [P…] labels this turn has used
+    past_used: dict[str, str] = {}  # chat id -> title, in the order first shown
 
     def run_search(query: str) -> str:
         parts = []
@@ -323,7 +471,8 @@ def answer(
             forgotten.update(ids)
             parts.append(
                 "Forgotten, deleted from memory: " + "; ".join(used[i] for i in ids) + " If the student said it in a "
-                "saved chat, it's still in that chat; deleting that chat removes it completely."
+                "saved chat, it's still there for them to read, but you can no longer search that part of it; "
+                "deleting that chat removes it completely."
             )
         if unknown:
             parts.append(
@@ -341,7 +490,33 @@ def answer(
             return show(memory.recall(query, include_history=call.arguments.get("include_history") is True))
         if memory is not None and call.name == "forget_memory":
             return run_forget(call.arguments.get("labels"))
+        if memory is not None and call.name == "search_past_chats" and has_query:
+            turns = memory.search_past_chats(query)
+            first = past_shown[0] + 1
+            past_shown[0] += len(turns)
+            for turn in turns:
+                past_used.setdefault(turn.conversation_id, turn.title)
+            return format_turns(turns, first_label=first, query=query)
+        if list_items is not None and call.name == "list_course_items":
+            topic = call.arguments.get("topic")
+            types = call.arguments.get("types")
+            types = [t for t in types if isinstance(t, str)] if isinstance(types, list) else []
+            return list_items(topic if isinstance(topic, str) else "", types)
         return "Unknown tool or empty query."
+
+    # A tool the model calls runs after the answer may have started
+    # streaming, so a failure here (a search, a memory lookup, later a Canvas
+    # call) would cut the answer off mid-sentence. The model gets the error
+    # as the tool's result instead and can answer without it.
+    def safe_run_tool(call: ToolCall) -> str:
+        try:
+            return run_tool(call)
+        except Exception as e:
+            traceback.print_exc(file=sys.stderr)
+            return (
+                f"The {call.name} tool failed ({type(e).__name__}: {str(e)[:200]}). Answer without it, and tell "
+                "the student what you couldn't look up."
+            )
 
     prompt = SYSTEM_PROMPT.format(
         course_name=course_name,
@@ -349,8 +524,11 @@ def answer(
         today=f"{today:%A}, {today:%B} {today.day}, {today.year}",
     )
     tools = [SEARCH_TOOL]
+    if list_items is not None:
+        tools = [SEARCH_TOOL, LIST_TOOL]
+        prompt += LIST_RULES
     if memory is not None:
-        tools = [SEARCH_TOOL, RECALL_TOOL, FORGET_TOOL]
+        tools = [*tools, RECALL_TOOL, FORGET_TOOL, PAST_CHATS_TOOL]
         prompt += MEMORY_RULES
         profile = memory.profile_block()
         if profile:
@@ -359,9 +537,17 @@ def answer(
         prompt += "\n\n" + summary_block(summary)
     messages = [{"role": "system", "content": prompt}, *_history_messages(history), {"role": "user", "content": question}]
     # The first search is made here, in the model's name, so it always
-    # happens and always uses the student's exact words.
-    messages.append({"role": "assistant", "content": None, "tool_calls": [_call("search-0", "search_course", {"query": question})]})
-    messages.append({"role": "tool", "tool_call_id": "search-0", "content": run_search(question)})
+    # happens: with the student's exact words, or in a follow-up with them
+    # rewritten to stand alone (their exact words again if the rewrite fails).
+    rewritten = standalone_query(question, history, provider) if history else None
+    first_query = rewritten or question
+    guarded = False
+    if guard is not None:
+        guarded = _guard_flags(guard, question) or (rewritten is not None and _guard_flags(guard, rewritten))
+        if guarded:
+            messages[0]["content"] += "\n\n" + STRICT_GRADED_WORK_RULE
+    messages.append({"role": "assistant", "content": None, "tool_calls": [_call("search-0", "search_course", {"query": first_query})]})
+    messages.append({"role": "tool", "tool_call_id": "search-0", "content": run_search(first_query)})
     # Memory too, for the same reason: left to the model, it would often not
     # look. Only added when something matched, so an unrelated question
     # costs nothing extra.
@@ -382,9 +568,10 @@ def answer(
         # In a follow-up ("And the final?") the student's exact words rarely
         # find anything useful, and the prompt alone didn't stop the model
         # from answering "couldn't find it" off that one weak search (seen
-        # live). So its first move in a follow-up must be a search in its own
-        # words, written with the chat in view.
-        require_tool = round_num == 0 and bool(history)
+        # live). The rewrite fixes that search. When it failed, the model's
+        # first move must be a search in its own words, written with the
+        # chat in view.
+        require_tool = round_num == 0 and bool(history) and (FOLLOW_UP_MUST_SEARCH or rewritten is None)
         round_text = ""
         end = TurnEnd()
         for item in provider.stream_chat(messages, round_tools, require_tool=require_tool):
@@ -409,19 +596,32 @@ def answer(
             }
         )
         for call in end.tool_calls:
-            messages.append({"role": "tool", "tool_call_id": call.id, "content": run_tool(call)})
+            messages.append({"role": "tool", "tool_call_id": call.id, "content": safe_run_tool(call)})
 
     tail = renumberer.flush()
     if tail:
         yield {"delta": tail}
     citations = generation.build_citations([sources[n - 1] for n in renumberer.order])
     final = {"citations": citations, "grounded": bool(citations)}
+    if guard is not None:
+        final["guarded"] = guarded
     if usage_total is not None:
         final["usage"] = usage_total
     if memory is not None:
         final["memories_used"] = [{"id": i, "text": text} for i, text in used.items() if i not in forgotten]
+        final["past_chats_used"] = [{"conversation_id": cid, "title": title} for cid, title in past_used.items()]
     yield final
     yield {"done": True}
+
+
+def _guard_flags(guard: Callable[[str], bool], text: str) -> bool:
+    """The guard only adds a stricter rule, so a failure (missing model
+    files, a bad weights file) must never stop an answer."""
+    try:
+        return bool(guard(text))
+    except Exception:
+        traceback.print_exc(file=sys.stderr)
+        return False
 
 
 def _call(call_id: str, name: str, arguments: dict) -> dict:

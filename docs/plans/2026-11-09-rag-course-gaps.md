@@ -1,0 +1,182 @@
+# RAG Gaps from the "Building RAG Agents with LLMs" Course
+
+**Status:** Task 1 merged in PR #55. Task 2 built and verified on branch `chat-answer-feedback`; see its [implementation and evidence](2026-11-10-answer-feedback.md). Tasks 3 to 8 not started.
+
+**Goal:** Close the eight gaps found by comparing Second Mind with NVIDIA's "Building RAG Agents with LLMs" notebooks (`docs/RAG with LLMs/`, gitignored). Most of what the course teaches is already here and often goes further (hybrid search with rank fusion, a cross-encoder reranker, the memory layer, the ask-modes eval). These eight are what's missing or unfinished.
+
+**Deadlines:** Sprint 9 (beta and independent testing) is due 2026-11-17. The final (technical evidence against baselines) is due 2026-12-01. Tasks 1 to 4 help the beta; tasks 5 to 8 are evidence for the final. Sprint 9's main graded work (an outside tester running the core workflow, deployment steps, user docs) is not in this list.
+
+**Rule for every task:** tests first, then the code. A change to search or chat is measured with `backend/scripts/ask_modes_eval.py` before it's called better. Prompts are tuned on development cases only. The frozen Sprint 8 sets (`sprint8-test`, `sprint8-chat`) are run once, when the design is settled.
+
+## Before the tasks
+
+- **OpenAI key for evals.** The eval reads it from the macOS Keychain, so running it may show a Keychain prompt. Each before/after chat run with the gpt-4o judge costs well under $1.
+- **Frozen index for course 55710.** Only courses 55016 and 56350 are indexed on this machine, so 8 of the 13 `sprint8-chat` cases can't run here. A copy of the frozen Sprint 8 index from whoever ran it lets every case run. A fresh Canvas sync would give different numbers.
+- **Overlap with the generative UI plan** (`2026-10-28-chat-generative-ui.md`). Its steps change `chat.answer()`, as tasks 1 and 7 do, and `ChatPanel.tsx` / `Answer.tsx`, as task 2 does, so merge one before rebasing the other. Its `show_deadlines` tool covers deadline listings (see task 8).
+
+## Tasks
+
+### 1. Rewrite follow-up questions before the first search (beta) — done, merged in PR #55
+
+- **Why:** a follow-up searched as typed ("and the final?") found its fact on 8 of 15 turns. A hand-written stand-alone version found 12 of 14 (Sprint 8 report §1.3). Live chat graded 7 of 16 follow-up turns bad.
+- **Built:** `chat.standalone_query()` makes one JSON call on follow-ups only. The rewritten question is the first search. Any failure falls back to the student's words. 10 new tests; all 554 backend tests pass.
+- **First measurement (2026-11-09):**
+  - Prompt tuned on `heldout` H9, H10, H18, H19.
+  - `sprint8-chat` run on the 5 cases whose courses are indexed here (CH6 to CH10, 6 follow-up turns), without the reranker (its model isn't converted on this machine).
+  - The first search found the turn's fact on 3 of 6 turns, up from 2 of 6. Hand-written rewrites also find 3 of 6.
+  - Any search in the turn found it on 3 of 6 both before and after: the model's forced own search already caught the turn the rewrite fixed.
+  - Median time per follow-up turn went from 2.7 s to 3.2 s.
+  - Judge grades didn't move beyond noise (the same untouched first turn graded good, good, then bad across three runs).
+- **Rerun with the reranker (2026-11-09, same 5 cases, 6 follow-up turns):**
+  - First search found the fact on 2 of 6 before and 2 of 6 after. Any search in the turn: 3 of 6 both ways. Median time per follow-up turn 3.1 s before, 4.0 s after.
+  - Turn by turn, the rewrite is already at its ceiling here. CH7.2 and CH8.2 hit either way. CH9.2 is the only wording miss: the model wrote "TA", the hand rewrite "teaching assistant", and the syllabus chunk says the latter. CH6.2 is a labeling miss: search returns the Task 4 objectives page, which answers the question, but the gold fact string is a phrasing from a different page. CH6.3 misses for the hand rewrite too (a 435-character chunk competing with other Task 4 pages). CH10.2's fact isn't in the local index at all, so it can't be scored here.
+  - So on this sample the rewrite buys nothing and costs about 0.5 to 0.9 s per follow-up. The Sprint 8 gap (8 of 15 as typed, 12 of 14 rewritten) came mostly from course 55710's cases, which can't run here.
+- **Rewrite on, forced own-words search off (2026-11-09, `chat.FOLLOW_UP_MUST_SEARCH = False`, same 6 turns):** first search 2 of 6, any search 2 of 6, median 2.8 s per turn. It saves 0.3 s against main and loses one fact (CH9.2: the model's second search said "Teaching Assistant", which matched; its rewrite said "TA", which didn't). Not worth it on this sample.
+- **Sprint 9 chat set (2026-11-10).** Nobody on the team can sync 18-654 any more, so `sprint9-chat` was written for the two courses that are indexed: 14 chats, 26 follow-up turns, every fact checked word for word in the index text before any search ran. Frozen like the Sprint 8 sets. Search only, as typed against hand-written rewrites: 17 of 26 against 24 of 25.
+
+  | 26 follow-up turns | Main | Rewrite | Rewrite, no forced search |
+  | --- | --- | --- | --- |
+  | First search finds the fact | 17 | 24 | 25 |
+  | Any search finds it | 23 | 24 | 25 |
+  | Median seconds per turn | 2.9 | 4.0 | 2.8 |
+  | Searches per turn | 2 | 2 | 1 |
+  | Judge: good / OK / bad | 18 / 5 / 3 | 21 / 3 / 2 | 18 / 3 / 5 |
+
+  The 5 "bad" grades without the forced search were read by hand: 4 answers state the fact correctly (main's near-identical answers were graded OK or bad too), and 1 (N7.2, "interview two practitioners") is missed by every version because no search returns that chunk.
+- **Decision:** ship the rewrite with the forced search off. It stays on when the rewrite call fails, and `chat.FOLLOW_UP_MUST_SEARCH = True` brings the old behavior back for comparisons.
+- **Left:** nothing. N7.2 goes to task 3 as a search miss.
+- **Proof:** the before/after table, and the PR.
+
+### 2. Thumbs up/down on chat answers (beta) — built, verified
+
+- **Why:** the course's release advice is to collect feedback before rollout. The app has no way to flag an answer. Sprint 9's outside tester can flag bad answers during the test, which feeds the independent-test report and task 6.
+- **Build:** up and down buttons under each finished answer, with an optional short note. Stored on the saved turn in the local conversation file, so nothing leaves the computer. Add a route to list flagged turns for a course.
+- **Proof:** tests for saving and listing; screenshots of an answer with each state.
+- **Built (2026-11-10):** Helpful / Not helpful buttons, removable ratings, and optional notes up to 500 characters. Feedback stays on the saved turn locally and is restored when reopening the chat. `GET /courses/{course_id}/feedback` lists thumbs-down turns for review. The final stream event identifies the saved turn, so failed answers cannot shift feedback onto another answer.
+- **Verified:** 593 backend tests passed (9 skipped), 5 frontend interaction tests passed, production build passed. [Screenshots and verification scope](../evaluations/answer-feedback/README.md).
+
+### 3. Keep graded exam and quiz text out of the index, and drop junk chunks (beta) — junk filter built; exam rule dropped
+
+- **Why:** Sprint 8 found a midterm coding question in the index, and an interviewee raised graded-quiz exposure (Sprint 8 next step 1). The course also drops near-empty and mostly-numeric chunks, and `indexing.py` has no such filter.
+- **Build:**
+  - In `course_sync.sync_course` / `canvas.list_assignments`, skip graded quizzes and exams. Decide the rule from Canvas's own fields (quiz assignments, submission types) before falling back to names.
+  - In `indexing.py`, drop chunks under a minimum length or mostly non-letters.
+- **Proof:**
+  - Tests for both rules.
+  - Chunk counts before and after on the two local courses.
+  - `--retrieval-only` on `sprint8` showing facts found didn't drop.
+- **Built first (2026-11-11, branch `index-filters`, never opened as a PR):** both rules. On the old index: 387 → 385 chunks, no assignment counted as an exam, and retrieval-only facts found unchanged (sprint8 local cases 4/4, heldout recall@5 0.91, sprint9-chat 30/40).
+- **Exam rule dropped (2026-11-15).** For exam-like files found by the course-menu sync (task 8), the decision was to index whatever the student can open. The assignment rule is dropped too, so the two agree. Exam and quiz descriptions are indexed like any other assignment.
+- **Junk filter shipped** (`indexing.is_junk`, branch `junk-chunk-filter`). Canvas chunks under 8 characters or under 25% letters are dropped. A section is judged together with its own heading: "Units / 12" answers sprint9-chat N5.3. Transcripts and the student's notes are not filtered. On the synced copy after task 8 it would drop 43 of 2,589 chunks in 18-658, almost all dot-leader table-of-contents lines from the textbooks, and 3 of 520 in 56350 ("Zotero", "Enjoy!", a one-word slide).
+
+### 4. One retry when a model reply isn't valid JSON (beta) — built on branch `json-retry`
+
+- **Why:** `llm.complete_json` returns `None` on bad JSON. Memory extraction then saves nothing for that turn. Consolidation falls back to adding a memory, which can create duplicates. Copilot has no JSON mode, so it's more exposed.
+- **Build:** on a parse failure or a reply of the wrong shape, one retry that adds "Return exactly one valid JSON object." Count retries in the log.
+- **Proof:** tests for retry-then-success and retry-then-give-up.
+- **Built (2026-11-13):**
+  - `json_retry.complete_json(llm, messages, valid=..., label=...)` wraps any provider, so OpenAI, DeepSeek and Copilot all get it. A reply that is `None` (not JSON) or fails the caller's `valid` check gets one more call with a reminder appended. A second failure returns `None`, which every caller already handles.
+  - Provider errors (network, auth) aren't retried.
+  - Each retry is logged with its caller and outcome (recovered or gave up), and counted. `memory_eval.py` prints the counts at the end of a run.
+  - It lives in its own module so the `memory/` package doesn't import the OpenAI client.
+  - Used by memory extraction (needs a `memories` list), consolidation (needs a known decision and a valid target), and quiz/flashcard writing and checking in `study.py`. Bad items inside a usable list are still dropped one by one, not retried.
+  - **Not used by the follow-up rewrite** (`chat.standalone_query`). It runs while the student waits, a retry would add about a second, and a failed rewrite already falls back to the student's own words plus the forced search.
+  - 18 new tests. All 681 backend tests pass (9 skipped).
+- **Left:** how often retries happen with real models isn't measured. A cached `memory_eval.py` run doesn't call extraction, so it needs a run that writes memories afresh.
+
+### 5. Build the memory evaluation (final) — development sample done, in PR #56
+
+- **Why:** the LongMemEval harness in `docs/specs/2026-09-25-agent-memory-evaluation-design.md` was never built, so the memory layer has no measured numbers.
+- **Build:**
+  - The harness from that spec, on the LongMemEval subset, with the shipped chat without memory as the baseline.
+  - Tool-sequence checks on a small student set:
+    - `recall_memory` called when the answer needs it
+    - "forget that" deleting the right memory
+    - "what was it before?" using `include_history`
+- **Built (2026-11-10):** `backend/scripts/memory_eval.py`, on LongMemEval's oracle split, graded by `gpt-4o` with the benchmark's own prompts.
+  - It compares the shipped chat's window (S0), the whole history (S1), search over raw turns (S2), the memory layer (S3) and the memory layer with past-chat search (S4).
+  - It writes each question's memories once and runs 8 questions at a time: 60 questions in about 50 seconds for $0.04 after the first run.
+- **First result:** on 30 questions the memory layer scored lowest (14 of 27, against 23 for raw-turn search), at about a sixth of the prompt tokens.
+- **What the misses led to,** all in PR #56:
+  - The no-grades filter was dropping "lost 10 pounds". Fixed.
+  - The extraction prompt now asks for dated events and the student's specifics.
+  - **Search over past chats** (`search_past_chats`, design in `docs/specs/2026-11-10-past-chat-search-design.md`). Memory never stores what the assistant said, so "which video did you recommend?" scored 0 to 2 of 10; with the search it scores about 6.
+  - **Recall returns 10 memories, not 5.** Counting questions need every matching memory: 35.2 against 32.5 of 54 on multi-chat questions, four runs each.
+  - **`gpt-5-mini` is the default OpenAI model.** It scored 49.5 to 51.5 of 58 against 42 to 43 for `gpt-4o-mini`. In course chat it is about four times slower (11.7 s a turn against 2.6 s), and a gain there is not established.
+- **Tried and dropped:** writing memories with a stronger model (no difference), and an automatic past-chat search (one more question right for twice the tokens).
+- **What the numbers are worth:** a single run on 60 questions varies by up to four questions. The recall-limit and model results use four runs each; the earlier steps are single runs and show direction only.
+- **Left:**
+  1. The full benchmark, where each history has about 50 sessions. The oracle split used so far holds only the sessions with the answer.
+  2. The student-memory set and the tool-sequence checks above. Nothing coursework-specific is measured yet.
+  3. Whether the chat follows the "check a past answer's course fact with course search" rule.
+  4. The report in `docs/evaluations/`. The results so far are in PR #56's description and commit messages.
+- **Proof so far:** PR #56.
+
+### 6. A grader you can trust (final) — steps 1 to 3 done on branch `grader-check`
+
+- **Why:** Sprint 8 called the automatic grader "too noisy to trust", and "have a person grade a fixed sample" is still open. The final needs believable answer-quality numbers.
+- **Build:**
+  1. Hand-grade a fixed sample of about 30 answers, including any flagged in task 2.
+  2. Measure how often the gpt-4o judge agrees.
+  3. Try the course's pairwise format (old answer vs new answer, verdict first) and keep whichever agrees with people more.
+  4. Add generated questions that need two documents, to grow the 60-question set.
+- **Proof:** the agreement numbers and the chosen grading method, written up in `docs/evaluations/`.
+- **Done (2026-11-13), [report](../evaluations/2026-11-grader-check/report.md):**
+  - **Sample:** 20 `sprint9-chat` turns, each with two answers: the shipped chat and the no-search baseline, both on gpt-4o-mini. Graded blind by one person, split into a tuning half and a reporting half.
+  - **Picks:** the judge picked the same better answer on 20 of 20 turns, in both formats.
+  - **Grades:** pointwise grades matched on 32 of 40 answers (kappa 0.82 on the tuning half, 0.52 on the reporting half). All 8 misses are the judge one step stricter.
+  - **Order:** the pairwise verdict never changed with the order of the answers.
+  - **Decision:** keep the pointwise judge, prompt unchanged. Trust it for comparisons against a baseline, and read its "good" counts as a lower bound.
+  - **Code:** `backend/scripts/grader_check.py`, and `--model` in `ask_modes_eval.py`. Mode G also no longer sends a temperature that gpt-5-mini rejects.
+- **Left:**
+  - Step 4 (two-document questions).
+  - A second grader.
+  - A close pair (two versions of the chat) to test the judge where Sprint 8 found it noisy.
+  - Flagged answers from task 2, once the outside tester has used it.
+
+### 7. A classifier guard for graded-work requests (final) — built, on branch `classifier-guard`
+
+- **Why:** the "don't do graded work" rule is prompt-only, and it held on 5 of 6 misuse prompts in Sprint 8. The course's method is a logistic regression on question embeddings that switches to a stricter prompt instead of refusing outright. It costs one local embedding, which the bge model already loaded can do.
+- **Build:**
+  - A labeled set of misuse and normal questions (real ones plus generated ones), split into train and held-out.
+  - The classifier, loaded at startup.
+  - A high score adds a stricter instruction to that turn's system prompt.
+- **Proof:** held-out accuracy and false-alarm rate. Misuse prompts refused before and after. Normal study questions still answered.
+- **Proof so far:** `docs/evaluations/2026-11-classifier-guard/report.md`. Held-out: 26 of 32 misuse caught, 4 of 65 false alarms (2 of 113 on frozen turns). Chat on gpt-4o-mini, graded by hand: a clear refusal on 29 of 32 misuse requests with the guard vs 23 without, work handed over 1 vs 2. The flagged "when is homework 2 due?" still gets its date 6 of 6. The guard loads on the first question, not at startup.
+
+### 8. Listing questions (final, if time)
+
+- **Why:** "What are all the readings for week 3?" can't be answered from five search results. The course adds an "available documents" overview for this.
+- **Build:** decide with the generative UI plan first. Its `show_deadlines` covers assignments and due dates. What's left is files, pages and lectures. A `list_course_items` tool built from the synced Canvas data would cover them.
+- **Proof:** a few listing questions added to the eval, answered before and after.
+- **Decided (2026-11-15):** `show_deadlines` is still only proposed, so due dates stay with it. Task 8 saves the course outline at sync (module, sub-header section, title, kind) in each course's `manifest.db`, and chat gets a `list_course_items` tool (topic in whole words, item types). Names from it need no citation.
+- **Found on the way: the sync only read Modules.** 18-658 lists no files in its Modules; all 46 of its readings are links in its pages and syllabus, so none were searchable. 56350's Files tab has 24 files no module lists, and 13 announcements nothing read. The sync now covers the whole course menu: files from module items, the Files tab and links in every text it reads (Home, Syllabus, pages, assignments, announcements, discussions), plus announcements and discussion posts as their own kinds. Exam-like files are indexed like any other, by choice.
+- **Live sync into a copy of `~/.secondmind` (the frozen-eval index untouched):**
+
+  | | 18-658 (55016) | 56350 |
+  | --- | --- | --- |
+  | Files indexed, before → after | 0 → 37 (8 images skipped) | 7 → 29 (3 unsupported skipped) |
+  | New announcements / discussions | 0 / 2 | 13 / 0 |
+  | Failures | 0 | 0 |
+  | First-sync time | 14.4 min (two whole textbooks took ~7.5) | 76 s |
+
+  Index on disk: 3.0 MB → 17 MB for both courses. The outline lists each Task page's readings under it ("Linked from Task 3 Resources": 8 files).
+- **Faster first sync, agreed in three steps:** names and outline first (seconds), content indexed in the background with pages and small files first, and large files left for the student. Step 3 is built (below); steps 1 and 2 are not. Syncing costs no money: Canvas API, local extraction, OCR and embeddings.
+- **Faster first sync, rule agreed:** a PDF over 150 pages (page count read from the PDF's header after download, 0.25 s for 722 pages), any other file whose text is longer than a 150-page PDF (about 450,000 characters), or any file over 50 MB (from Canvas's size, before download) waits until the student turns it on. Decided: a long PDF's first 150 pages are indexed as a preview, labeled ("About Face: 150 of 722 pages indexed") in the outline and for the model, so chat says it has only part of the book instead of "not covered". The pages a course assigns are often later (Cooper p507–554, p655–659), so indexing the page ranges the course pages cite is a later option.
+- **Large-file limit built (`large_files.py`, 2026-11-15).** A long file's chunks carry the label in their source name ("About Face.pdf (first 150 of 722 pages)"), the outline says "first 150 of 722 pages synced" or "not synced: 60 MB", and the chat prompt says to tell the student it has only part of the file. Manage courses lists these files with "Sync whole file", which syncs that course right away; turning a file on or off changes its manifest version ("|preview", "|skipped"), so the next sync re-indexes only that file. One sync per course at a time (a lock in `main.py`). Live, on a fresh copy of the old index: 18-658's first sync took 4.5 min instead of 14.4 (both textbooks kept to 150 pages, 0 failures); turning *About Face* on re-synced only that book, in 147 s.
+- **Listing eval (`scripts/listing_eval.py`, 2026-11-15):** 8 questions with full answers taken from the outline, on the synced copy, `gpt-4o-mini`, 2 runs per variant. Answers kept in `~/second-mind-local/2026-11-listing/` (they quote course text).
+
+  | Question | Without tool | With tool | Tool called |
+  | --- | --- | --- | --- |
+  | L1 Task 3 readings (hand key, 11) | 11, 11 | 11, 11 | no |
+  | L2 Task 4 resources (hand key, 19) | 12, 12 | 12, 12 | no |
+  | L3 class preparation readings (hand key, 18) | 4, 5 | 4, 5 | yes, list ignored |
+  | L4 pages in the Task 1 module (5) | 0, 0 | 5, 5 | yes |
+  | L5 Field Project assignments (3) | 3, 3 | 3, 3 | yes |
+  | L6 week 2 literature review materials (5) | 2, 2 | 2, 5 | yes |
+  | L7 all announcements (13) | 3, 3 | 13, 13 | yes |
+  | L8 all sprint deliverables (9) | 5, 5 | 9, 9 | yes |
+
+  Median time 5.0 s against 5.2 s; about 40% more tokens. The first run found the model asking for "sprint deliverables" when "Sprint" is in the item names and "Deliverables" in the module's: a topic now falls back to every word anywhere when the phrase matches nothing, with a plural "s" ignored.
+- **What the listing tool doesn't fix:** a list held inside one long page. Task 4 Resources is two search chunks and only the first came back (L2); Class Preparation is about 45 chunks over 14 weeks (L3), and the answers mixed in page numbers from other pages. That needs a tool that reads a whole page or file by name: a candidate next task.
+- **Left:** steps 1 and 2 of the faster first sync. The frozen Sprint 8/9 sets were written against the old index, so a re-synced index changes what they measure; re-sync the real index after this merges.

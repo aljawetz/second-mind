@@ -31,6 +31,22 @@ backend tests, checks the frozen runtime, builds the installer, and tests its
 installed resources. Tesseract is bundled on Windows; developers still need it
 installed locally to build.
 
+### macOS keeps asking for your password
+
+The app keeps students' keys in the Keychain, and "Always Allow" there is tied to the program's
+signature. A plain `tauri dev` build gets a new signature on every rebuild, so macOS asks for your
+login password again each time. The fix is one local code-signing certificate that signs every dev
+build. `bootstrap` creates it on macOS; on an existing checkout run it yourself, once:
+
+```bash
+./scripts/make-signing-cert.sh
+```
+
+macOS asks for your password once to trust the certificate. After that, click **Always Allow** on
+the Keychain prompts one last time and they stop. If the certificate is missing, `tauri dev` prints a
+reminder at launch. Keep the `.p12` backup the script writes to your home folder; deleting the
+certificate means approving once more.
+
 ## Before opening a PR
 
 ```bash

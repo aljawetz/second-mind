@@ -22,16 +22,17 @@ export function getBackendInstanceToken(): Promise<string> {
 
 export type CredentialKind = "canvas" | LlmProvider;
 
-// Format check only (Step 2) — not a real Canvas/model provider call yet. Step 3
-// upgrades main.py's handler for this same endpoint to do that; the
-// frontend's interface here doesn't need to change when it does.
+// Format check, then one real call (main.py's verify_credential): a Canvas
+// token against canvasBaseUrl, an OpenAI or DeepSeek key against the
+// provider. Without canvasBaseUrl a Canvas token gets the format check only.
 export async function validateCredential(
   kind: CredentialKind,
-  value: string
+  value: string,
+  canvasBaseUrl?: string
 ): Promise<{ valid: boolean; reason: string }> {
   const res = await fetch("http://127.0.0.1:8756/credentials/validate", {
     method: "POST",
-    body: JSON.stringify({ kind, value }),
+    body: JSON.stringify({ kind, value, canvas_base_url: canvasBaseUrl }),
   });
   return res.json();
 }
@@ -144,7 +145,7 @@ export async function listAssignments(courseId: number): Promise<CanvasAssignmen
 }
 
 export interface Citation {
-  source_type: "page" | "file" | "syllabus" | "assignment" | "transcript" | "notes";
+  source_type: "page" | "file" | "syllabus" | "assignment" | "announcement" | "discussion" | "transcript" | "notes";
   label: string;
   item_id: string;
 }
@@ -174,6 +175,8 @@ export interface MemoryUsed {
 
 export interface AskEvent {
   conversation_id?: string;
+  // Only present on done after the backend has saved this answer.
+  turn_index?: number;
   delta?: string;
   citations?: Citation[];
   grounded?: boolean;
@@ -218,12 +221,19 @@ export async function askQuestion(
 }
 
 // Saved course chats (conversations.py): one per conversation id, newest
-// first. A saved turn has no memories_used; only the live /ask stream does.
+// first. A saved turn's memories_used has today's text of each memory its
+// answer drew on, minus any since forgotten.
 export interface ConversationSummary {
   conversation_id: string;
   title: string;
   updated_at: string;
   turn_count: number;
+}
+
+export interface AnswerFeedback {
+  rating: "up" | "down";
+  note: string;
+  updated_at: string;
 }
 
 export interface SavedTurn {
@@ -232,6 +242,24 @@ export interface SavedTurn {
   citations: Citation[];
   grounded: boolean;
   asked_at: string;
+  memories_used?: MemoryUsed[];
+  feedback?: AnswerFeedback | null;
+}
+
+export async function saveAnswerFeedback(
+  courseId: number,
+  conversationId: string,
+  turnIndex: number,
+  rating: AnswerFeedback["rating"] | null,
+  note = ""
+): Promise<AnswerFeedback | null> {
+  const res = await fetch(
+    `http://127.0.0.1:8756/courses/${courseId}/conversations/${conversationId}/turns/${turnIndex}/feedback`,
+    { method: "POST", body: JSON.stringify({ rating, note }) }
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message ?? `Couldn't save feedback (${res.status})`);
+  return data.feedback;
 }
 
 export async function listConversations(courseId: number): Promise<ConversationSummary[]> {
@@ -397,6 +425,40 @@ export async function deleteSession(courseId: number, sessionId: string): Promis
 // manifest, every session recording and note — all of it, unrecoverable).
 export async function unselectCourse(courseId: number): Promise<void> {
   await fetch(`http://127.0.0.1:8756/courses/${courseId}/unselect`, { method: "POST" });
+}
+
+// A long file kept to a preview, or one too big to download
+// (backend/large_files.py). want_full: the student turned it on, so the next
+// sync indexes all of it.
+export interface LargeFile {
+  file_id: string;
+  name: string;
+  size: number;
+  pages: number | null;
+  chars: number | null;
+  state: "preview" | "none" | "full";
+  want_full: boolean;
+}
+
+export async function listLargeFiles(courseId: number): Promise<LargeFile[]> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/large-files`);
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `failed to list large files (${res.status})`);
+  }
+  return data.files ?? [];
+}
+
+export async function setLargeFileFull(courseId: number, fileId: string, full: boolean): Promise<void> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/large-files/${fileId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ full }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error?.message ?? `failed to update the file (${res.status})`);
+  }
 }
 
 export async function deleteCourse(courseId: number): Promise<void> {

@@ -1,6 +1,8 @@
 """Sidecar backend — see docs/architecture/implementation-plan.md."""
 
+import collections
 import errno
+import importlib
 import itertools
 import json
 import multiprocessing
@@ -16,20 +18,6 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs
-
-# Handle PyInstaller worker processes before importing the application stack.
-# The self-test runs offline against the same native libraries/models we ship.
-if __name__ == "__main__":
-    multiprocessing.freeze_support()
-    if sys.argv[1:] == ["--self-test"]:
-        from runtime_check import run
-
-        run()
-        # Native model/database shutdown has the same teardown hazards as
-        # the server (_exit_now below); all check writes are complete.
-        sys.stdout.flush()
-        sys.stderr.flush()
-        os._exit(0)
 
 import httpx
 import openai
@@ -92,10 +80,14 @@ class _MemoryWorkerProxy:
 
 MEMORY_WORKER = _MemoryWorkerProxy()
 
+_SYNC_LOCKS: "collections.defaultdict[int, threading.Lock]" = collections.defaultdict(threading.Lock)
+
 COURSE_PATH = re.compile(r"^/courses/(\d+)$")
 UNSELECT_PATH = re.compile(r"^/courses/(\d+)/unselect$")
 ASK_PATH = re.compile(r"^/courses/(\d+)/ask$")
 SYNC_PATH = re.compile(r"^/courses/(\d+)/sync$")
+LARGE_FILES_PATH = re.compile(r"^/courses/(\d+)/large-files$")
+LARGE_FILE_PATH = re.compile(r"^/courses/(\d+)/large-files/(\d+)$")
 ASSIGNMENTS_PATH = re.compile(r"^/courses/(\d+)/assignments$")
 EXPLAIN_PATH = re.compile(r"^/courses/(\d+)/assignments/(\d+)/explain$")
 SESSION_LIST_PATH = re.compile(r"^/courses/(\d+)/sessions$")
@@ -108,6 +100,8 @@ SESSION_CHUNK_PATH = re.compile(r"^/sessions/([\w-]+)/chunks/(\d+)$")
 SESSION_NOTES_PATH = re.compile(r"^/sessions/([\w-]+)/notes$")
 CONVERSATION_LIST_PATH = re.compile(r"^/courses/(\d+)/conversations$")
 CONVERSATION_DETAIL_PATH = re.compile(r"^/courses/(\d+)/conversations/([\w-]+)$")
+TURN_FEEDBACK_PATH = re.compile(r"^/courses/(\d+)/conversations/([\w-]+)/turns/(-?\d+)/feedback$")
+FEEDBACK_LIST_PATH = re.compile(r"^/courses/(\d+)/feedback$")
 MEMORY_LIST_PATH = re.compile(r"^/courses/(\d+)/memories$")
 MEMORY_ALL_PATH = re.compile(r"^/courses/(\d+)/memories/all$")
 MEMORY_DETAIL_PATH = re.compile(r"^/courses/(\d+)/memories/([\w-]+)$")
@@ -149,6 +143,28 @@ def _memory_service(course_id: int, provider=None, conversation_id: str | None =
     )
 
 
+_guard = None
+_guard_loaded = False
+_guard_lock = threading.Lock()
+
+
+def _graded_work_guard():
+    """guard.Guard.flags, loaded once on first use and shared by request
+    threads; None when the weights file is missing (RAG gaps plan, task 7)."""
+    global _guard, _guard_loaded
+    with _guard_lock:
+        if not _guard_loaded:
+            import guard
+            import memory_jobs
+
+            _guard_loaded = True
+            try:
+                _guard = guard.load(memory_jobs.embed)
+            except Exception:
+                traceback.print_exc(file=sys.stderr)
+    return _guard.flags if _guard is not None else None
+
+
 def _run_memory_job(job: tuple[int, str | None]) -> None:
     """(course, chat): read the chat's new turns, then sweep the course.
     (course, None): just the sweep, which needs no model and so no key."""
@@ -166,16 +182,48 @@ def _run_memory_job(job: tuple[int, str | None]) -> None:
         service.sweep()
 
 
+# Modules that pull in llama_index, LanceDB or the ONNX models. They're
+# imported when first needed, so /ping answers within ~2 s of launch. But the
+# app's first requests (each course's sync, the assignments list, sessions,
+# study, and the startup memory jobs below) arrive together, each in its own
+# thread, and concurrent first imports of llama_index break: "cannot import
+# name 'BaseRetriever' from partially initialized module" and
+# "_DeadlockError". 18-658's sync failed that way before doing anything (seen
+# in the app, 2026-11-17). So they are imported once, under a lock, before
+# any request that may need them.
+HEAVY_MODULES = ("indexing", "generation", "chat", "course_sync", "courses", "explain", "memory_jobs", "sessions", "study")
+_heavy_lock = threading.Lock()
+_heavy_loaded = False
+# Routes that never touch them: startup, onboarding and the Canvas course list.
+LIGHT_PATHS = frozenset(
+    {"/ping", "/config", "/courses", "/credentials/status", "/credentials/validate", "/github/device/start", "/github/device/poll"}
+)
+
+
+def _load_heavy_modules() -> None:
+    global _heavy_loaded
+    if _heavy_loaded:
+        return
+    with _heavy_lock:
+        if not _heavy_loaded:
+            for name in HEAVY_MODULES:
+                importlib.import_module(name)
+            _heavy_loaded = True
+
+
+def _needs_heavy_modules(path: str) -> bool:
+    return path not in LIGHT_PATHS
+
+
 def queue_startup_memory_jobs() -> None:
     """At startup: turns saved but not yet read by memory when the app last
     quit, then a sweep of every selected course."""
+    _load_heavy_modules()
+    import memory_jobs
+
     if not _memory_enabled():
         return
     selected = config.read_config(SM_HOME).get("selected_courses", [])
-    if not selected:
-        return
-    import memory_jobs
-
     for job in memory_jobs.pending(SM_HOME, selected):
         MEMORY_WORKER.submit(job)
     for course_id in selected:
@@ -185,6 +233,26 @@ def queue_startup_memory_jobs() -> None:
 def _parse_include_inactive(query: str) -> bool:
     val = parse_qs(query).get("include_inactive", [""])[0].strip().lower()
     return val in ("1", "true", "yes")
+
+
+def _attach_memories_used(course_id: int, conversation: dict) -> None:
+    """A saved turn keeps the ids of the memories its answer drew on
+    (memory_ids). Swap them for memories_used: [{id, text}], the same shape
+    the live /ask stream sends, with today's text. Memories since forgotten,
+    replaced or archived are left out. If the memory store can't be read,
+    the chat still opens, just without them."""
+    turns = conversation.get("turns", [])
+    wanted = {i for t in turns for i in t.get("memory_ids", [])}
+    active: dict[str, str] = {}
+    if wanted and _memory_enabled():
+        try:
+            with _memory_service(course_id) as service:
+                active = {m.id: m.text for m in service.list() if m.id in wanted}
+        except sqlite3.Error:
+            traceback.print_exc()
+    for t in turns:
+        if "memory_ids" in t:
+            t["memories_used"] = [{"id": i, "text": active[i]} for i in t.pop("memory_ids") if i in active]
 
 
 def _memory_json(m) -> dict:
@@ -241,6 +309,55 @@ def validate_credential(kind: str, value: str) -> tuple[bool, str]:
     return False, f"unknown credential kind '{kind}'"
 
 
+def _check_canvas_token(base_url: str, token: str) -> tuple[bool, str]:
+    origin = config.normalize_canvas_base_url(base_url)
+    try:
+        res = httpx.get(
+            f"{origin}/api/v1/users/self",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10.0,
+        )
+    except httpx.HTTPError:
+        return False, f"couldn't reach Canvas at {origin} — check the URL"
+    if res.status_code == 401:
+        return False, "Canvas didn't accept this token — create a new one under Account → Settings"
+    if res.status_code != 200:
+        return False, f"Canvas at {origin} answered with an error ({res.status_code}) — check the URL"
+    return True, ""
+
+
+def _check_llm_key(kind: str, key: str) -> tuple[bool, str]:
+    provider = providers.PROVIDERS[kind]
+    try:
+        providers.openai_client(provider, key).with_options(timeout=10.0, max_retries=0).models.list()
+    except openai.AuthenticationError:
+        return False, f"{provider.name} didn't accept this key"
+    except openai.APIConnectionError:
+        return False, f"couldn't reach {provider.name} — check your connection"
+    except openai.APIError:
+        # Rate limits or outages say nothing about the key itself.
+        return True, ""
+    return True, ""
+
+
+def verify_credential(kind: str, value: str, canvas_base_url: str | None = None) -> tuple[bool, str]:
+    """/credentials/validate: the format check, then one real call. Found
+    in the Sprint 9 test run: a format check alone accepted any 20
+    characters as a Canvas token, so a wrong token only showed up later as
+    an empty course list. Canvas is checked only when the app sends the
+    Canvas URL; Copilot keeps the format check (its sign-in flow checks
+    the token itself)."""
+    valid, reason = validate_credential(kind, value)
+    if not valid:
+        return valid, reason
+    value = value.strip()
+    if kind == "canvas":
+        return _check_canvas_token(canvas_base_url, value) if canvas_base_url else (True, "")
+    if kind in providers.PROVIDERS and kind != providers.COPILOT.id:
+        return _check_llm_key(kind, value)
+    return True, ""
+
+
 class Handler(BaseHTTPRequestHandler):
     # BaseHTTPRequestHandler defaults to declaring HTTP/1.0, under which
     # Transfer-Encoding: chunked (/ask's streaming response) is technically
@@ -264,6 +381,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path, _, query = self.path.partition("?")
+        if _needs_heavy_modules(path):
+            _load_heavy_modules()
         if path == "/ping":
             self._send_json(200, {"status": "ok", "source": "sm-backend", "instance": INSTANCE_TOKEN})
         elif path == "/courses":
@@ -292,6 +411,14 @@ class Handler(BaseHTTPRequestHandler):
             conversation_list_match = CONVERSATION_LIST_PATH.match(path)
             if conversation_list_match:
                 self._handle_list_conversations(conversation_list_match.group(1))
+                return
+            large_files_match = LARGE_FILES_PATH.match(path)
+            if large_files_match:
+                self._handle_list_large_files(large_files_match.group(1))
+                return
+            feedback_list_match = FEEDBACK_LIST_PATH.match(path)
+            if feedback_list_match:
+                self._handle_list_feedback(feedback_list_match.group(1))
                 return
             conversation_match = CONVERSATION_DETAIL_PATH.match(path)
             if conversation_match:
@@ -454,6 +581,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path, _, _ = self.path.partition("?")
+        if _needs_heavy_modules(path):
+            _load_heavy_modules()
         if path == "/config":
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length)
@@ -497,7 +626,9 @@ class Handler(BaseHTTPRequestHandler):
             except json.JSONDecodeError:
                 self._send_json(400, {"error": {"code": "bad_request", "message": "invalid JSON"}})
                 return
-            valid, reason = validate_credential(data.get("kind", ""), data.get("value", ""))
+            valid, reason = verify_credential(
+                data.get("kind", ""), data.get("value", ""), data.get("canvas_base_url") or None
+            )
             self._send_json(200, {"valid": valid, "reason": reason})
             return
 
@@ -509,6 +640,16 @@ class Handler(BaseHTTPRequestHandler):
         ask_match = ASK_PATH.match(path)
         if ask_match:
             self._handle_ask(ask_match.group(1))
+            return
+
+        feedback_match = TURN_FEEDBACK_PATH.match(path)
+        if feedback_match:
+            self._handle_turn_feedback(*feedback_match.groups())
+            return
+
+        large_file_match = LARGE_FILE_PATH.match(path)
+        if large_file_match:
+            self._handle_set_large_file(*large_file_match.groups())
             return
 
         sync_match = SYNC_PATH.match(path)
@@ -575,6 +716,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         path, _, query = self.path.partition("?")
+        if _needs_heavy_modules(path):
+            _load_heavy_modules()
         if path == "/data":
             import privacy
 
@@ -731,6 +874,36 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send_json(200, {"conversations": conversations.list_conversations(SM_HOME, int(course_id))})
 
+    def _handle_list_feedback(self, course_id: str):
+        import conversations
+
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        self._send_json(200, {"turns": conversations.list_feedback(SM_HOME, int(course_id))})
+
+    def _handle_turn_feedback(self, course_id: str, cid: str, turn_index: str):
+        import conversations
+
+        raw = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        try:
+            data = json.loads(raw)
+            if not isinstance(data, dict) or "rating" not in data or data.keys() - {"rating", "note"}:
+                raise ValueError("expected rating and an optional note")
+            feedback = conversations.set_feedback(
+                SM_HOME, int(course_id), cid, int(turn_index), data["rating"], data.get("note", "")
+            )
+        except (ValueError, UnicodeDecodeError) as e:
+            self._send_json(400, {"error": {"code": "bad_request", "message": str(e)}})
+            return
+        except KeyError:
+            self._not_found("no such conversation or turn")
+            return
+        self._send_json(200, {"feedback": feedback})
+
     def _handle_conversation_detail(self, course_id: str, cid: str):
         import conversations
 
@@ -741,6 +914,7 @@ class Handler(BaseHTTPRequestHandler):
         if conversation is None:
             self._not_found("no such conversation")
             return
+        _attach_memories_used(int(course_id), conversation)
         self._send_json(200, conversation)
 
     def _handle_conversation_delete(self, course_id: str, cid: str):
@@ -836,6 +1010,7 @@ class Handler(BaseHTTPRequestHandler):
     def _handle_ask(self, course_id: str):
         import chat
         import conversations
+        import course_items
         import indexing
         import llm
         from llama_index.vector_stores.lancedb.base import TableNotFoundError
@@ -893,11 +1068,15 @@ class Handler(BaseHTTPRequestHandler):
             # searching, the first model calls) fails here, before any response
             # bytes, and still gets a clean status code.
             try:
+                # Course not indexed yet (never synced, or its first sync failed):
+                # every search comes back empty and the model says it couldn't
+                # find anything, same as a real miss. Checked up front because
+                # load_index opens a missing table lazily: the error would
+                # only surface at the first search, after this handler's catch.
+                db_path, table_name = SM_HOME / "index.lancedb", f"course_{course_id}"
                 try:
-                    index = indexing.load_index(SM_HOME / "index.lancedb", f"course_{course_id}")
+                    index = indexing.load_index(db_path, table_name) if indexing.index_exists(db_path, table_name) else None
                 except TableNotFoundError:
-                    # Course not indexed yet: every search comes back empty and the
-                    # model says it couldn't find anything, same as a real miss.
                     index = None
                 provider = llm.current_provider()
                 memory = _memory_service(int(course_id), provider, conversation_id=cid) if memory_on else None
@@ -909,6 +1088,8 @@ class Handler(BaseHTTPRequestHandler):
                     provider,
                     memory=memory,
                     summary=summary,
+                    guard=_graded_work_guard(),
+                    list_items=lambda topic, types: course_items.list_for_course(SM_HOME, int(course_id), topic, types),
                 )
                 first = next(events)
             except OnnxModelFileMissing:
@@ -974,9 +1155,16 @@ class Handler(BaseHTTPRequestHandler):
                         "grounded": final.get("grounded", False),
                         "asked_at": asked_at,
                     }
-                    if conversations.append_turn(
+                    # Ids only: the text is looked up again when the chat is
+                    # opened, so an edited memory shows its new text and a
+                    # forgotten one isn't kept on disk here.
+                    if final.get("memories_used"):
+                        turn["memory_ids"] = [m["id"] for m in final["memories_used"]]
+                    turn_index = conversations.append_turn(
                         SM_HOME, course_id, cid, turn, create_if_missing=create_if_missing
-                    ):
+                    )
+                    if turn_index is not None:
+                        event = {**event, "turn_index": turn_index}
                         if memory_on:
                             MEMORY_WORKER.submit((course_id, cid))
                 self._write_chunk(event)
@@ -1004,10 +1192,61 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Transfer-Encoding", "chunked")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
-        for event in course_sync.sync_course(int(course_id), SM_HOME):
-            self._write_chunk(event)
+        # One sync per course at a time: the launch sync and a "sync whole
+        # file" from Manage courses can otherwise write one manifest at once.
+        with _SYNC_LOCKS[int(course_id)]:
+            for event in course_sync.sync_course(int(course_id), SM_HOME):
+                self._write_chunk(event)
         self.wfile.write(b"0\r\n\r\n")
         self.wfile.flush()
+
+    def _large_files_conn(self, course_id: int):
+        """The course's manifest, or None when it was never synced (nothing
+        is created just by asking)."""
+        import sync
+
+        path = SM_HOME / "courses" / str(course_id) / "manifest.db"
+        return sync.open_manifest(path) if path.exists() else None
+
+    def _handle_list_large_files(self, course_id: str):
+        import large_files
+
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        conn = self._large_files_conn(int(course_id))
+        if conn is None:
+            self._send_json(200, {"files": []})
+            return
+        try:
+            self._send_json(200, {"files": large_files.rows(conn)})
+        finally:
+            conn.close()
+
+    def _handle_set_large_file(self, course_id: str, file_id: str):
+        """{"full": true} indexes the whole file on the next sync; false goes
+        back to the preview (large_files.py)."""
+        import large_files
+
+        data = self._read_json_body()
+        if data is None:
+            return
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        if not isinstance(data.get("full"), bool):
+            self._send_json(400, {"error": {"code": "bad_request", "message": "full must be true or false"}})
+            return
+        conn = self._large_files_conn(int(course_id))
+        try:
+            found = conn is not None and large_files.set_want_full(conn, file_id, data["full"])
+        finally:
+            if conn is not None:
+                conn.close()
+        if not found:
+            self._not_found("no such large file")
+            return
+        self._send_json(200, {"file_id": file_id, "want_full": data["full"]})
 
     def _handle_explain(self, course_id: str, assignment_id: str):
         import explain
@@ -1233,6 +1472,13 @@ def _exit_when_app_closes() -> None:
 
 
 if __name__ == "__main__":
+    # Required before anything that might use multiprocessing (faster-whisper's
+    # transcription backend does) — without this, the frozen PyInstaller binary
+    # re-executes this entire script every time a worker process is spawned,
+    # which recursively re-spawns more workers. Confirmed as a real, genuine
+    # fork bomb during Step 12's development, not a theoretical risk.
+    multiprocessing.freeze_support()
+
     # stdout is a pipe to the Tauri app, so Python block-buffers it: sync's
     # "[course_sync] skipping ..." lines sat unseen in the buffer instead of
     # reaching the app's [backend] log. Line buffering delivers each line.
@@ -1253,18 +1499,7 @@ if __name__ == "__main__":
     try:
         server = ThreadingHTTPServer((HOST, PORT), Handler)
     except OSError as e:
-        # Windows can report WSAEACCES when another listener has exclusive
-        # use of the port. Do not disguise other access-denied errors.
-        port_taken = e.errno == errno.EADDRINUSE
-        if getattr(e, "winerror", None) == 10013:
-            import socket
-
-            try:
-                with socket.create_connection((HOST, PORT), timeout=1):
-                    port_taken = True
-            except OSError:
-                pass
-        if not port_taken:
+        if e.errno != errno.EADDRINUSE:
             raise
         print(
             f"sm-backend: port {PORT} is already in use, most likely by another "

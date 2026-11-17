@@ -373,7 +373,18 @@ def test_a_reply_that_is_not_json_gives_an_empty_result(db):
     result = study.generate("quiz", _material(db), count=5, difficulty="easy", topic="", llm=llm, rng=random.Random(0))
 
     assert result["items"] == []
-    assert len(llm.calls) == 1  # nothing to check
+    assert len(llm.calls) == 2  # the reply, its one retry, and nothing to check
+
+
+def test_an_unusable_reply_is_asked_for_once_more(db):
+    llm = ScriptedLLM(None, {"title": "T", "cards": [_card("Stub")]}, {"cards": "oops"}, {"supported": [1]})
+
+    result = study.generate("flashcards", _material(db), count=1, difficulty="easy", topic="", llm=llm, rng=random.Random(0))
+
+    assert len(llm.calls) == 4  # write, retry, check, retry
+    assert "valid JSON object" in llm.calls[1][-1]["content"]
+    assert [c["front"] for c in result["items"]] == ["Stub"]
+    assert result["stats"]["checked"] is True
 
 
 # --- storage and background runs --------------------------------------------

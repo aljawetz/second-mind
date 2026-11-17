@@ -54,6 +54,17 @@ def test_at_most_k_results(store):
     assert len(_recall(store, "anything", k=3)) == 3
 
 
+def test_ten_memories_come_back_when_no_limit_is_given(store):
+    # Five left some facts out of counting questions ("how many kits have I
+    # bought?"): on 60 multi-chat questions of the memory evaluation, ten
+    # answered about three more, in each of four runs.
+    for i in range(14):
+        _add(store, f"Memory {i}.", [1.0, 0.01 * i, 0.0])
+
+    assert recall.TOP_K == 10
+    assert len(_recall(store, "anything")) == 10
+
+
 def test_an_empty_store_recalls_nothing(store):
     assert _recall(store, "anything") == []
 

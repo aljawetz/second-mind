@@ -42,6 +42,12 @@ export async function openCitation(
     await open(`${origin}/courses/${courseId}/assignments/${assignmentId}`);
     return;
   }
+  if (citation.source_type === "announcement" || citation.source_type === "discussion") {
+    // Both are discussion topics in Canvas, under the same URL.
+    const topicId = citation.item_id.replace(/^(announcement|discussion):/, "");
+    await open(`${origin}/courses/${courseId}/discussion_topics/${topicId}`);
+    return;
+  }
   if (citation.source_type === "page") {
     const pageUrl = citation.item_id.replace(/^page:/, "");
     await open(`${origin}/courses/${courseId}/pages/${pageUrl}`);

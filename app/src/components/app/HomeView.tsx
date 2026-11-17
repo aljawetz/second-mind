@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { splitAssignments, statusPill } from "../../assignmentStatus";
+import { countdownPercent, dueParts, splitAssignments, statusText } from "../../assignmentStatus";
 import type { CanvasAssignment, Citation, SessionSummary } from "../../sidecar";
 import { openCitation } from "../../citations";
 import ChatPanel from "./ChatPanel";
@@ -53,16 +53,29 @@ export default function HomeView({
   // Upcoming work is what needs attention; past work is there to check.
   const [pastOpen, setPastOpen] = useState(false);
 
+  // The first upcoming item due within a week gets the countdown bar.
+  const countdownId = upcoming.find((a) => countdownPercent(a) !== null)?.id;
+
   function renderRows(list: CanvasAssignment[]) {
     return list.map((a) => {
-      const pill = statusPill(a);
+      const status = statusText(a);
+      const when = dueParts(a.due_at);
+      const percent = a.id === countdownId ? countdownPercent(a) : null;
       return (
         <button className="assign-row" key={a.id} type="button" onClick={() => onOpenAssignment(a.id)}>
+          <span className="when">
+            <span className="day">{when.day}</span>
+            <span className="dow">{when.dow}</span>
+          </span>
           <span className="body">
             <span className="ttl">{a.name}</span>
-            <span className={`pill ${pill.cls}`}>{pill.text}</span>
+            <span className={`status ${status.tone}`}>{status.text}</span>
+            {percent !== null && (
+              <span className="count" aria-hidden="true">
+                <i style={{ width: `${percent}%` }}></i>
+              </span>
+            )}
           </span>
-          <Chevron />
         </button>
       );
     });
@@ -82,7 +95,6 @@ export default function HomeView({
       />
 
       <div className="home-side">
-        {studyPanel}
         <section className="assign-panel" aria-label="Assignments">
           <div className="assign-top">
             <h2>Assignments</h2>
@@ -113,6 +125,7 @@ export default function HomeView({
             )}
           </div>
         </section>
+        {studyPanel}
       </div>
     </section>
   );

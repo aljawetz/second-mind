@@ -12,11 +12,13 @@ const GENERAL_KNOWLEDGE_LABEL = "General knowledge (not from your course materia
 // sent after the answer. [1, 3] is two markers.
 const CITATION = /[ \t]?\[(\d+(?:\s*,\s*\d+)*)\]/g;
 
-const SOURCE_KIND: Record<Citation["source_type"], string> = {
+export const SOURCE_KIND: Record<Citation["source_type"], string> = {
   page: "Canvas page",
   file: "File",
   syllabus: "Syllabus",
   assignment: "Assignment",
+  announcement: "Announcement",
+  discussion: "Discussion",
   transcript: "Recording",
   notes: "Your notes",
 };
@@ -139,7 +141,7 @@ export default function Answer({
       {course && <div className="qa-body">{markdown(course)}</div>}
       {general !== null && (
         <div className="qa-general">
-          <div className="qa-general-head">General knowledge · not from your course</div>
+          <div className="qa-general-head">General knowledge, not from your course</div>
           {general && <div className="qa-body">{markdown(general)}</div>}
         </div>
       )}
@@ -164,14 +166,19 @@ export default function Answer({
         </ol>
       )}
       {memoriesUsed.length > 0 && (
-        <div className="qa-memories">
-          <span>Used what you told me earlier</span>
-          {memoriesUsed.map((m) => (
-            <span className="memory-chip" key={m.id}>
-              {m.text}
-            </span>
-          ))}
-        </div>
+        // One quiet line by default; the memories themselves only on request.
+        <details className="qa-memories">
+          <summary>
+            Used {memoriesUsed.length === 1 ? "1 thing" : `${memoriesUsed.length} things`} you told me earlier
+          </summary>
+          <ul>
+            {memoriesUsed.map((m) => (
+              <li className="memory-chip" key={m.id} title={m.text}>
+                {m.text}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
       {actions}
     </>

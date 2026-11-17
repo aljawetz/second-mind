@@ -113,6 +113,11 @@ export default function QuizView({
   }).length;
   const attempted = Object.keys(answers).length;
   const skipped = questions.length - attempted;
+  // What to look at again after a run: wrong or skipped, each with where it comes from.
+  const review = questions
+    .map((qq, i) => ({ qq, answer: answers[String(i)] }))
+    .filter(({ qq, answer }) => answer === undefined || !qq.options[answer]?.correct)
+    .slice(0, 5);
 
   return (
     <section className="study-view">
@@ -154,6 +159,24 @@ export default function QuizView({
                   <dd>{skipped}</dd>
                 </div>
               </dl>
+              {review.length > 0 && (
+                <div className="quiz-review">
+                  <h3>Worth another look</h3>
+                  <ul>
+                    {review.map(({ qq, answer }, i) => (
+                      <li key={i}>
+                        <span className="rq">
+                          {qq.question}
+                          {answer === undefined && <span className="muted"> Skipped</span>}
+                        </span>
+                        <button type="button" className="cite cite-link" onClick={() => onOpenCitation(qq.citation)}>
+                          {qq.citation.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="study-actions center">
                 <button type="button" className="btn-secondary" onClick={() => restart(true)}>
                   Review answers
@@ -212,7 +235,7 @@ export default function QuizView({
                 </div>
                 <div className="study-actions">
                   <button type="button" className="btn-secondary" disabled={position === 0} onClick={() => go(position - 1)}>
-                    ‹ Previous
+                    Previous
                   </button>
                   <button
                     type="button"
@@ -221,11 +244,11 @@ export default function QuizView({
                     title={answered ? undefined : "Answer first"}
                     onClick={() => onExplain(explainQuizPrompt(q, chosen))}
                   >
-                    ✦ Explain
+                    Explain
                   </button>
                   {position < questions.length - 1 ? (
                     <button type="button" className="btn-primary" onClick={() => go(position + 1)}>
-                      Next ›
+                      Next
                     </button>
                   ) : (
                     <button type="button" className="btn-primary" onClick={finish}>
