@@ -1482,6 +1482,12 @@ if __name__ == "__main__":
     # fork bomb during Step 12's development, not a theoretical risk.
     multiprocessing.freeze_support()
 
+    if sys.argv[1:] == ["--self-test"]:
+        from runtime_check import run
+
+        run()
+        _exit_now(0)
+
     # stdout is a pipe to the Tauri app, so Python block-buffers it: sync's
     # "[course_sync] skipping ..." lines sat unseen in the buffer instead of
     # reaching the app's [backend] log. Line buffering delivers each line.
