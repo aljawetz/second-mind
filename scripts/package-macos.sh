@@ -46,5 +46,18 @@ codesign --verify --deep --strict --verbose=4 "$APP"
 
 mkdir -p "$DMG_DIR"
 rm -f "$DMG_DIR"/*.dmg
-hdiutil create -volname "Second Mind" -srcfolder "$APP" -ov -format UDZO "$DMG_DIR/SecondMind.dmg"
+# On GitHub's macOS runners hdiutil sometimes fails with "Resource busy"
+# while the system still holds the freshly signed app (the first v0.2.0
+# build that got this far hit it). It passes on a retry, so try a few times.
+for attempt in 1 2 3 4 5; do
+  if hdiutil create -volname "Second Mind" -srcfolder "$APP" -ov -format UDZO "$DMG_DIR/SecondMind.dmg"; then
+    break
+  fi
+  if [ "$attempt" -eq 5 ]; then
+    echo "hdiutil failed 5 times" >&2
+    exit 1
+  fi
+  echo "hdiutil failed (attempt $attempt), retrying in 10s" >&2
+  sleep 10
+done
 echo "packaged: $DMG_DIR/SecondMind.dmg"
