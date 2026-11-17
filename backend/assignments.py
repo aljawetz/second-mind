@@ -141,11 +141,12 @@ def _row(assignment: dict, now: datetime, tz: tzinfo) -> dict:
     }
 
 
-def upcoming(raw: list[dict], days: int = DEFAULT_DAYS, include_submitted: bool = False, now: datetime | None = None,
+def upcoming(raw: list[dict], days: int = DEFAULT_DAYS, only_unsubmitted: bool = False, now: datetime | None = None,
              tz: tzinfo | None = None) -> dict:
-    """raw: canvas.list_assignments() rows. Assignments due in the next
-    `days` days, plus unsubmitted ones up to OVERDUE_DAYS past due, soonest
-    first. Submitted or graded work only with include_submitted."""
+    """raw: canvas.list_assignments() rows. Every assignment due from
+    OVERDUE_DAYS ago to `days` days ahead, submitted or not, each with its
+    status, soonest first; the student asks a follow-up to narrow it. With
+    only_unsubmitted, just the work still to hand in."""
     now = now or datetime.now(timezone.utc)
     tz = tz or machine_zone()
     days = min(max(int(days), 1), MAX_DAYS)
@@ -157,7 +158,7 @@ def upcoming(raw: list[dict], days: int = DEFAULT_DAYS, include_submitted: bool 
             continue
         row = _row(a, now, tz)
         done = row["status"] in ("submitted", "graded")
-        if done and not include_submitted:
+        if done and only_unsubmitted:
             continue
         rows.append((due, row))
     rows.sort(key=lambda pair: pair[0])

@@ -59,12 +59,13 @@ def test_upcoming_keeps_the_window_sorted_by_due_date():
     assert "due_at" not in out["assignments"][0]  # only the explicit utc/local/display fields
 
 
-def test_upcoming_hides_submitted_work_unless_asked():
+def test_upcoming_shows_submitted_and_unsubmitted_work_by_default():
     raw = [_a(1, "Lab 3", NOW + timedelta(days=2), SUBMITTED), _a(2, "Lab 4", NOW + timedelta(days=3), UNSUBMITTED)]
 
-    assert [a["name"] for a in assignments.upcoming(raw, days=7, now=NOW)["assignments"]] == ["Lab 4"]
-    shown = assignments.upcoming(raw, days=7, include_submitted=True, now=NOW)["assignments"]
+    shown = assignments.upcoming(raw, days=7, now=NOW)["assignments"]
     assert [(a["name"], a["status"]) for a in shown] == [("Lab 3", "submitted"), ("Lab 4", "not submitted")]
+    left = assignments.upcoming(raw, days=7, only_unsubmitted=True, now=NOW)["assignments"]
+    assert [a["name"] for a in left] == ["Lab 4"]
 
 
 def test_upcoming_shows_recent_missed_work_as_overdue():
@@ -76,7 +77,8 @@ def test_upcoming_shows_recent_missed_work_as_overdue():
 
     shown = assignments.upcoming(raw, days=7, now=NOW)["assignments"]
 
-    assert [(a["name"], a["status"]) for a in shown] == [("Missed lab", "past due, not submitted")]
+    # The 20-day-old one is outside the window; last week's work shows either way.
+    assert [(a["name"], a["status"]) for a in shown] == [("Missed lab", "past due, not submitted"), ("Done lab", "submitted")]
 
 
 def test_upcoming_clamps_days_and_caps_rows():
@@ -93,7 +95,7 @@ def test_upcoming_clamps_days_and_caps_rows():
 def test_scores_are_shown_for_graded_work():
     raw = [_a(1, "Lab 2", NOW - timedelta(days=1), GRADED)]
 
-    row = assignments.upcoming(raw, days=7, include_submitted=True, now=NOW)["assignments"][0]
+    row = assignments.upcoming(raw, days=7, now=NOW)["assignments"][0]
 
     assert row["status"] == "graded"
     assert row["score"] == 42.0

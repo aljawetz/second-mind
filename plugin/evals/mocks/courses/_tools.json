@@ -46,7 +46,7 @@
     },
     {
       "name": "list_assignments",
-      "description": "Live from Canvas: what's due in the next `days` days (plus missed work from the last week), with\nsubmission status and scores. Times come in the student's zone: show due_at_display as given. Pass\ninclude_submitted for finished work. With assignment_id: that one assignment's description, rubric,\nsubmission and score.",
+      "description": "Live from Canvas: every assignment due in the next `days` days and the last week, submitted or not,\neach with its submission status and score. Times come in the student's zone: show due_at_display as\ngiven. Pass only_unsubmitted when the student asks only for what is left to hand in. With\nassignment_id: that one assignment's description, rubric, submission and score.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -59,9 +59,9 @@
             "title": "Days",
             "type": "integer"
           },
-          "include_submitted": {
+          "only_unsubmitted": {
             "default": false,
-            "title": "Include Submitted",
+            "title": "Only Unsubmitted",
             "type": "boolean"
           },
           "assignment_id": {

@@ -278,7 +278,7 @@ def canvas_zone():
     return zone
 
 
-def list_assignments_result(home: Path, course_id: int, fetch, days: int, include_submitted: bool,
+def list_assignments_result(home: Path, course_id: int, fetch, days: int, only_unsubmitted: bool,
                             assignment_id: int | None, zone=assignments.machine_zone) -> dict:
     try:
         raw = fetch(course_id)
@@ -290,7 +290,7 @@ def list_assignments_result(home: Path, course_id: int, fetch, days: int, includ
         if match is None:
             return {"course_id": course_id, "note": f"No assignment {assignment_id} in this course on Canvas."}
         return {"course_id": course_id, **assignments.detail(match, tz=zone())}
-    return {"course_id": course_id, **assignments.upcoming(raw, days, include_submitted, tz=zone())}
+    return {"course_id": course_id, **assignments.upcoming(raw, days, only_unsubmitted, tz=zone())}
 
 
 def sync_course_result(jobs: "sync_jobs.SyncJobs", course_id: int, token_check=canvas._token) -> dict:
@@ -335,13 +335,13 @@ def build_server(home: Path | None = None, searcher: Searcher | None = None, cou
         return searcher.search(course_id, query, k)
 
     @server.tool()
-    def list_assignments(course_id: int, days: int = assignments.DEFAULT_DAYS, include_submitted: bool = False,
+    def list_assignments(course_id: int, days: int = assignments.DEFAULT_DAYS, only_unsubmitted: bool = False,
                          assignment_id: int | None = None) -> dict:
-        """Live from Canvas: what's due in the next `days` days (plus missed work from the last week), with
-        submission status and scores. Times come in the student's zone: show due_at_display as given. Pass
-        include_submitted for finished work. With assignment_id: that one assignment's description, rubric,
-        submission and score."""
-        return list_assignments_result(home, course_id, assignments_for, days, include_submitted, assignment_id,
+        """Live from Canvas: every assignment due in the next `days` days and the last week, submitted or not,
+        each with its submission status and score. Times come in the student's zone: show due_at_display as
+        given. Pass only_unsubmitted when the student asks only for what is left to hand in. With
+        assignment_id: that one assignment's description, rubric, submission and score."""
+        return list_assignments_result(home, course_id, assignments_for, days, only_unsubmitted, assignment_id,
                                        zone_for)
 
     @server.tool()

@@ -19,7 +19,9 @@ the question is about. If more than one could fit, ask the student which one.
 ## Pick the tool
 
 - Deadlines, "what's due", "did I submit", "am I missing anything", scores: `list_assignments`. Don't
-  search for these; the index doesn't know what was submitted and its dates can be old.
+  search for these; the index doesn't know what was submitted and its dates can be old. It returns
+  everything in the window, submitted or not, with each one's status: show the status. Pass
+  `only_unsubmitted` only when the student asks just for what is left to hand in.
 - What an assignment asks for or how it is graded: `list_assignments` with its `assignment_id` (find
   the id in the list first). Search as well only if the description doesn't answer it.
 - Everything the material says (concepts, policies, exam dates in the syllabus, lecture content):
