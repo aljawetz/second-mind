@@ -36,3 +36,5 @@ backend/tests/fixtures/ingestion/
 # Evaluation datasets (LongMemEval), downloaded by the memory evaluation —
 # docs/superpowers/specs/2026-09-25-agent-memory-evaluation-design.md §4.1.
 backend/.cache/
+
+docs/RAG with LLMs
