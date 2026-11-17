@@ -132,19 +132,18 @@ export default function Answer({
     </ReactMarkdown>
   );
 
-  const at = answer.indexOf(GENERAL_KNOWLEDGE_LABEL);
-  const course = (at === -1 ? answer : answer.slice(0, at)).trim();
-  const general = at === -1 ? null : answer.slice(at + GENERAL_KNOWLEDGE_LABEL.length).trim();
+  // The label stays in the model's reply (it keeps general knowledge apart
+  // from cited course facts), but the student sees one answer: drop the label
+  // and run the general part on as the next paragraph.
+  const body = answer
+    .split(GENERAL_KNOWLEDGE_LABEL)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join("\n\n");
 
   return (
     <>
-      {course && <div className="qa-body">{markdown(course)}</div>}
-      {general !== null && (
-        <div className="qa-general">
-          <div className="qa-general-head">General knowledge, not from your course</div>
-          {general && <div className="qa-body">{markdown(general)}</div>}
-        </div>
-      )}
+      {body && <div className="qa-body">{markdown(body)}</div>}
       {sources.length > 0 && (
         <ol className="qa-notes" aria-label="Sources">
           {sources.map((c, i) => (

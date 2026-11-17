@@ -250,9 +250,6 @@ sup:has(> .fn),sup.fn{line-height:0}
 }
 sup.fn{cursor:default}
 .fn:hover,.fn.lit{background:var(--mark);color:var(--text)}
-.qa-general{background:var(--raised);border-radius:var(--r-sm);padding:14px 16px;display:flex;flex-direction:column;gap:6px}
-.qa-general-head{font-size:.75rem;color:var(--muted)}
-.qa-general .qa-body{font-size:var(--t2);color:var(--text-2)}
 .qa-notes{margin:4px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
 .qa-notes button{
   display:grid;grid-template-columns:1.25rem minmax(0,1fr) auto;gap:10px;align-items:baseline;width:100%;
