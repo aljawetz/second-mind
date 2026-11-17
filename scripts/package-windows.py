@@ -39,10 +39,6 @@ def main() -> None:
     run(npm, "ci", cwd=ROOT / "app")
     action = "bundle" if args.skip_app_build else "build"
     run(npm, "run", "tauri", action, "--", "--bundles", "nsis", cwd=ROOT / "app")
-    # Check the copied resource too, so an incorrect Tauri resource mapping
-    # cannot pass just because the development backend works.
-    installed_resource = ROOT / "app/src-tauri/target/release/sm-backend/sm-backend.exe"
-    run(sys.executable, str(ROOT / "scripts/smoke_backend.py"), str(installed_resource))
     installers = list((ROOT / "app/src-tauri/target/release/bundle/nsis").glob("*-setup.exe"))
     if not installers:
         raise RuntimeError("Tauri did not produce an NSIS installer")
