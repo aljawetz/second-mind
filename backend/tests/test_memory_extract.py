@@ -21,7 +21,7 @@ class ScriptedLLM:
         self._replies = list(replies)
         self.calls = []
 
-    def complete_json(self, messages):
+    def complete_json(self, messages, quick=False):
         self.calls.append(messages)
         return self._replies.pop(0)
 

@@ -46,8 +46,10 @@ class LLMProvider(Protocol):
         require_tool: the model must call one of `tools` instead of answering."""
         ...
 
-    def complete_json(self, messages: list[dict]) -> object:
-        """One non-streaming reply in JSON, parsed; None if it isn't JSON."""
+    def complete_json(self, messages: list[dict], quick: bool = False) -> object:
+        """One non-streaming reply in JSON, parsed; None if it isn't JSON.
+        quick: a small task (the follow-up rewrite), run with the least
+        reasoning the model allows."""
         ...
 
 
@@ -74,7 +76,7 @@ class OpenAIProvider:
         self._temperature = temperature
         self._extra = {"extra_body": self._provider.extra_body} if self._provider.extra_body else {}
 
-    def complete_json(self, messages: list[dict], temperature: float = 0) -> object:
+    def complete_json(self, messages: list[dict], temperature: float = 0, quick: bool = False) -> object:
         """One non-streaming call in JSON mode — memory extraction and
         consolidation (memory/extract.py's JsonLLM) at temperature 0, study
         artifacts (study.py) higher, so asking again gives new questions. The
@@ -85,6 +87,7 @@ class OpenAIProvider:
             messages=messages,
             response_format={"type": "json_object"},
             **self._temperature_args(temperature),
+            **self._effort_args(self._provider.quick_reasoning_effort if quick else self._provider.reasoning_effort),
             **self._extra,
         )
         try:
@@ -96,6 +99,10 @@ class OpenAIProvider:
         """Nothing for a model that only accepts its default temperature."""
         return {} if self._provider.fixed_temperature else {"temperature": temperature}
 
+    @staticmethod
+    def _effort_args(effort: str | None) -> dict:
+        return {"reasoning_effort": effort} if effort else {}
+
     def chat_request(self, messages: list[dict], tools: list[dict] | None, require_tool: bool = False) -> dict:
         """What stream_chat sends."""
         kwargs = {
@@ -104,6 +111,7 @@ class OpenAIProvider:
             "stream": True,
             "stream_options": {"include_usage": True},
             **self._temperature_args(self._temperature),
+            **self._effort_args(self._provider.reasoning_effort),
             **self._extra,
         }
         if tools:

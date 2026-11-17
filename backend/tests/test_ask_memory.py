@@ -62,7 +62,7 @@ class FakeModel:
             yield piece
         yield TurnEnd()
 
-    def complete_json(self, messages):
+    def complete_json(self, messages, quick=False):
         if messages[0]["content"] == chat.REWRITE_PROMPT:
             self.rewrite_calls.append(messages)
             return None
@@ -482,7 +482,7 @@ class _OneReply:
     def __init__(self, reply):
         self._reply = reply
 
-    def complete_json(self, messages):
+    def complete_json(self, messages, quick=False):
         return self._reply
 
 

@@ -304,7 +304,7 @@ def standalone_query(question: str, history: list[dict], provider: LLMProvider) 
         {"role": "user", "content": f"{chat_text}\n\nLatest message: {question}"},
     ]
     try:
-        reply = provider.complete_json(messages)
+        reply = provider.complete_json(messages, quick=True)
     except Exception:
         traceback.print_exc(file=sys.stderr)
         return None

@@ -320,7 +320,7 @@ class CountingLLM:
         slot["prompt_tokens"] += response.usage.prompt_tokens
         slot["completion_tokens"] += response.usage.completion_tokens
 
-    def complete_json(self, messages: list[dict]) -> object:
+    def complete_json(self, messages: list[dict], quick: bool = False) -> object:
         response = self.client.chat.completions.create(
             model=self.write_model, messages=messages, temperature=0, response_format={"type": "json_object"}
         )

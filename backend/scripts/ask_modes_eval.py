@@ -73,7 +73,10 @@ def set_answer_model(model: str) -> None:
     Reasoning models (gpt-5 family) take only their default temperature."""
     global MODEL, ANSWER_PROVIDER
     MODEL = model
-    ANSWER_PROVIDER = dataclasses.replace(providers.OPENAI, model=model, fixed_temperature=model.startswith("gpt-5"))
+    reasoning = model.startswith("gpt-5")
+    # Only gpt-5 models take reasoning_effort; the others reject it.
+    effort = {} if reasoning else {"reasoning_effort": None, "quick_reasoning_effort": None}
+    ANSWER_PROVIDER = dataclasses.replace(providers.OPENAI, model=model, fixed_temperature=reasoning, **effort)
 TEMPERATURE = 0.1  # llama_index's OpenAI default, which mode A already uses
 MAX_TOOL_ROUNDS = 4
 

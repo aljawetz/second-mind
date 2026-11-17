@@ -32,7 +32,7 @@ class ScriptedLLM:
         self._before_each = before_each
         self.calls = []
 
-    def complete_json(self, messages):
+    def complete_json(self, messages, quick=False):
         self.calls.append(messages[-1]["content"])
         if self._before_each:
             self._before_each()

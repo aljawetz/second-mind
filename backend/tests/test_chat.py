@@ -33,7 +33,7 @@ class FakeProvider:
         yield from text_pieces
         yield TurnEnd(tool_calls=tool_calls)
 
-    def complete_json(self, messages):
+    def complete_json(self, messages, quick=False):
         self.json_calls.append([dict(m) for m in messages])
         if isinstance(self._rewrite, Exception):
             raise self._rewrite

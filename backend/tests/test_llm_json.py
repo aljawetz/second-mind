@@ -28,7 +28,9 @@ def _completion(content):
 
 
 # A model that takes a temperature, as gpt-4o-mini did when it was the default.
-TUNABLE = dataclasses.replace(providers.OPENAI, model="gpt-4o-mini", fixed_temperature=False)
+TUNABLE = dataclasses.replace(
+    providers.OPENAI, model="gpt-4o-mini", fixed_temperature=False, reasoning_effort=None, quick_reasoning_effort=None
+)
 
 
 @respx.mock
@@ -125,3 +127,32 @@ def test_the_chat_call_leaves_temperature_out_for_such_a_model_and_sends_it_othe
     assert "temperature" not in llm.OpenAIProvider(providers.OPENAI, api_key="sk-test").chat_request([], None)
     assert llm.OpenAIProvider(TUNABLE, api_key="sk-test").chat_request([], None)["temperature"] == 0.1
 
+
+
+def test_the_chat_call_asks_gpt_5_mini_for_low_reasoning_and_other_models_for_none():
+    # At its default (medium) effort a one-search answer took 8.9 s, at low 3.4 s.
+    assert llm.OpenAIProvider(providers.OPENAI, api_key="sk-test").chat_request([], None)["reasoning_effort"] == "low"
+    # DeepSeek and gpt-4o-mini reject the field.
+    assert "reasoning_effort" not in llm.OpenAIProvider(providers.DEEPSEEK, api_key="sk-test").chat_request([], None)
+    assert "reasoning_effort" not in llm.OpenAIProvider(TUNABLE, api_key="sk-test").chat_request([], None)
+
+
+@respx.mock
+def test_a_quick_json_call_asks_for_minimal_reasoning_and_others_for_the_chat_effort():
+    route = respx.post(COMPLETIONS).mock(return_value=httpx.Response(200, json=_completion('{"ok": true}')))
+    provider = llm.OpenAIProvider(providers.OPENAI, api_key="sk-test")
+
+    provider.complete_json([{"role": "user", "content": "hi"}], quick=True)
+    provider.complete_json([{"role": "user", "content": "hi"}])
+
+    assert json.loads(route.calls[0].request.content)["reasoning_effort"] == "minimal"
+    assert json.loads(route.calls[1].request.content)["reasoning_effort"] == "low"
+
+
+@respx.mock
+def test_deepseek_json_call_sends_no_reasoning_effort_even_when_quick():
+    route = respx.post(DEEPSEEK_COMPLETIONS).mock(return_value=httpx.Response(200, json=_completion('{"ok": true}')))
+
+    llm.OpenAIProvider(providers.DEEPSEEK, api_key="sk-test").complete_json([{"role": "user", "content": "hi"}], quick=True)
+
+    assert "reasoning_effort" not in json.loads(route.calls[0].request.content)

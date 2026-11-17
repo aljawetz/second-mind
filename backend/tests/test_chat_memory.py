@@ -32,7 +32,7 @@ class ScriptedLLM:
     def __init__(self):
         self.replies = []
 
-    def complete_json(self, messages):
+    def complete_json(self, messages, quick=False):
         return self.replies.pop(0)
 
 

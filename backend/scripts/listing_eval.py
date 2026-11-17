@@ -84,7 +84,7 @@ def main():
     args = parser.parse_args()
     use_eval_key()
     home = Path(args.home)
-    provider = llm.OpenAIProvider(dataclasses.replace(providers.OPENAI, model=args.model, fixed_temperature=False))
+    provider = llm.OpenAIProvider(dataclasses.replace(providers.OPENAI, model=args.model, fixed_temperature=False, reasoning_effort=None, quick_reasoning_effort=None))
     results = []
     for qid, course_id, question, items in QUESTIONS:
         search = chat.make_search(indexing.load_index(home / "index.lancedb", f"course_{course_id}"), CHAT_SIMILARITY_CUTOFF)
