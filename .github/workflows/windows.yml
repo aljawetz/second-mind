@@ -26,7 +26,9 @@ jobs:
     env:
       PYTHONUTF8: "1"
       UV_LINK_MODE: copy
-      CARGO_BUILD_JOBS: "2"
+      # package-windows.py defaults to 2 jobs to spare laptop RAM. The
+      # runner has 4 vCPUs and 16 GB, so use them all.
+      CARGO_BUILD_JOBS: "4"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -47,6 +49,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: app/src-tauri -> target
+          # Saving takes about 2 minutes, and other PRs can't read a PR's
+          # cache anyway. main saves it; PRs restore from main.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install OCR runtime for bundling
         run: choco install tesseract --no-progress -y
       - name: Cache local models
