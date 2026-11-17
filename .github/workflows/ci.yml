@@ -10,6 +10,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  windows:
+    uses: ./.github/workflows/windows.yml
+
   changes:
     name: Detect changes
     runs-on: ubuntu-latest

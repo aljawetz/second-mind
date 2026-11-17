@@ -25,7 +25,8 @@ def test_sections_never_share_a_chunk():
 
 
 def test_text_before_any_heading_uses_the_title_alone():
-    assert _texts([{"heading": None, "text": "Welcome!"}], source="Week 1 Overview") == ["Week 1 Overview\nWelcome!"]
+    texts = _texts([{"heading": None, "text": "Welcome to the first week of class!"}], source="Week 1 Overview")
+    assert texts == ["Week 1 Overview\nWelcome to the first week of class!"]
 
 
 def test_headings_with_no_text_join_the_next_section():
@@ -42,7 +43,7 @@ def test_headings_with_no_text_join_the_next_section():
 
 
 def test_trailing_headings_with_no_text_are_kept():
-    assert _texts([{"heading": "Units", "text": ""}]) == ["Syllabus\nUnits"]
+    assert _texts([{"heading": "Units and Credit Hours", "text": ""}]) == ["Syllabus\nUnits and Credit Hours"]
 
 
 def test_long_sections_split_under_the_embedding_window():

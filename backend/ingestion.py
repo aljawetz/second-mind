@@ -16,9 +16,10 @@ from docx.table import Table
 from docx.text.paragraph import Paragraph
 import openpyxl
 import pdfplumber
-import pytesseract
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
+
+from native_tools import image_to_string
 
 
 def needs_fallback(char_count: int, has_image: bool) -> bool:
@@ -141,11 +142,19 @@ def sections_text(sections: list[dict]) -> str:
     return "\n".join(parts)
 
 
-def extract_pdf(path: Path) -> list[dict]:
-    """One entry per page: text, char_count, has_image, needs_fallback."""
+def pdf_page_count(path: Path) -> int:
+    """From the PDF's page tree, without reading any page's text (0.25 s for
+    a 722-page book): how large_files.py decides on a preview."""
+    with pdfplumber.open(path) as pdf:
+        return len(pdf.pages)
+
+
+def extract_pdf(path: Path, max_pages: int | None = None) -> list[dict]:
+    """One entry per page: text, char_count, has_image, needs_fallback.
+    max_pages stops after that many: a long book's preview."""
     pages = []
     with pdfplumber.open(path) as pdf:
-        for i, page in enumerate(pdf.pages):
+        for i, page in enumerate(pdf.pages[:max_pages]):
             text = page.extract_text() or ""
             has_image = len(page.images) > 0
             pages.append(
@@ -310,4 +319,4 @@ def ocr_pdf_page(path: Path, page_number: int) -> str:
     """Rasterize one PDF page (1-indexed) and run Tesseract on it."""
     with pdfplumber.open(path) as pdf:
         rendered = pdf.pages[page_number - 1].to_image(resolution=200)
-        return pytesseract.image_to_string(rendered.original)
+        return image_to_string(rendered.original)

@@ -66,6 +66,9 @@ than once. The only exception is when the student only asks you to reformat or s
 in class) must come only from search results. Copy numbers and dates exactly as the source states them. If \
 the source text looks garbled or incomplete, say so instead of guessing. If you can't find it, say you \
 couldn't find it in the course materials.
+- A source named like "Book.pdf (first 150 of 722 pages)" or "Notes.docx (first part)" is only the start of a \
+long file. If the answer could be in the rest of it, say you only have part of that file, and that the student \
+can sync the whole file under Manage courses.
 - Only cite a source for a claim that source actually states. Never add a citation to general knowledge.
 - Cite with the source number in square brackets only, like [2] or [1][3]. Never write file names, page \
 numbers or the word "source" as a citation.

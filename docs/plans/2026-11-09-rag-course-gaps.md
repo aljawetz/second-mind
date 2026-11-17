@@ -55,7 +55,7 @@
 - **Built (2026-11-10):** Helpful / Not helpful buttons, removable ratings, and optional notes up to 500 characters. Feedback stays on the saved turn locally and is restored when reopening the chat. `GET /courses/{course_id}/feedback` lists thumbs-down turns for review. The final stream event identifies the saved turn, so failed answers cannot shift feedback onto another answer.
 - **Verified:** 593 backend tests passed (9 skipped), 5 frontend interaction tests passed, production build passed. [Screenshots and verification scope](../evaluations/answer-feedback/README.md).
 
-### 3. Keep graded exam and quiz text out of the index, and drop junk chunks (beta)
+### 3. Keep graded exam and quiz text out of the index, and drop junk chunks (beta) — junk filter built; exam rule dropped
 
 - **Why:** Sprint 8 found a midterm coding question in the index, and an interviewee raised graded-quiz exposure (Sprint 8 next step 1). The course also drops near-empty and mostly-numeric chunks, and `indexing.py` has no such filter.
 - **Build:**
@@ -65,6 +65,9 @@
   - Tests for both rules.
   - Chunk counts before and after on the two local courses.
   - `--retrieval-only` on `sprint8` showing facts found didn't drop.
+- **Built first (2026-11-11, branch `index-filters`, never opened as a PR):** both rules. On the old index: 387 → 385 chunks, no assignment counted as an exam, and retrieval-only facts found unchanged (sprint8 local cases 4/4, heldout recall@5 0.91, sprint9-chat 30/40).
+- **Exam rule dropped (2026-11-15).** For exam-like files found by the course-menu sync (task 8), the decision was to index whatever the student can open. The assignment rule is dropped too, so the two agree. Exam and quiz descriptions are indexed like any other assignment.
+- **Junk filter shipped** (`indexing.is_junk`, branch `junk-chunk-filter`). Canvas chunks under 8 characters or under 25% letters are dropped. A section is judged together with its own heading: "Units / 12" answers sprint9-chat N5.3. Transcripts and the student's notes are not filtered. On the synced copy after task 8 it would drop 43 of 2,589 chunks in 18-658, almost all dot-leader table-of-contents lines from the textbooks, and 3 of 520 in 56350 ("Zotero", "Enjoy!", a one-word slide).
 
 ### 4. One retry when a model reply isn't valid JSON (beta) — built on branch `json-retry`
 
@@ -158,8 +161,9 @@
   | First-sync time | 14.4 min (two whole textbooks took ~7.5) | 76 s |
 
   Index on disk: 3.0 MB → 17 MB for both courses. The outline lists each Task page's readings under it ("Linked from Task 3 Resources": 8 files).
-- **Next, as its own change:** a faster first sync. Names and outline first (seconds), content indexed in the background with pages and small files first, and files over a size limit last, with an opt-out per file. Syncing costs no money: Canvas API, local extraction, OCR and embeddings.
+- **Faster first sync, agreed in three steps:** names and outline first (seconds), content indexed in the background with pages and small files first, and large files left for the student. Step 3 is built (below); steps 1 and 2 are not. Syncing costs no money: Canvas API, local extraction, OCR and embeddings.
 - **Faster first sync, rule agreed:** a PDF over 150 pages (page count read from the PDF's header after download, 0.25 s for 722 pages), any other file whose text is longer than a 150-page PDF (about 450,000 characters), or any file over 50 MB (from Canvas's size, before download) waits until the student turns it on. Decided: a long PDF's first 150 pages are indexed as a preview, labeled ("About Face: 150 of 722 pages indexed") in the outline and for the model, so chat says it has only part of the book instead of "not covered". The pages a course assigns are often later (Cooper p507–554, p655–659), so indexing the page ranges the course pages cite is a later option.
+- **Large-file limit built (`large_files.py`, 2026-11-15).** A long file's chunks carry the label in their source name ("About Face.pdf (first 150 of 722 pages)"), the outline says "first 150 of 722 pages synced" or "not synced: 60 MB", and the chat prompt says to tell the student it has only part of the file. Manage courses lists these files with "Sync whole file", which syncs that course right away; turning a file on or off changes its manifest version ("|preview", "|skipped"), so the next sync re-indexes only that file. One sync per course at a time (a lock in `main.py`). Live, on a fresh copy of the old index: 18-658's first sync took 4.5 min instead of 14.4 (both textbooks kept to 150 pages, 0 failures); turning *About Face* on re-synced only that book, in 147 s.
 - **Listing eval (`scripts/listing_eval.py`, 2026-11-15):** 8 questions with full answers taken from the outline, on the synced copy, `gpt-4o-mini`, 2 runs per variant. Answers kept in `~/second-mind-local/2026-11-listing/` (they quote course text).
 
   | Question | Without tool | With tool | Tool called |
@@ -175,4 +179,4 @@
 
   Median time 5.0 s against 5.2 s; about 40% more tokens. The first run found the model asking for "sprint deliverables" when "Sprint" is in the item names and "Deliverables" in the module's: a topic now falls back to every word anywhere when the phrase matches nothing, with a plural "s" ignored.
 - **What the listing tool doesn't fix:** a list held inside one long page. Task 4 Resources is two search chunks and only the first came back (L2); Class Preparation is about 45 chunks over 14 weeks (L3), and the answers mixed in page numbers from other pages. That needs a tool that reads a whole page or file by name: a candidate next task.
-- **Left:** the faster first sync (its own change). The frozen Sprint 8/9 sets were written against the old index, so a re-synced index changes what they measure; re-sync the real index after this merges.
+- **Left:** steps 1 and 2 of the faster first sync. The frozen Sprint 8/9 sets were written against the old index, so a re-synced index changes what they measure; re-sync the real index after this merges.

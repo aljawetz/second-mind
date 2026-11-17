@@ -29,6 +29,7 @@ from memory import MemoryService
 from memory.store import MemoryStore
 
 COURSE = 55710
+REAL_LOAD_INDEX = indexing.load_index
 
 
 def embed(text):
@@ -623,3 +624,45 @@ def test_ask_offers_the_course_listing_tool(app):
     events = _say(app, "What are all the readings for week 3?", answer="None found.")
     assert events[-1]["done"] is True
     assert "list_course_items" in app.model.chat_calls[0][0]["content"]
+
+
+def test_large_files_are_listed_and_can_be_turned_on(app):
+    """GET /courses/{id}/large-files lists files kept to a preview or not
+    synced; POST /courses/{id}/large-files/{file_id} records the student's
+    choice for the next sync (large_files.py)."""
+    import large_files
+    import sync
+
+    assert _json(app, "GET", f"/courses/{COURSE}/large-files") == (200, {"files": []})  # never synced: nothing to list
+    path = app.home / "courses" / str(COURSE) / "manifest.db"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sync.open_manifest(path)
+    large_files.record(conn, "555", "About Face.pdf", 33_000_000, pages=722, chars=None, long=True, state="preview")
+    conn.close()
+
+    status, listed = _json(app, "GET", f"/courses/{COURSE}/large-files")
+    assert status == 200
+    assert listed["files"] == [{"file_id": "555", "name": "About Face.pdf", "size": 33_000_000, "pages": 722, "chars": None,
+                       "state": "preview", "want_full": False}]
+    assert _json(app, "POST", f"/courses/{COURSE}/large-files/555", {"full": True}) == (200, {"file_id": "555", "want_full": True})
+    assert _json(app, "GET", f"/courses/{COURSE}/large-files")[1]["files"][0]["want_full"] is True
+    assert _json(app, "POST", f"/courses/{COURSE}/large-files/999", {"full": True})[0] == 404
+    assert _json(app, "POST", f"/courses/{COURSE}/large-files/555", {"full": "yes"})[0] == 400
+    assert _json(app, "GET", "/courses/1/large-files")[0] == 404  # not a selected course
+
+
+def test_a_selected_course_that_was_never_synced_still_gets_an_answer(app, monkeypatch):
+    # Found by the Sprint 9 test run: the real load_index opens a missing
+    # table lazily, so the error used to surface only at the first search,
+    # outside the handler's catch, and the connection dropped with no reply.
+    # Here the index database exists (another course is synced) but this
+    # course's table does not.
+    import lancedb
+
+    lancedb.connect(str(app.home / "index.lancedb")).create_table("course_1", data=[{"x": 1}])
+    monkeypatch.setattr(indexing, "load_index", REAL_LOAD_INDEX)
+
+    events = _say(app, "When is the midterm?", answer="I couldn't find that in the course materials.")
+
+    assert _final(events)["grounded"] is False
+    assert events[-1]["done"] is True

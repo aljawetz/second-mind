@@ -34,7 +34,7 @@ export default function OnboardingKeys({ onNext }: { onNext: (canvasUrl: string)
     llm.setError("");
 
     const [canvasResult, llmResult] = await Promise.all([
-      validateCredential("canvas", canvasKey),
+      validateCredential("canvas", canvasKey, canvasUrl),
       validateCredential(provider, llmKey),
     ]);
 

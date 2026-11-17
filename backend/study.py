@@ -579,14 +579,19 @@ def export_csv(sm_home: Path, course_id: int, artifact_id: str, out_dir: Path) -
         for i, card in enumerate(artifact["items"]):
             if i not in removed:
                 writer.writerow([card["front"], card["back"], card["citation"]["label"]])
-    stem = re.sub(r'[\\/:*?"<>|]+', " ", artifact["title"]).strip() or _DEFAULT_TITLE[artifact["kind"]]
+    stem = re.sub(r'[\x00-\x1f\\/:*?"<>|]+', " ", artifact["title"]).strip(" .") or _DEFAULT_TITLE[artifact["kind"]]
+    # Windows device names remain reserved even with a file extension.
+    if re.match(r"^(CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])(?:\.|$)", stem, re.IGNORECASE):
+        stem = "_" + stem
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"{stem}.csv"
     n = 2
     while path.exists():
         path = out_dir / f"{stem} ({n}).csv"
         n += 1
-    path.write_text(buffer.getvalue(), encoding="utf-8-sig")  # the BOM lets Excel read it as UTF-8
+    # csv.writer already emits CRLF; Windows text translation would turn
+    # that into CRCRLF and add a blank row between every pair of records.
+    path.write_text(buffer.getvalue(), encoding="utf-8-sig", newline="")
     return path
 
 

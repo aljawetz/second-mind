@@ -158,10 +158,37 @@ reaches, and an environment that also had `convert` installed (`optimum`) once s
 
 The output is a folder, not a single file (PyInstaller "onedir"): the single-file build unpacked
 ~900 MB to a fresh temp dir on every launch, and macOS rescanned it each time, so the backend took
-~35s to answer on every launch instead of ~2s. Tauri can't bundle that folder itself (see
-`scripts/package-macos.sh` at the repo root), so a release is packaged in two steps:
+~35s to answer on every launch instead of ~2s. On macOS, Tauri can't copy the folder's
+symlinks itself (see `scripts/package-macos.sh`), so a release is packaged in two steps:
 
 ```bash
 cd ../app && npm run tauri build -- --bundles app
 cd .. && ./scripts/package-macos.sh   # adds the backend, re-signs, builds the .dmg
 ```
+
+On Windows, run `python scripts\package-windows.py` from the repository root.
+`tauri.windows.conf.json` maps the complete backend directory into the installer's
+resources. The backend includes Tesseract, DLLs, English language data, and the OCR
+distribution's license notices. No Python, Rust, Node, or separate OCR installation
+is needed on the student's machine. The installer bootstraps WebView2 when needed.
+
+The packaging command runs `sm-backend.exe --self-test` (real embeddings, LanceDB,
+MP4/WebM decoding, Whisper, OCR, and lazy provider imports), then verifies HTTP and
+stdin shutdown using an isolated Unicode data directory. It repeats these checks
+against Tauri's copied resources. Windows CI also silently installs the NSIS package
+and checks the installed backend, as well as running the backend tests on Windows.
+Copilot still downloads its own platform runtime on first use, as it does on macOS;
+Canvas sync and model-provider calls require network access and valid credentials.
+
+Windows OCR streams PNG data over stdin and runs with a relative `tessdata` path.
+The Windows Tesseract runtime's narrow environment handling corrupts an absolute
+`TESSDATA_PREFIX` containing non-ASCII characters; setting a Unicode working
+directory through Windows process APIs avoids that failure. CI installs into a
+directory containing spaces and Japanese characters to cover this case.
+
+`scripts/smoke_sync.py` exercises the frozen backend over HTTP against a local
+Canvas fixture, including actual indexing and an unchanged re-sync. Packaging
+runs it with two concurrent requests: development-mode effect replays previously
+let both requests create/write one LanceDB table, causing incompatible transactions.
+The frontend now shares an in-flight sync, and the backend serializes each course's
+diff/write/manifest operation. This check needs no Canvas account or provider key.

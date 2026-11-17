@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { fetch } from "@tauri-apps/plugin-http";
 import type { LlmProvider } from "./credentials";
+import { createSyncCourse } from "./syncStream";
+export type { SyncEvent } from "./syncStream";
 
 // Routed through the Rust backend via IPC, not the webview's own fetch:
 // WKWebView blocks a plain fetch() to http://127.0.0.1 from this app's
@@ -20,16 +22,17 @@ export function getBackendInstanceToken(): Promise<string> {
 
 export type CredentialKind = "canvas" | LlmProvider;
 
-// Format check only (Step 2) — not a real Canvas/model provider call yet. Step 3
-// upgrades main.py's handler for this same endpoint to do that; the
-// frontend's interface here doesn't need to change when it does.
+// Format check, then one real call (main.py's verify_credential): a Canvas
+// token against canvasBaseUrl, an OpenAI or DeepSeek key against the
+// provider. Without canvasBaseUrl a Canvas token gets the format check only.
 export async function validateCredential(
   kind: CredentialKind,
-  value: string
+  value: string,
+  canvasBaseUrl?: string
 ): Promise<{ valid: boolean; reason: string }> {
   const res = await fetch("http://127.0.0.1:8756/credentials/validate", {
     method: "POST",
-    body: JSON.stringify({ kind, value }),
+    body: JSON.stringify({ kind, value, canvas_base_url: canvasBaseUrl }),
   });
   return res.json();
 }
@@ -291,43 +294,7 @@ export async function deleteConversation(courseId: number, conversationId: strin
   }
 }
 
-export interface SyncEvent {
-  item?: string;
-  status?: "done" | "failed";
-  error?: string;
-  done?: boolean;
-  new?: number;
-  changed?: number;
-  removed?: number;
-  failed?: number;
-}
-
-// Same chunked-NDJSON contract as /ask (main.py's _write_chunk), just a
-// different endpoint and event shape — the parsing loop is identical on
-// purpose, not duplicated by accident.
-export async function syncCourse(courseId: number, onEvent: (event: SyncEvent) => void): Promise<void> {
-  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/sync`, { method: "POST" });
-
-  if (!res.ok || !res.body) {
-    const data = await res.json().catch(() => null);
-    throw new Error(data?.error?.message ?? `sync failed (${res.status})`);
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let newlineIndex;
-    while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
-      const line = buffer.slice(0, newlineIndex);
-      buffer = buffer.slice(newlineIndex + 1);
-      if (line.trim()) onEvent(JSON.parse(line));
-    }
-  }
-}
+export const syncCourse = createSyncCourse(fetch);
 
 export interface Pointer {
   label: string;
@@ -398,7 +365,7 @@ export async function uploadChunk(sessionId: string, index: number, slice: Blob)
   if (!res.ok) throw new Error(`chunk ${index} upload failed (${res.status})`);
 }
 
-// Raw audio bytes as the body (audio/mp4 from MediaRecorder) — not
+// Raw audio bytes as the body (MP4 or WebM from MediaRecorder) — not
 // JSON/base64, this backend already reads raw request bodies elsewhere.
 // It is the last slice of the recording; earlier slices go through
 // uploadChunk.
@@ -458,6 +425,40 @@ export async function deleteSession(courseId: number, sessionId: string): Promis
 // manifest, every session recording and note — all of it, unrecoverable).
 export async function unselectCourse(courseId: number): Promise<void> {
   await fetch(`http://127.0.0.1:8756/courses/${courseId}/unselect`, { method: "POST" });
+}
+
+// A long file kept to a preview, or one too big to download
+// (backend/large_files.py). want_full: the student turned it on, so the next
+// sync indexes all of it.
+export interface LargeFile {
+  file_id: string;
+  name: string;
+  size: number;
+  pages: number | null;
+  chars: number | null;
+  state: "preview" | "none" | "full";
+  want_full: boolean;
+}
+
+export async function listLargeFiles(courseId: number): Promise<LargeFile[]> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/large-files`);
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `failed to list large files (${res.status})`);
+  }
+  return data.files ?? [];
+}
+
+export async function setLargeFileFull(courseId: number, fileId: string, full: boolean): Promise<void> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/large-files/${fileId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ full }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error?.message ?? `failed to update the file (${res.status})`);
+  }
 }
 
 export async function deleteCourse(courseId: number): Promise<void> {

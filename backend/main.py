@@ -1,12 +1,15 @@
 """Sidecar backend — see docs/architecture/implementation-plan.md."""
 
+import collections
 import errno
+import importlib
 import itertools
 import json
 import multiprocessing
 import os
 import re
 import signal
+import socket
 import socketserver
 import sqlite3
 import sys
@@ -78,10 +81,14 @@ class _MemoryWorkerProxy:
 
 MEMORY_WORKER = _MemoryWorkerProxy()
 
+_SYNC_LOCKS: "collections.defaultdict[int, threading.Lock]" = collections.defaultdict(threading.Lock)
+
 COURSE_PATH = re.compile(r"^/courses/(\d+)$")
 UNSELECT_PATH = re.compile(r"^/courses/(\d+)/unselect$")
 ASK_PATH = re.compile(r"^/courses/(\d+)/ask$")
 SYNC_PATH = re.compile(r"^/courses/(\d+)/sync$")
+LARGE_FILES_PATH = re.compile(r"^/courses/(\d+)/large-files$")
+LARGE_FILE_PATH = re.compile(r"^/courses/(\d+)/large-files/(\d+)$")
 ASSIGNMENTS_PATH = re.compile(r"^/courses/(\d+)/assignments$")
 EXPLAIN_PATH = re.compile(r"^/courses/(\d+)/assignments/(\d+)/explain$")
 SESSION_LIST_PATH = re.compile(r"^/courses/(\d+)/sessions$")
@@ -176,14 +183,50 @@ def _run_memory_job(job: tuple[int, str | None]) -> None:
         service.sweep()
 
 
+# Modules that pull in llama_index, LanceDB or the ONNX models. They're
+# imported when first needed, so /ping answers within ~2 s of launch. But the
+# app's first requests (each course's sync, the assignments list, sessions,
+# study, and the startup memory jobs below) arrive together, each in its own
+# thread, and concurrent first imports of llama_index break: "cannot import
+# name 'BaseRetriever' from partially initialized module" and
+# "_DeadlockError". 18-658's sync failed that way before doing anything (seen
+# in the app, 2026-11-17). So they are imported once, under a lock, before
+# any request that may need them.
+HEAVY_MODULES = ("indexing", "generation", "chat", "course_sync", "courses", "explain", "memory_jobs", "sessions", "study")
+_heavy_lock = threading.Lock()
+_heavy_loaded = False
+# Routes that never touch them: startup, onboarding and the Canvas course list.
+LIGHT_PATHS = frozenset(
+    {"/ping", "/config", "/courses", "/credentials/status", "/credentials/validate", "/github/device/start", "/github/device/poll"}
+)
+
+
+def _load_heavy_modules() -> None:
+    global _heavy_loaded
+    if _heavy_loaded:
+        return
+    with _heavy_lock:
+        if not _heavy_loaded:
+            for name in HEAVY_MODULES:
+                importlib.import_module(name)
+            _heavy_loaded = True
+
+
+def _needs_heavy_modules(path: str) -> bool:
+    return path not in LIGHT_PATHS
+
+
 def queue_startup_memory_jobs() -> None:
     """At startup: turns saved but not yet read by memory when the app last
     quit, then a sweep of every selected course."""
+    settings = config.read_config(SM_HOME)
+    selected = settings.get("selected_courses", [])
+    if settings.get("memory_enabled") is False or not selected:
+        return
+
+    _load_heavy_modules()
     import memory_jobs
 
-    if not _memory_enabled():
-        return
-    selected = config.read_config(SM_HOME).get("selected_courses", [])
     for job in memory_jobs.pending(SM_HOME, selected):
         MEMORY_WORKER.submit(job)
     for course_id in selected:
@@ -269,6 +312,55 @@ def validate_credential(kind: str, value: str) -> tuple[bool, str]:
     return False, f"unknown credential kind '{kind}'"
 
 
+def _check_canvas_token(base_url: str, token: str) -> tuple[bool, str]:
+    origin = config.normalize_canvas_base_url(base_url)
+    try:
+        res = httpx.get(
+            f"{origin}/api/v1/users/self",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10.0,
+        )
+    except httpx.HTTPError:
+        return False, f"couldn't reach Canvas at {origin} — check the URL"
+    if res.status_code == 401:
+        return False, "Canvas didn't accept this token — create a new one under Account → Settings"
+    if res.status_code != 200:
+        return False, f"Canvas at {origin} answered with an error ({res.status_code}) — check the URL"
+    return True, ""
+
+
+def _check_llm_key(kind: str, key: str) -> tuple[bool, str]:
+    provider = providers.PROVIDERS[kind]
+    try:
+        providers.openai_client(provider, key).with_options(timeout=10.0, max_retries=0).models.list()
+    except openai.AuthenticationError:
+        return False, f"{provider.name} didn't accept this key"
+    except openai.APIConnectionError:
+        return False, f"couldn't reach {provider.name} — check your connection"
+    except openai.APIError:
+        # Rate limits or outages say nothing about the key itself.
+        return True, ""
+    return True, ""
+
+
+def verify_credential(kind: str, value: str, canvas_base_url: str | None = None) -> tuple[bool, str]:
+    """/credentials/validate: the format check, then one real call. Found
+    in the Sprint 9 test run: a format check alone accepted any 20
+    characters as a Canvas token, so a wrong token only showed up later as
+    an empty course list. Canvas is checked only when the app sends the
+    Canvas URL; Copilot keeps the format check (its sign-in flow checks
+    the token itself)."""
+    valid, reason = validate_credential(kind, value)
+    if not valid:
+        return valid, reason
+    value = value.strip()
+    if kind == "canvas":
+        return _check_canvas_token(canvas_base_url, value) if canvas_base_url else (True, "")
+    if kind in providers.PROVIDERS and kind != providers.COPILOT.id:
+        return _check_llm_key(kind, value)
+    return True, ""
+
+
 class Handler(BaseHTTPRequestHandler):
     # BaseHTTPRequestHandler defaults to declaring HTTP/1.0, under which
     # Transfer-Encoding: chunked (/ask's streaming response) is technically
@@ -292,6 +384,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path, _, query = self.path.partition("?")
+        if _needs_heavy_modules(path):
+            _load_heavy_modules()
         if path == "/ping":
             self._send_json(200, {"status": "ok", "source": "sm-backend", "instance": INSTANCE_TOKEN})
         elif path == "/courses":
@@ -320,6 +414,10 @@ class Handler(BaseHTTPRequestHandler):
             conversation_list_match = CONVERSATION_LIST_PATH.match(path)
             if conversation_list_match:
                 self._handle_list_conversations(conversation_list_match.group(1))
+                return
+            large_files_match = LARGE_FILES_PATH.match(path)
+            if large_files_match:
+                self._handle_list_large_files(large_files_match.group(1))
                 return
             feedback_list_match = FEEDBACK_LIST_PATH.match(path)
             if feedback_list_match:
@@ -486,6 +584,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path, _, _ = self.path.partition("?")
+        if _needs_heavy_modules(path):
+            _load_heavy_modules()
         if path == "/config":
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length)
@@ -529,7 +629,9 @@ class Handler(BaseHTTPRequestHandler):
             except json.JSONDecodeError:
                 self._send_json(400, {"error": {"code": "bad_request", "message": "invalid JSON"}})
                 return
-            valid, reason = validate_credential(data.get("kind", ""), data.get("value", ""))
+            valid, reason = verify_credential(
+                data.get("kind", ""), data.get("value", ""), data.get("canvas_base_url") or None
+            )
             self._send_json(200, {"valid": valid, "reason": reason})
             return
 
@@ -546,6 +648,11 @@ class Handler(BaseHTTPRequestHandler):
         feedback_match = TURN_FEEDBACK_PATH.match(path)
         if feedback_match:
             self._handle_turn_feedback(*feedback_match.groups())
+            return
+
+        large_file_match = LARGE_FILE_PATH.match(path)
+        if large_file_match:
+            self._handle_set_large_file(*large_file_match.groups())
             return
 
         sync_match = SYNC_PATH.match(path)
@@ -612,6 +719,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         path, _, query = self.path.partition("?")
+        if _needs_heavy_modules(path):
+            _load_heavy_modules()
         if path == "/data":
             import privacy
 
@@ -962,11 +1071,15 @@ class Handler(BaseHTTPRequestHandler):
             # searching, the first model calls) fails here, before any response
             # bytes, and still gets a clean status code.
             try:
+                # Course not indexed yet (never synced, or its first sync failed):
+                # every search comes back empty and the model says it couldn't
+                # find anything, same as a real miss. Checked up front because
+                # load_index opens a missing table lazily: the error would
+                # only surface at the first search, after this handler's catch.
+                db_path, table_name = SM_HOME / "index.lancedb", f"course_{course_id}"
                 try:
-                    index = indexing.load_index(SM_HOME / "index.lancedb", f"course_{course_id}")
+                    index = indexing.load_index(db_path, table_name) if indexing.index_exists(db_path, table_name) else None
                 except TableNotFoundError:
-                    # Course not indexed yet: every search comes back empty and the
-                    # model says it couldn't find anything, same as a real miss.
                     index = None
                 provider = llm.current_provider()
                 memory = _memory_service(int(course_id), provider, conversation_id=cid) if memory_on else None
@@ -1082,10 +1195,61 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Transfer-Encoding", "chunked")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
-        for event in course_sync.sync_course(int(course_id), SM_HOME):
-            self._write_chunk(event)
+        # One sync per course at a time: the launch sync and a "sync whole
+        # file" from Manage courses can otherwise write one manifest at once.
+        with _SYNC_LOCKS[int(course_id)]:
+            for event in course_sync.sync_course(int(course_id), SM_HOME):
+                self._write_chunk(event)
         self.wfile.write(b"0\r\n\r\n")
         self.wfile.flush()
+
+    def _large_files_conn(self, course_id: int):
+        """The course's manifest, or None when it was never synced (nothing
+        is created just by asking)."""
+        import sync
+
+        path = SM_HOME / "courses" / str(course_id) / "manifest.db"
+        return sync.open_manifest(path) if path.exists() else None
+
+    def _handle_list_large_files(self, course_id: str):
+        import large_files
+
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        conn = self._large_files_conn(int(course_id))
+        if conn is None:
+            self._send_json(200, {"files": []})
+            return
+        try:
+            self._send_json(200, {"files": large_files.rows(conn)})
+        finally:
+            conn.close()
+
+    def _handle_set_large_file(self, course_id: str, file_id: str):
+        """{"full": true} indexes the whole file on the next sync; false goes
+        back to the preview (large_files.py)."""
+        import large_files
+
+        data = self._read_json_body()
+        if data is None:
+            return
+        if not self._course_selected(int(course_id)):
+            self._not_found()
+            return
+        if not isinstance(data.get("full"), bool):
+            self._send_json(400, {"error": {"code": "bad_request", "message": "full must be true or false"}})
+            return
+        conn = self._large_files_conn(int(course_id))
+        try:
+            found = conn is not None and large_files.set_want_full(conn, file_id, data["full"])
+        finally:
+            if conn is not None:
+                conn.close()
+        if not found:
+            self._not_found("no such large file")
+            return
+        self._send_json(200, {"file_id": file_id, "want_full": data["full"]})
 
     def _handle_explain(self, course_id: str, assignment_id: str):
         import explain
@@ -1318,6 +1482,12 @@ if __name__ == "__main__":
     # fork bomb during Step 12's development, not a theoretical risk.
     multiprocessing.freeze_support()
 
+    if sys.argv[1:] == ["--self-test"]:
+        from runtime_check import run
+
+        run()
+        _exit_now(0)
+
     # stdout is a pipe to the Tauri app, so Python block-buffers it: sync's
     # "[course_sync] skipping ..." lines sat unseen in the buffer instead of
     # reaching the app's [backend] log. Line buffering delivers each line.
@@ -1338,7 +1508,15 @@ if __name__ == "__main__":
     try:
         server = ThreadingHTTPServer((HOST, PORT), Handler)
     except OSError as e:
-        if e.errno != errno.EADDRINUSE:
+        port_taken = e.errno == errno.EADDRINUSE
+        # An exclusive listener can cause WSAEACCES instead of WSAEADDRINUSE.
+        if getattr(e, "winerror", None) == 10013:
+            try:
+                with socket.create_connection((HOST, PORT), timeout=1):
+                    port_taken = True
+            except OSError:
+                pass
+        if not port_taken:
             raise
         print(
             f"sm-backend: port {PORT} is already in use, most likely by another "

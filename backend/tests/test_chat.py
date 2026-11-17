@@ -425,3 +425,13 @@ def test_listing_tool_tolerates_missing_or_odd_arguments(arguments, expected):
     )
     list(chat.answer("list everything", [], "Test Course", lambda q: [], provider, list_items=lambda t, ty: asked.append((t, ty)) or "x"))
     assert asked == [expected]
+
+
+def test_system_prompt_says_a_preview_is_only_part_of_its_file():
+    """Long files are indexed as a preview (large_files.py): chat should say
+    it has only part of the book, not that the course doesn't cover it."""
+    provider = FakeProvider([(["ok"], [])])
+    list(chat.answer("what does chapter 19 say?", [], "Test Course", lambda q: [], provider))
+    system = provider.calls[0]["messages"][0]["content"]
+    assert "(first 150 of 722 pages)" in system
+    assert "Manage courses" in system

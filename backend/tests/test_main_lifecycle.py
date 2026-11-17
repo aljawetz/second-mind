@@ -101,7 +101,11 @@ def _warm_one(sm_home: Path, scenario: _WarmScenario) -> tuple[str, subprocess.P
     port = _free_port()
     env = {"SM_HOME": str(sm_home), **scenario.extra_env}
     proc = _spawn(port, pending_stdout=scenario.pending_stdout, **env)
-    ping = _wait_for_ping(proc, port)
+    try:
+        ping = _wait_for_ping(proc, port)
+    except BaseException:
+        _stop(proc)
+        raise
     return scenario.test_name, proc, port, ping
 
 
@@ -115,15 +119,24 @@ def warmed_backends(sm_home):
     """Start every lifecycle configuration in parallel so each test reuses a hot process."""
     warmed: dict[str, tuple[subprocess.Popen, int, dict]] = {}
     procs: list[subprocess.Popen] = []
-    with ThreadPoolExecutor(max_workers=len(_WARM_SCENARIOS)) as pool:
-        futures = [pool.submit(_warm_one, sm_home, scenario) for scenario in _WARM_SCENARIOS]
-        for future in as_completed(futures):
-            name, proc, port, ping = future.result()
-            warmed[name] = (proc, port, ping)
-            procs.append(proc)
-    yield warmed
-    for proc in procs:
-        _stop(proc)
+    try:
+        scenarios = [s for s in _WARM_SCENARIOS if sys.platform != "win32" or s.test_name != "test_sigterm_exits_cleanly"]
+        with ThreadPoolExecutor(max_workers=len(scenarios)) as pool:
+            futures = [pool.submit(_warm_one, sm_home, scenario) for scenario in scenarios]
+            errors = []
+            for future in as_completed(futures):
+                try:
+                    name, proc, port, ping = future.result()
+                    warmed[name] = (proc, port, ping)
+                    procs.append(proc)
+                except BaseException as error:
+                    errors.append(error)
+            if errors:
+                raise errors[0]
+        yield warmed
+    finally:
+        for proc in procs:
+            _stop(proc)
 
 
 @pytest.fixture

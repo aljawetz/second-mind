@@ -13,13 +13,24 @@ shared venv meant tests broke after each build and vice versa.
 """
 
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 backend = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(backend))
+from build_support import install_sidecar
 env = {**os.environ, "UV_PROJECT_ENVIRONMENT": ".venv-build"}
+
+if sys.platform == "win32":
+    from native_tools import tesseract_executable
+
+    tesseract = tesseract_executable()
+    if not tesseract:
+        sys.exit("Install Tesseract OCR before building: winget install UB-Mannheim.TesseractOCR")
+    if not (tesseract.parent / "tessdata" / "eng.traineddata").is_file():
+        sys.exit(f"English OCR data missing beside {tesseract}")
+    env["SM_TESSERACT_DIR"] = str(tesseract.parent)
 
 
 def run(*cmd: str) -> None:
@@ -43,8 +54,8 @@ if torch_modules:
     )
 
 # symlinks=True keeps the onedir folder's symlinks as symlinks (macOS).
-dest = backend.parent / "app" / "src-tauri" / "binaries" / "sm-backend"
+dest = (backend.parent / "app" / "src-tauri" / "binaries" / "sm-backend").resolve()
+assert dest.is_relative_to(backend.parent.resolve())
 dest.parent.mkdir(parents=True, exist_ok=True)
-shutil.rmtree(dest, ignore_errors=True)
-shutil.copytree(backend / "dist" / "sm-backend", dest, symlinks=True)
+install_sidecar(backend / "dist" / "sm-backend", dest, backend.parent)
 print("installed: app/src-tauri/binaries/sm-backend/")

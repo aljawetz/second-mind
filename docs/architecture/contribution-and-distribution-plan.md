@@ -21,6 +21,14 @@ others" currently only ever means "other CMU students with a CMU Canvas token."
 (Windows/Linux explicitly out of scope, not half-supported); Canvas base URL becomes a real
 configuration option rather than staying CMU-only.
 
+**Windows follow-up:** the repository now includes a Windows x64 NSIS pipeline in
+`.github/workflows/windows.yml`, reused by CI and tagged releases. It packages the
+onedir backend through a Windows-only Tauri resource mapping, includes Tesseract,
+checks actual native inference and MP4/WebM decoding, and installs the resulting
+package in CI before checking its backend. Build locally with
+`python scripts/package-windows.py`. Windows and macOS builds remain unsigned;
+Linux packaging is still outside the supported release pipeline.
+
 Sequenced 2 → 1 → 3 → 4 → 6 → 5: the Canvas de-lock and license are substance blockers, CI should
 exist before a release pipeline builds on top of it, and the signed-installer question (step 5) is
 an open call-out, not a decided scope item.

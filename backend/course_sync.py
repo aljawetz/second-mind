@@ -9,6 +9,7 @@ responsible for the actual Canvas calls") — this module is that caller.
 import re
 import sys
 import tempfile
+import threading
 from datetime import datetime, tzinfo
 from pathlib import Path
 
@@ -18,6 +19,7 @@ import canvas
 import course_items
 import ingestion
 import indexing
+import large_files
 import sync
 
 # File types read as sections (headings and their text), like Canvas pages.
@@ -29,6 +31,14 @@ SECTION_EXTRACTORS = {
     ".csv": "extract_text_file",
 }
 SUPPORTED_FILE_SUFFIXES = {".pdf", ".pptx", *SECTION_EXTRACTORS}
+_course_locks: dict[int, threading.Lock] = {}
+_course_locks_guard = threading.Lock()
+
+
+def _course_lock(sm_home: Path, course_id: int):
+    del sm_home
+    with _course_locks_guard:
+        return _course_locks.setdefault(course_id, threading.Lock())
 
 
 def _course_paths(sm_home: Path, course_id: int) -> tuple[Path, Path]:
@@ -41,49 +51,104 @@ def _sync_deleted(conn, db_path, table_name, item_type, deleted_ids):
     for prefixed_id in deleted_ids:
         indexing.delete_ref_doc_nodes(db_path, table_name, prefixed_id)
         sync.forget(conn, prefixed_id, item_type)
+        if item_type == "file":
+            large_files.forget(conn, prefixed_id.removeprefix("file:"))
         yield {"item": prefixed_id, "status": "done"}
 
 
-def _sync_file(conn, db_path, table_name, file_meta, is_changed):
-    prefixed_id = f"file:{file_meta['id']}"
+def _cut_to(items: list[dict], limit: int, text_of) -> list[dict]:
+    """The leading items whose text fits in `limit` characters (at least one)."""
+    kept, total = [], 0
+    for item in items:
+        total += len(text_of(item))
+        if kept and total > limit:
+            break
+        kept.append(item)
+    return kept
+
+
+def _sync_file(conn, db_path, table_name, file_meta, is_changed, version_suffix=""):
+    """Indexes a file, or the preview large_files.py allows: version_suffix
+    is "" (the whole file, unless it turns out long), "|preview" or
+    "|skipped" (over the size limit: not downloaded)."""
+    file_id = str(file_meta["id"])
+    prefixed_id = f"file:{file_id}"
     display_name = file_meta.get("display_name", "")
     updated_at = file_meta.get("updated_at", "")
+    size = file_meta.get("size") or 0
     suffix = Path(display_name).suffix.lower()
+    want_full = large_files.wants_full(conn, file_id)
 
     if is_changed:
         indexing.delete_ref_doc_nodes(db_path, table_name, prefixed_id)
 
+    if version_suffix == "|skipped":
+        large_files.record(conn, file_id, display_name, size, pages=None, chars=None, long=False, state="none")
+        sync.mark_synced(conn, prefixed_id, "file", display_name, updated_at + version_suffix, sync.content_hash(""))
+        return display_name
+
     raw = canvas.download(file_meta["url"])
     tmp_path = Path(tempfile.mktemp(suffix=suffix))
     tmp_path.write_bytes(raw)
+    pages_total = chars = None
     try:
         if suffix == ".pdf":
-            pages = ingestion.extract_pdf(tmp_path)
+            pages_total = ingestion.pdf_page_count(tmp_path)
+            long = pages_total > large_files.MAX_PDF_PAGES
+            preview = long and not want_full
+            pages = ingestion.extract_pdf(tmp_path, max_pages=large_files.MAX_PDF_PAGES) if preview else ingestion.extract_pdf(tmp_path)
             for p in pages:
                 if p["needs_fallback"]:
                     p["text"] = ingestion.merge_ocr_text(p["text"], ingestion.ocr_pdf_page(tmp_path, p["page"]))
-            nodes = indexing.pages_to_nodes(pages, display_name, prefixed_id)
+            source = large_files.preview_source(display_name, pages_total) if preview else display_name
+            nodes = indexing.pages_to_nodes(pages, source, prefixed_id)
             full_text = "".join(p["text"] for p in pages)
         elif suffix == ".pptx":
             slides = ingestion.extract_pptx(tmp_path)
-            nodes = indexing.slides_to_nodes(slides, display_name, prefixed_id)
+            chars = sum(len(s["text"]) for s in slides)
+            long = chars > large_files.MAX_TEXT_CHARS
+            preview = long and not want_full
+            if preview:
+                slides = _cut_to(slides, large_files.MAX_TEXT_CHARS, lambda s: s["text"])
+            source = large_files.preview_source(display_name, None) if preview else display_name
+            nodes = indexing.slides_to_nodes(slides, source, prefixed_id)
             full_text = "".join(s["text"] for s in slides)
         else:  # Word, Excel, plain text
             sections = getattr(ingestion, SECTION_EXTRACTORS[suffix])(tmp_path)
-            nodes = indexing.sections_to_nodes(sections, display_name, prefixed_id, "file")
+            chars = len(ingestion.sections_text(sections))
+            long = chars > large_files.MAX_TEXT_CHARS
+            preview = long and not want_full
+            if preview:
+                sections = _cut_to(sections, large_files.MAX_TEXT_CHARS, lambda s: f"{s['heading'] or ''}{s['text'] or ''}")
+            source = large_files.preview_source(display_name, None) if preview else display_name
+            nodes = indexing.sections_to_nodes(sections, source, prefixed_id, "file")
             full_text = ingestion.sections_text(sections)
     finally:
         tmp_path.unlink()
 
     if nodes:
         indexing.add_nodes(nodes, db_path, table_name)
-    sync.mark_synced(conn, prefixed_id, "file", display_name, updated_at, sync.content_hash(full_text))
+    if long or size > large_files.MAX_FILE_BYTES or want_full:
+        state = "preview" if preview else "full"
+        large_files.record(conn, file_id, display_name, size, pages=pages_total, chars=chars, long=long, state=state)
+    else:
+        large_files.forget(conn, file_id)
+    version = updated_at + ("|preview" if preview else "")
+    sync.mark_synced(conn, prefixed_id, "file", display_name, version, sync.content_hash(full_text))
     return display_name
 
 
-def _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed):
+# The course's Home, when it's a wiki page: indexed as "Home: <title>" so
+# "what's on the Home page?" finds it. 18-658's Home is titled "Welcome to
+# Software Requirements and Interaction Design (18-658)!", and under that
+# title alone the question found nothing (seen in the app, 2026-11-17). The
+# version suffix makes a front page synced before this resync once.
+HOME_SUFFIX = "|home"
+
+
+def _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed, is_home=False):
     prefixed_id = f"page:{page_summary['url']}"
-    updated_at = page_summary.get("updated_at", "")
+    updated_at = page_summary.get("updated_at", "") + (HOME_SUFFIX if is_home else "")
 
     if is_changed:
         indexing.delete_ref_doc_nodes(db_path, table_name, prefixed_id)
@@ -99,7 +164,7 @@ def _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed):
     # generation.py's citation formatting reads item_type back as
     # source_type, so this must say "page", not "file", and carries no
     # fabricated page number.
-    nodes = indexing.sections_to_nodes(sections, title, prefixed_id, item_type="page")
+    nodes = indexing.sections_to_nodes(sections, f"Home: {title}" if is_home else title, prefixed_id, item_type="page")
 
     if nodes:
         indexing.add_nodes(nodes, db_path, table_name)
@@ -251,6 +316,19 @@ def _sync_topic(conn, db_path, table_name, topic, kind, is_changed):
 
 
 def sync_course(course_id: int, sm_home: Path):
+    """Serialize overlapping sync requests for the same course."""
+    with _course_lock(sm_home, course_id):
+        manifest_path, db_path = _course_paths(sm_home, course_id)
+        conn = sync.open_manifest(manifest_path)
+        try:
+            yield from _sync_course_items(course_id, db_path, f"course_{course_id}", conn)
+        except Exception as error:
+            yield {"done": True, "error": str(error)}
+        finally:
+            conn.close()
+
+
+def _sync_course_items(course_id: int, db_path: Path, table_name: str, conn):
     """Generator — see module docstring and the design spec for the full
     contract. Yields {"item", "status", "error"?} per processed item, then
     exactly one final {"done": True, "new", "changed", "removed", "failed"}
@@ -267,10 +345,6 @@ def sync_course(course_id: int, sm_home: Path):
     shows it, and links in the text of all the others. 18-658 lists no files
     in its Modules; all 46 of its readings are links in its pages and
     syllabus."""
-    manifest_path, db_path = _course_paths(sm_home, course_id)
-    table_name = f"course_{course_id}"
-    conn = sync.open_manifest(manifest_path)
-
     try:
         structure = canvas.get_course_structure(course_id)
         pages_list = canvas.list_pages(course_id)
@@ -339,7 +413,11 @@ def sync_course(course_id: int, sm_home: Path):
                 links_complete = False
                 continue
             pages_by_url[url] = {**page, **full, "updated_at": page.get("updated_at", full.get("updated_at", ""))}
-        page_remote = [{"id": f"page:{url}", "updated_at": p.get("updated_at", "")} for url, p in pages_by_url.items()]
+        home_url = front_page.get("url") if front_page else None
+        page_remote = [
+            {"id": f"page:{url}", "updated_at": p.get("updated_at", "") + (HOME_SUFFIX if url == home_url else "")}
+            for url, p in pages_by_url.items()
+        ]
 
         # The syllabus has no updated_at of its own: its content hash stands
         # in as the version, so an edit reads as "changed".
@@ -424,14 +502,22 @@ def sync_course(course_id: int, sm_home: Path):
             file_metas[str(meta["id"])] = meta
             all_file_names[str(meta["id"])] = display_name
 
+        # A large file's version carries whether it's a preview or skipped
+        # (large_files.version_suffix): the student turning it on or off
+        # then reads as a change.
+        file_suffix = {fid: large_files.version_suffix(conn, fid, meta.get("size") or 0) for fid, meta in file_metas.items()}
         file_remote = [
-            {"id": f"file:{fid}", "updated_at": meta.get("updated_at", "")} for fid, meta in file_metas.items()
+            {"id": f"file:{fid}", "updated_at": meta.get("updated_at", "") + file_suffix[fid]}
+            for fid, meta in file_metas.items()
         ]
 
         # The course outline, for listing questions in chat (course_items.py).
         # Like the deletion guards below, an empty listing never wipes one
         # already saved: a hidden modules tab looks the same as no modules.
         outline = course_items.outline_rows(structure, page_links=page_links, file_names=all_file_names)
+        if home_url:
+            home_title = (front_page.get("title") or "").strip() or "Home"
+            outline = course_items.group_rows("Home", [home_title], "page") + outline
         # By id, not name: a module item's title often isn't its file's name.
         in_modules = {str(item.get("content_id")) for item in module_items if item.get("type") == "File"}
         in_modules |= {fid for url in module_page_urls for fid in page_links.get(url, [])}
@@ -447,8 +533,6 @@ def sync_course(course_id: int, sm_home: Path):
             [(t.get("title") or "").strip() for t in discussions if str(t.get("id")) not in module_topics],
             "discussion",
         )
-        if outline:
-            course_items.save_outline(conn, outline)
 
         file_diff = sync.diff(conn, "file", file_remote)
         page_diff = sync.diff(conn, "page", page_remote)
@@ -483,7 +567,7 @@ def sync_course(course_id: int, sm_home: Path):
                 fid = prefixed_id.removeprefix("file:")
                 meta = file_metas[fid]
                 try:
-                    name = _sync_file(conn, db_path, table_name, meta, is_changed)
+                    name = _sync_file(conn, db_path, table_name, meta, is_changed, file_suffix[fid])
                     yield {"item": name, "status": "done"}
                     changed_count += is_changed
                     new_count += not is_changed
@@ -496,7 +580,7 @@ def sync_course(course_id: int, sm_home: Path):
                 url = prefixed_id.removeprefix("page:")
                 page_summary = pages_by_url[url]
                 try:
-                    title = _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed)
+                    title = _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed, url == home_url)
                     yield {"item": title, "status": "done"}
                     changed_count += is_changed
                     new_count += not is_changed
@@ -541,6 +625,11 @@ def sync_course(course_id: int, sm_home: Path):
                     except Exception as e:
                         failed_count += 1
                         yield {"item": topic.get("title") or prefixed_id, "status": "failed", "error": str(e)}
+
+        # Saved last, so a large file's line says what this sync indexed of it.
+        if outline:
+            labels = {r["name"]: large_files.outline_label(r) for r in large_files.rows(conn)}
+            course_items.save_outline(conn, course_items.label_files(outline, labels))
     except Exception as e:
         yield {"done": True, "error": str(e)}
         return

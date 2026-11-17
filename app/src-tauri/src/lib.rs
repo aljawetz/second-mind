@@ -10,6 +10,22 @@ const CREDENTIAL_SERVICE: &str = "com.secondmind.app";
 const CREDENTIAL_KEYS: [&str; 4] = ["canvas-token", "openai-key", "deepseek-key", "github-copilot-token"];
 const CREDENTIAL_SAVE_PREFIX: &str = "sm-credential:";
 
+#[cfg(all(test, target_os = "windows"))]
+mod windows_tests {
+    #[test]
+    fn native_credentials_round_trip() {
+        let key = format!("windows-smoke-{}", super::new_instance_token());
+        super::save_credential(&key, "Second Mind test value").unwrap();
+        let result = super::read_credential(&key);
+        keyring::v1::Entry::new(super::CREDENTIAL_SERVICE, &key)
+            .unwrap()
+            .delete_credential()
+            .unwrap();
+        assert_eq!(result.unwrap().as_deref(), Some("Second Mind test value"));
+        assert_eq!(super::read_credential(&key).unwrap(), None);
+    }
+}
+
 fn read_credential(key: &str) -> Result<Option<String>, String> {
     use keyring::v1::Entry;
     let entry = Entry::new(CREDENTIAL_SERVICE, key).map_err(|e| e.to_string())?;
@@ -122,7 +138,8 @@ pub fn run() {
             // loading one library twice. So: dev runs it in place from
             // binaries/, and a release gets it copied into
             // Contents/Resources/ by scripts/package-macos.sh (ditto keeps
-            // the symlinks) before the bundle is re-signed.
+            // the symlinks) before the bundle is re-signed. Windows bundles
+            // the whole directory via tauri.windows.conf.json's resources.
             //
             // EXE_SUFFIX is ".exe" on Windows (PyInstaller's output name
             // there) and empty elsewhere.

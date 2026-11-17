@@ -12,7 +12,7 @@ on:
 permissions:
   contents: write
 
-# macOS only, unsigned — contribution-and-distribution-plan.md step 5. An
+# macOS is unsigned — contribution-and-distribution-plan.md step 5. An
 # unsigned .dmg triggers Gatekeeper on first install: either "Apple cannot
 # verify this app" (right-click -> Open bypasses it) or, more often on
 # recent macOS, "Second Mind is damaged and can't be opened" (right-click -> Open
@@ -21,8 +21,29 @@ permissions:
 # account and is deliberately deferred rather than blocking a first
 # release on it.
 jobs:
+  windows:
+    uses: ./.github/workflows/windows.yml
+
+  publish-windows:
+    needs: windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: windows-installer
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: windows-installer/*-setup.exe
+
   build:
     runs-on: macos-latest
+    # The runner's newest Python (3.15 since November 2026) has no
+    # onnxruntime wheel, so uv's default pick broke the v0.2.0 build at
+    # "Generate the embedding model". 3.14 is what the app is developed
+    # and tested on.
+    env:
+      UV_PYTHON: "3.14"
     steps:
       - uses: actions/checkout@v4
 
@@ -52,6 +73,9 @@ jobs:
         run: |
           uv sync --group convert
           uv run python3 scripts/convert_embedding_model.py
+          # sm-backend.spec bundles the reranker too (Sprint 8); without
+          # this the PyInstaller step can't find it and the build fails.
+          uv run python3 scripts/convert_reranker_model.py
 
       - name: Fetch the session-transcription model
         working-directory: backend
@@ -82,6 +106,10 @@ jobs:
           files: app/src-tauri/target/release/bundle/dmg/*.dmg
           generate_release_notes: true
           body: |
+            **Windows x64:** download the `-setup.exe` installer. It includes the local backend,
+            models, and Tesseract OCR; WebView2 is installed if needed (requires internet access).
+            The installer is unsigned, so Windows SmartScreen may show a warning.
+
             **Unsigned build** (not notarized by Apple). macOS Gatekeeper will block it on first
             launch. Fastest fix, open Terminal and run:
             ```
