@@ -32,11 +32,11 @@ jobs:
             frontend:
               - 'app/**'
               - '.github/workflows/ci.yml'
+            # cargo check only needs app/dist to exist, so frontend-only
+            # changes can't break it. Skipping them keeps PRs off the slow
+            # macOS runner queue. Pushes to main still run the job.
             rust:
               - 'app/src-tauri/**'
-              - 'app/package-lock.json'
-              - 'app/vite.config.*'
-              - 'app/src/**'
               - '.github/workflows/ci.yml'
 
   backend:
