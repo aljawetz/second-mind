@@ -16,9 +16,10 @@ from docx.table import Table
 from docx.text.paragraph import Paragraph
 import openpyxl
 import pdfplumber
-import pytesseract
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
+
+from native_tools import image_to_string
 
 
 def needs_fallback(char_count: int, has_image: bool) -> bool:
@@ -310,4 +311,4 @@ def ocr_pdf_page(path: Path, page_number: int) -> str:
     """Rasterize one PDF page (1-indexed) and run Tesseract on it."""
     with pdfplumber.open(path) as pdf:
         rendered = pdf.pages[page_number - 1].to_image(resolution=200)
-        return pytesseract.image_to_string(rendered.original)
+        return image_to_string(rendered.original)

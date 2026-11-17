@@ -111,6 +111,51 @@ def test_first_sync_reports_one_new_file_and_one_new_page(tmp_path, stub_canvas,
     assert done_items == {"syllabus.pdf", "Week 1 Overview"}
 
 
+def test_concurrent_syncs_wait_and_rediff(tmp_path, stub_canvas, stub_extraction, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+
+    first_entered = threading.Event()
+    release_first = threading.Event()
+    second_started = threading.Event()
+    calls = []
+    original = course_sync.canvas.get_course_structure
+
+    def structure(course_id):
+        calls.append(course_id)
+        if len(calls) == 1:
+            first_entered.set()
+            assert release_first.wait(5)
+        return original(course_id)
+
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", structure)
+
+    def second_sync():
+        second_started.set()
+        return run(1, tmp_path)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(run, 1, tmp_path)
+        assert first_entered.wait(5)
+        second = pool.submit(second_sync)
+        assert second_started.wait(5)
+        try:
+            assert calls == [1]
+            assert not second.done()
+        finally:
+            release_first.set()
+        assert first.result()[-1]["new"] == 2
+        assert second.result()[-1] == {"done": True, "new": 0, "changed": 0, "removed": 0, "failed": 0}
+
+
+def test_file_linked_in_two_modules_is_fetched_once(tmp_path, stub_canvas, stub_extraction, monkeypatch):
+    calls = []
+    monkeypatch.setattr(course_sync.canvas, "get_course_structure", lambda _: _structure(FILE_META, FILE_META))
+    monkeypatch.setattr(course_sync.canvas, "get_file", lambda file_id: (calls.append(file_id), dict(FILE_META))[1])
+    assert run(1, tmp_path)[-1]["failed"] == 0
+    assert calls == [FILE_META["id"]]
+
+
 def test_second_sync_with_no_remote_changes_reports_nothing(tmp_path, stub_canvas, stub_extraction):
     run(1, tmp_path)
     events = run(1, tmp_path)

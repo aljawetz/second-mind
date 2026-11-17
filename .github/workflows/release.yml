@@ -12,7 +12,7 @@ on:
 permissions:
   contents: write
 
-# macOS only, unsigned — contribution-and-distribution-plan.md step 5. An
+# macOS is unsigned — contribution-and-distribution-plan.md step 5. An
 # unsigned .dmg triggers Gatekeeper on first install: either "Apple cannot
 # verify this app" (right-click -> Open bypasses it) or, more often on
 # recent macOS, "Second Mind is damaged and can't be opened" (right-click -> Open
@@ -21,6 +21,21 @@ permissions:
 # account and is deliberately deferred rather than blocking a first
 # release on it.
 jobs:
+  windows:
+    uses: ./.github/workflows/windows.yml
+
+  publish-windows:
+    needs: windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: windows-installer
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: windows-installer/*-setup.exe
+
   build:
     runs-on: macos-latest
     steps:
@@ -82,6 +97,10 @@ jobs:
           files: app/src-tauri/target/release/bundle/dmg/*.dmg
           generate_release_notes: true
           body: |
+            **Windows x64:** download the `-setup.exe` installer. It includes the local backend,
+            models, and Tesseract OCR; WebView2 is installed if needed (requires internet access).
+            The installer is unsigned, so Windows SmartScreen may show a warning.
+
             **Unsigned build** (not notarized by Apple). macOS Gatekeeper will block it on first
             launch. Fastest fix, open Terminal and run:
             ```

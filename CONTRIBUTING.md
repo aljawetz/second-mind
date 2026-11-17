@@ -25,9 +25,11 @@ PATH="$HOME/.cargo/bin:$PATH" npm run tauri dev
 ```
 
 Windows: run `python scripts\bootstrap.py` instead, then `npm run tauri dev` from `app` (setup
-notes in the README). Released builds are macOS only for now — see
-[docs/architecture/contribution-and-distribution-plan.md](docs/architecture/contribution-and-distribution-plan.md)
-for why, and what's planned.
+notes in the README). Build a Windows x64 installer with
+`python scripts\package-windows.py` from the repository root. Windows CI runs the
+backend tests, checks the frozen runtime, builds the installer, and tests its
+installed resources. Tesseract is bundled on Windows; developers still need it
+installed locally to build.
 
 ## Before opening a PR
 
@@ -37,7 +39,7 @@ cd app && npx tsc --noEmit                 # frontend
 ```
 
 Both need to pass. If you touched anything under `app/src-tauri/`, also confirm `npm run tauri
-dev` still launches cleanly — there's no automated check for the Rust shell itself yet.
+dev` still launches cleanly. CI checks the macOS Rust shell and builds the Windows installer.
 
 ## How this repo documents itself
 

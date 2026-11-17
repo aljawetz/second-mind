@@ -1,0 +1,81 @@
+name: Windows build and installer
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
+      UV_LINK_MODE: copy
+      CARGO_BUILD_JOBS: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          architecture: x64
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.9.28"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+      - name: Install OCR runtime for bundling
+        run: choco install tesseract --no-progress -y
+      - name: Cache local models
+        uses: actions/cache@v4
+        with:
+          path: backend/models
+          key: windows-models-${{ hashFiles('backend/scripts/convert_embedding_model.py', 'backend/scripts/fetch_whisper_model.py', 'backend/uv.lock') }}
+      - name: Install locked dependencies
+        working-directory: backend
+        run: uv sync --all-groups --frozen
+      - name: Prepare offline models
+        working-directory: backend
+        run: |
+          if (!(Test-Path models/bge-small-en-v1.5-onnx/model.onnx)) {
+            uv run --no-sync python scripts/convert_embedding_model.py
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          uv run --no-sync python scripts/fetch_whisper_model.py
+      - name: Test backend on Windows
+        working-directory: backend
+        run: uv run --no-sync pytest tests/ -q
+      - name: Test recording format selection
+        working-directory: app
+        run: node --experimental-transform-types --test tests/*.test.mjs
+      - name: Build and validate frozen backend and NSIS installer
+        run: python scripts/package-windows.py
+      - name: Check Windows Credential Manager
+        working-directory: app/src-tauri
+        run: cargo test --locked --lib windows_tests::native_credentials_round_trip
+      - name: Install and check packaged resources
+        run: |
+          $installer = Get-ChildItem app/src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          $installDir = Join-Path $env:RUNNER_TEMP 'Second Mind installed 日本語'
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList "/S /D=$installDir" -Wait -PassThru -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+          python scripts/smoke_backend.py "$installDir/sm-backend/sm-backend.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $app = Get-ChildItem $installDir -Filter *.exe | Where-Object Name -NotMatch 'uninstall' | Select-Object -First 1
+          python scripts/smoke_app.py $app.FullName
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: app/src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error

@@ -37,7 +37,9 @@ def check_prerequisites() -> None:
         missing.append(node_hint)
     if not shutil.which("npm"):
         missing.append("npm (comes with node)")
-    if not shutil.which("tesseract"):
+    sys.path.insert(0, str(backend))
+    from native_tools import tesseract_executable
+    if not tesseract_executable():
         missing.append(tesseract_hint)
     if not find_cargo():
         missing.append("rust (https://rustup.rs)")
@@ -58,13 +60,13 @@ def step(title: str, cwd: Path, *cmd: str) -> None:
 check_prerequisites()
 
 step("Backend: installing Python dependencies (uv sync --all-groups)",
-     backend, "uv", "sync", "--all-groups")
+     backend, "uv", "sync", "--all-groups", "--frozen")
 step("Backend: generating the local embedding model (one-time, needs network access to Hugging Face)",
-     backend, "uv", "run", "python", "scripts/convert_embedding_model.py")
+     backend, "uv", "run", "--no-sync", "python", "scripts/convert_embedding_model.py")
 step("Backend: fetching the session-transcription model (one-time, needs network access to Hugging Face)",
-     backend, "uv", "run", "python", "scripts/fetch_whisper_model.py")
+     backend, "uv", "run", "--no-sync", "python", "scripts/fetch_whisper_model.py")
 step("Backend: running the test suite to confirm the environment is sound",
-     backend, "uv", "run", "pytest", "tests/", "-q")
+     backend, "uv", "run", "--no-sync", "pytest", "tests/", "-q")
 # After the model steps: the spec bundles both models into the build.
 step("Backend: building it for the app (PyInstaller, in its own .venv-build)",
      backend, "uv", "run", "--no-project", "python", "scripts/build_sidecar.py")
@@ -72,7 +74,7 @@ step("Frontend: installing npm dependencies", app, "npm", "install")
 
 if is_windows:
     start = "    cd app\n    npm run tauri dev"
-    note = "Rerun backend\\scripts\\build_sidecar.py after changing backend code you want to see in the app."
+    note = "Rebuild backend changes: python backend\\scripts\\build_sidecar.py\nBuild the installer: python scripts\\package-windows.py (from the repository root)."
 else:
     start = '    cd app\n    PATH="$HOME/.cargo/bin:$PATH" npm run tauri dev'
     note = (
