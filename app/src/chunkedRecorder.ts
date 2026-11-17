@@ -21,6 +21,10 @@ export function recordingMimeType(): string | undefined {
 }
 
 export class ChunkedRecorder {
+  private stream: MediaStream;
+  private mimeType: string | undefined;
+  private upload: Upload;
+  private onTick: (seconds: number) => void;
   private slice!: { recorder: MediaRecorder; parts: Blob[] };
   private seconds = 0;
   private sliceSeconds = 0;
@@ -32,11 +36,16 @@ export class ChunkedRecorder {
   private failed: { index: number; slice: Blob }[] = [];
 
   constructor(
-    private stream: MediaStream,
-    private mimeType: string | undefined,
-    private upload: Upload,
-    private onTick: (seconds: number) => void
-  ) {}
+    stream: MediaStream,
+    mimeType: string | undefined,
+    upload: Upload,
+    onTick: (seconds: number) => void
+  ) {
+    this.stream = stream;
+    this.mimeType = mimeType;
+    this.upload = upload;
+    this.onTick = onTick;
+  }
 
   start() {
     this.beginSlice();
