@@ -55,7 +55,10 @@ jobs:
       - name: Test backend on Windows
         working-directory: backend
         run: uv run --no-sync pytest tests/ -q
-      - name: Test recording format selection
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+      - name: Test frontend on Windows
         working-directory: app
         run: node --experimental-transform-types --test tests/*.test.mjs
       - name: Build and validate frozen backend and NSIS installer
