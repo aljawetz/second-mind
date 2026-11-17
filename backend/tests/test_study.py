@@ -637,3 +637,120 @@ def test_export_route_saves_a_quiz_to_the_downloads_folder(app, monkeypatch):
     assert row[0] == "What do stubs do?"
     assert row[1 + "ABCD".index(row[5])] == "What do stubs do? option 2"
     assert app.call("POST", f"/courses/{COURSE}/study/nope/export")[0] == 404
+
+
+def _pdf_text(path):
+    import pdfplumber
+
+    with pdfplumber.open(path) as pdf:
+        return [page.extract_text() for page in pdf.pages]
+
+
+def test_kahoot_pdf_reads_back_as_numbered_questions_with_their_answer(tmp_path):
+    import kahoot_export
+
+    questions = [
+        {"question": "O que um stub faz (em testes)?", "options": [{"text": t, "correct": i == 2} for i, t in enumerate(["Nada", "Grava chamadas", "Devolve valores fixos", "x → y ≤ z"])]},
+        {"question": "Q" * 130, "options": [{"text": "a", "correct": True}] + [{"text": "b" * 80, "correct": False}] * 3},
+    ]
+    path = tmp_path / "quiz.pdf"
+    path.write_bytes(kahoot_export.render("Testes: dublês", questions))
+
+    [text] = _pdf_text(path)
+    lines = text.splitlines()
+    assert lines[:7] == [
+        "Testes: dublês",
+        "1. O que um stub faz (em testes)?",
+        "A) Nada",
+        "B) Grava chamadas",
+        "C) Devolve valores fixos",
+        "D) x -> y <= z",
+        "Answer: C",
+    ]
+    assert kahoot_export.over_limit(questions) == [2]
+
+
+def test_kahoot_pdf_never_splits_a_question_across_pages(tmp_path):
+    import kahoot_export
+
+    questions = [_q(f"Question {n} " + "word " * 30) for n in range(25)]
+    for q in questions:
+        q["options"][0]["correct"] = True
+    path = tmp_path / "quiz.pdf"
+    path.write_bytes(kahoot_export.render("Long quiz", questions))
+
+    pages = _pdf_text(path)
+    assert len(pages) > 1
+    for page in pages:
+        lines = page.splitlines()
+        # Every page ends on an answer line, so no question ran over.
+        assert lines[-1].startswith("Answer: ")
+    assert sum(page.count("Answer: ") for page in pages) == 25
+
+
+def test_kahoot_xlsx_fills_kahoots_template_layout(tmp_path):
+    import openpyxl
+
+    import kahoot_export
+
+    questions = [_q("What do stubs do?", correct=2), _q("And mocks?", correct=0)]
+    path = tmp_path / "quiz.xlsx"
+    path.write_bytes(kahoot_export.render_xlsx(questions))
+
+    ws = openpyxl.load_workbook(path).active
+    # Same cells as Kahoot's own template: header on row 8, questions from row 9.
+    assert ws["B8"].value == "Question - max 120 characters"
+    assert ws["H8"].value == "Correct answer(s) - choose at least one"
+    assert [c.value for c in ws[9]][:8] == [
+        1,
+        "What do stubs do?",
+        *(f"What do stubs do? option {i}" for i in range(4)),
+        kahoot_export.TIME_LIMIT,
+        "3",
+    ]
+    assert ws["H10"].value == "1"
+    assert ws["A11"].value is None
+
+
+def _long_quiz():
+    ok = {"question": "Short?", "options": [{"text": t, "correct": i == 0} for i, t in enumerate("abcd")]}
+    long = {"question": "Why " + "very " * 30 + "long?", "options": [{"text": "x " * 50, "correct": i == 1} for i in range(4)]}
+    return [ok, long]
+
+
+def test_kahoot_fit_shortens_only_what_kahoot_would_refuse():
+    import kahoot_export
+
+    model = ScriptedLLM({"question": "Why so long?", "answers": ["w", "right", "y", "z"]})
+
+    fitted, shortened, complete = kahoot_export.fit(_long_quiz(), model)
+
+    assert shortened == [2] and complete
+    assert len(model.calls) == 1
+    assert fitted[0] == _long_quiz()[0]
+    assert fitted[1]["question"] == "Why so long?"
+    assert [(o["text"], o["correct"]) for o in fitted[1]["options"]] == [("w", False), ("right", True), ("y", False), ("z", False)]
+    assert kahoot_export.over_limit(fitted) == []
+
+
+def test_kahoot_fit_cuts_at_a_word_when_the_llm_fails_or_runs_long():
+    import kahoot_export
+
+    # No LLM, an LLM that fails, and one whose rewrite is the wrong shape (twice).
+    for model in [None, ScriptedLLM(RuntimeError("no key")), ScriptedLLM(*[{"question": "y", "answers": ["a"]}] * 2)]:
+        fitted, shortened, complete = kahoot_export.fit(_long_quiz(), model)
+
+        assert shortened == [2] and not complete
+        assert kahoot_export.over_limit(fitted) == []
+        assert fitted[1]["question"].endswith("…") and "  " not in fitted[1]["question"]
+        assert [o["correct"] for o in fitted[1]["options"]] == [False, True, False, False]
+
+
+def test_kahoot_fit_cuts_a_rewrite_that_still_runs_long():
+    import kahoot_export
+
+    fitted, _, complete = kahoot_export.fit(_long_quiz(), ScriptedLLM({"question": "y " * 100, "answers": ["a", "b", "c", "d"]}))
+
+    assert complete
+    assert kahoot_export.over_limit(fitted) == []
+    assert fitted[1]["question"].startswith("y y") and fitted[1]["question"].endswith("…")
