@@ -83,3 +83,91 @@ def test_a_token_missing_the_copilot_permission_says_so(copilot):
     status, body = main.Handler._llm_error(None, e)
     assert status == 401
     assert "Copilot Requests" in body["error"]["message"]
+
+
+# verify_credential: the format check, then one real call (found in the
+# Sprint 9 test run: any 20 characters passed as a Canvas token).
+
+CANVAS_TOKEN = "1234~" + "a" * 40
+OPENAI_KEY = "sk-" + "a" * 40
+
+
+def _canvas_answers(monkeypatch, status=None, error=None):
+    seen = {}
+
+    def fake_get(url, headers, timeout):
+        seen["url"], seen["auth"] = url, headers["Authorization"]
+        if error:
+            raise error
+        return httpx.Response(status, request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(main.httpx, "get", fake_get)
+    return seen
+
+
+def test_a_canvas_token_canvas_accepts_is_valid(monkeypatch):
+    seen = _canvas_answers(monkeypatch, 200)
+    assert main.verify_credential("canvas", CANVAS_TOKEN, "canvas.example.edu/") == (True, "")
+    assert seen == {"url": "https://canvas.example.edu/api/v1/users/self", "auth": f"Bearer {CANVAS_TOKEN}"}
+
+
+def test_a_canvas_token_canvas_rejects_is_invalid(monkeypatch):
+    _canvas_answers(monkeypatch, 401)
+    valid, reason = main.verify_credential("canvas", CANVAS_TOKEN, "https://canvas.example.edu")
+    assert not valid and "didn't accept" in reason
+
+
+def test_an_unreachable_canvas_url_is_invalid(monkeypatch):
+    _canvas_answers(monkeypatch, error=httpx.ConnectError("no route"))
+    valid, reason = main.verify_credential("canvas", CANVAS_TOKEN, "https://not-canvas.example")
+    assert not valid and "couldn't reach Canvas" in reason
+
+
+def test_a_badly_formed_canvas_token_is_refused_without_calling_canvas(monkeypatch):
+    seen = _canvas_answers(monkeypatch, 200)
+    valid, _ = main.verify_credential("canvas", "short", "https://canvas.example.edu")
+    assert not valid and seen == {}
+
+
+def test_without_a_canvas_url_only_the_format_is_checked(monkeypatch):
+    seen = _canvas_answers(monkeypatch, 401)
+    assert main.verify_credential("canvas", CANVAS_TOKEN) == (True, "")
+    assert seen == {}
+
+
+class _FakeModels:
+    def __init__(self, error):
+        self.error = error
+
+    def list(self):
+        if self.error:
+            raise self.error
+        return []
+
+
+class _FakeClient:
+    def __init__(self, error=None):
+        self.models = _FakeModels(error)
+
+    def with_options(self, **kwargs):
+        return self
+
+
+@pytest.mark.parametrize(
+    "error, expected_valid, reason_part",
+    [
+        (None, True, ""),
+        (openai.AuthenticationError("bad key", response=httpx.Response(401, request=httpx.Request("GET", "https://x")), body=None), False, "didn't accept"),
+        (openai.APIConnectionError(request=httpx.Request("GET", "https://x")), False, "couldn't reach"),
+        (_status_error(429), True, ""),
+    ],
+)
+def test_a_model_key_is_checked_with_the_provider(monkeypatch, error, expected_valid, reason_part):
+    monkeypatch.setattr(providers, "openai_client", lambda provider, key: _FakeClient(error))
+    valid, reason = main.verify_credential("openai", OPENAI_KEY)
+    assert valid is expected_valid and reason_part in reason
+
+
+def test_a_copilot_token_keeps_the_format_check_only(monkeypatch):
+    monkeypatch.setattr(providers, "openai_client", lambda provider, key: pytest.fail("no call expected"))
+    assert main.verify_credential("copilot", "github_pat_" + "a" * 40) == (True, "")
