@@ -20,16 +20,17 @@ export function getBackendInstanceToken(): Promise<string> {
 
 export type CredentialKind = "canvas" | LlmProvider;
 
-// Format check only (Step 2) — not a real Canvas/model provider call yet. Step 3
-// upgrades main.py's handler for this same endpoint to do that; the
-// frontend's interface here doesn't need to change when it does.
+// Format check, then one real call (main.py's verify_credential): a Canvas
+// token against canvasBaseUrl, an OpenAI or DeepSeek key against the
+// provider. Without canvasBaseUrl a Canvas token gets the format check only.
 export async function validateCredential(
   kind: CredentialKind,
-  value: string
+  value: string,
+  canvasBaseUrl?: string
 ): Promise<{ valid: boolean; reason: string }> {
   const res = await fetch("http://127.0.0.1:8756/credentials/validate", {
     method: "POST",
-    body: JSON.stringify({ kind, value }),
+    body: JSON.stringify({ kind, value, canvas_base_url: canvasBaseUrl }),
   });
   return res.json();
 }

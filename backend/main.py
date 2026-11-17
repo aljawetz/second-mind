@@ -274,6 +274,55 @@ def validate_credential(kind: str, value: str) -> tuple[bool, str]:
     return False, f"unknown credential kind '{kind}'"
 
 
+def _check_canvas_token(base_url: str, token: str) -> tuple[bool, str]:
+    origin = config.normalize_canvas_base_url(base_url)
+    try:
+        res = httpx.get(
+            f"{origin}/api/v1/users/self",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10.0,
+        )
+    except httpx.HTTPError:
+        return False, f"couldn't reach Canvas at {origin} — check the URL"
+    if res.status_code == 401:
+        return False, "Canvas didn't accept this token — create a new one under Account → Settings"
+    if res.status_code != 200:
+        return False, f"Canvas at {origin} answered with an error ({res.status_code}) — check the URL"
+    return True, ""
+
+
+def _check_llm_key(kind: str, key: str) -> tuple[bool, str]:
+    provider = providers.PROVIDERS[kind]
+    try:
+        providers.openai_client(provider, key).with_options(timeout=10.0, max_retries=0).models.list()
+    except openai.AuthenticationError:
+        return False, f"{provider.name} didn't accept this key"
+    except openai.APIConnectionError:
+        return False, f"couldn't reach {provider.name} — check your connection"
+    except openai.APIError:
+        # Rate limits or outages say nothing about the key itself.
+        return True, ""
+    return True, ""
+
+
+def verify_credential(kind: str, value: str, canvas_base_url: str | None = None) -> tuple[bool, str]:
+    """/credentials/validate: the format check, then one real call. Found
+    in the Sprint 9 test run: a format check alone accepted any 20
+    characters as a Canvas token, so a wrong token only showed up later as
+    an empty course list. Canvas is checked only when the app sends the
+    Canvas URL; Copilot keeps the format check (its sign-in flow checks
+    the token itself)."""
+    valid, reason = validate_credential(kind, value)
+    if not valid:
+        return valid, reason
+    value = value.strip()
+    if kind == "canvas":
+        return _check_canvas_token(canvas_base_url, value) if canvas_base_url else (True, "")
+    if kind in providers.PROVIDERS and kind != providers.COPILOT.id:
+        return _check_llm_key(kind, value)
+    return True, ""
+
+
 class Handler(BaseHTTPRequestHandler):
     # BaseHTTPRequestHandler defaults to declaring HTTP/1.0, under which
     # Transfer-Encoding: chunked (/ask's streaming response) is technically
@@ -538,7 +587,9 @@ class Handler(BaseHTTPRequestHandler):
             except json.JSONDecodeError:
                 self._send_json(400, {"error": {"code": "bad_request", "message": "invalid JSON"}})
                 return
-            valid, reason = validate_credential(data.get("kind", ""), data.get("value", ""))
+            valid, reason = verify_credential(
+                data.get("kind", ""), data.get("value", ""), data.get("canvas_base_url") or None
+            )
             self._send_json(200, {"valid": valid, "reason": reason})
             return
 
@@ -976,11 +1027,15 @@ class Handler(BaseHTTPRequestHandler):
             # searching, the first model calls) fails here, before any response
             # bytes, and still gets a clean status code.
             try:
+                # Course not indexed yet (never synced, or its first sync failed):
+                # every search comes back empty and the model says it couldn't
+                # find anything, same as a real miss. Checked up front because
+                # load_index opens a missing table lazily: the error would
+                # only surface at the first search, after this handler's catch.
+                db_path, table_name = SM_HOME / "index.lancedb", f"course_{course_id}"
                 try:
-                    index = indexing.load_index(SM_HOME / "index.lancedb", f"course_{course_id}")
+                    index = indexing.load_index(db_path, table_name) if indexing.index_exists(db_path, table_name) else None
                 except TableNotFoundError:
-                    # Course not indexed yet: every search comes back empty and the
-                    # model says it couldn't find anything, same as a real miss.
                     index = None
                 provider = llm.current_provider()
                 memory = _memory_service(int(course_id), provider, conversation_id=cid) if memory_on else None
