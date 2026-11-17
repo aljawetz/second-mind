@@ -40,7 +40,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: backend/models
-          key: windows-models-${{ hashFiles('backend/scripts/convert_embedding_model.py', 'backend/scripts/fetch_whisper_model.py', 'backend/uv.lock') }}
+          key: windows-models-${{ hashFiles('backend/scripts/convert_embedding_model.py', 'backend/scripts/convert_reranker_model.py', 'backend/scripts/fetch_whisper_model.py', 'backend/uv.lock') }}
       - name: Install locked dependencies
         working-directory: backend
         run: uv sync --all-groups --frozen
@@ -49,6 +49,10 @@ jobs:
         run: |
           if (!(Test-Path models/bge-small-en-v1.5-onnx/model.onnx)) {
             uv run --no-sync python scripts/convert_embedding_model.py
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          if (!(Test-Path models/ms-marco-MiniLM-L-6-v2-onnx/model.onnx)) {
+            uv run --no-sync python scripts/convert_reranker_model.py
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           uv run --no-sync python scripts/fetch_whisper_model.py
