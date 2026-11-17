@@ -8,6 +8,7 @@ responsible for the actual Canvas calls") — this module is that caller.
 
 import re
 import tempfile
+import threading
 from datetime import datetime, tzinfo
 from pathlib import Path
 
@@ -29,6 +30,15 @@ SECTION_EXTRACTORS = {
     ".csv": "extract_text_file",
 }
 SUPPORTED_FILE_SUFFIXES = {".pdf", ".pptx", *SECTION_EXTRACTORS}
+
+_SYNC_LOCKS: dict[tuple[str, int], threading.Lock] = {}
+_SYNC_LOCKS_GUARD = threading.Lock()
+
+
+def _course_lock(sm_home: Path, course_id: int):
+    key = (str(sm_home.resolve()), course_id)
+    with _SYNC_LOCKS_GUARD:
+        return _SYNC_LOCKS.setdefault(key, threading.Lock())
 
 
 def _course_paths(sm_home: Path, course_id: int) -> tuple[Path, Path]:
@@ -314,9 +324,23 @@ def sync_course(course_id: int, sm_home: Path):
     shows it, and links in the text of all the others. 18-658 lists no files
     in its Modules; all 46 of its readings are links in its pages and
     syllabus."""
-    manifest_path, db_path = _course_paths(sm_home, course_id)
-    table_name = f"course_{course_id}"
-    conn = sync.open_manifest(manifest_path)
+    # Requests can overlap during StrictMode effect replays, hot reloads,
+    # or a retry. LanceDB writes and the manifest diff must be one course
+    # operation; a waiting request re-diffs after the first one commits.
+    with _course_lock(sm_home, course_id):
+        conn = None
+        try:
+            manifest_path, db_path = _course_paths(sm_home, course_id)
+            conn = sync.open_manifest(manifest_path)
+            yield from _sync_course_items(course_id, db_path, f"course_{course_id}", conn)
+        except Exception as error:
+            yield {"done": True, "error": str(error)}
+        finally:
+            if conn is not None:
+                conn.close()
+
+
+def _sync_course_items(course_id, db_path, table_name, conn):
 
     try:
         structure = canvas.get_course_structure(course_id)

@@ -617,6 +617,13 @@ def test_export_writes_a_csv_without_removed_cards_or_overwriting(tmp_path, db):
     assert rows == [["Front", "Back", "Source"], ["Stub", "Stub back", "Lecture 3.pdf · p.1"]]
 
 
+@pytest.mark.parametrize("title,expected", [("CON", "_CON.csv"), ("nul.notes", "_nul.notes.csv"), ("Topic. ", "Topic.csv"), ("Unit\x01One", "Unit One.csv")])
+def test_export_uses_windows_safe_filenames(tmp_path, db, title, expected):
+    llm = ScriptedLLM({"title": title, "cards": [_card("Stub")]}, {"supported": [1]})
+    summary = _run(tmp_path, db, llm)
+    assert study.export_csv(tmp_path, COURSE, summary["id"], tmp_path / "Downloads").name == expected
+
+
 def test_export_route_saves_a_quiz_to_the_downloads_folder(app, monkeypatch):
     import csv
 

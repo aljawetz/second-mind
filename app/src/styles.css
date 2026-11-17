@@ -198,6 +198,9 @@ svg{flex:none}
 .sync .label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .text-btn{background:none;border:none;padding:4px 0;cursor:pointer;font-size:var(--t2);color:var(--muted)}
 .text-btn:hover{color:var(--text)}
+.sync-details-anchor{position:relative;min-width:0}
+.sync-details-label{flex-shrink:0;text-decoration:underline}
+.sync-details-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:min(40rem,calc(100vw - 32px));max-height:50vh;overflow:auto;margin:0;padding:16px;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:var(--t1);color:var(--text);background:var(--surface);border:1px solid var(--control);border-radius:var(--r);box-shadow:var(--shadow-pop);user-select:text}
 
 /* Every view except home is one panel that scrolls; home lays out its own. */
 .view{
@@ -700,3 +703,5 @@ fieldset.field legend{padding:0;margin-bottom:6px;font-size:var(--t3);font-weigh
   .study-card{padding:16px}
   .quiz-why{margin-left:0}
 }
+
+.sync-details-anchor .sync{border:0;background:none;padding:0;cursor:pointer;font-family:inherit}

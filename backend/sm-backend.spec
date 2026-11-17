@@ -15,6 +15,17 @@
 # `uv run --group build pyinstaller sm-backend.spec ...`.
 
 from PyInstaller.utils.hooks import collect_data_files
+import os
+import sys
+from pathlib import Path
+
+ocr_data = []
+if sys.platform == "win32":
+    ocr = Path(os.environ["SM_TESSERACT_DIR"])
+    # Preserve the distribution's data and license notices alongside its DLLs.
+    ocr_data = [(str(ocr / "tesseract.exe"), "tesseract")]
+    ocr_data += [(str(dll), "tesseract") for dll in ocr.glob("*.dll")]
+    ocr_data += [(str(ocr / folder), f"tesseract/{folder}") for folder in ("tessdata", "doc")]
 
 a = Analysis(
     ["main.py"],
@@ -38,6 +49,7 @@ a = Analysis(
         # vad_filter=True loads faster_whisper/assets/silero_vad_v6.onnx at
         # run time; PyInstaller doesn't see a data file nothing imports.
         *collect_data_files("faster_whisper"),
+        *ocr_data,
     ],
     hiddenimports=[],
     hookspath=[],

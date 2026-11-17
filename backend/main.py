@@ -18,6 +18,20 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs
 
+# Handle PyInstaller worker processes before importing the application stack.
+# The self-test runs offline against the same native libraries/models we ship.
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
+    if sys.argv[1:] == ["--self-test"]:
+        from runtime_check import run
+
+        run()
+        # Native model/database shutdown has the same teardown hazards as
+        # the server (_exit_now below); all check writes are complete.
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(0)
+
 import httpx
 import openai
 
@@ -184,11 +198,13 @@ def _run_memory_job(job: tuple[int, str | None]) -> None:
 def queue_startup_memory_jobs() -> None:
     """At startup: turns saved but not yet read by memory when the app last
     quit, then a sweep of every selected course."""
-    import memory_jobs
-
     if not _memory_enabled():
         return
     selected = config.read_config(SM_HOME).get("selected_courses", [])
+    if not selected:
+        return
+    import memory_jobs
+
     for job in memory_jobs.pending(SM_HOME, selected):
         MEMORY_WORKER.submit(job)
     for course_id in selected:
@@ -1431,13 +1447,6 @@ def _exit_when_app_closes() -> None:
 
 
 if __name__ == "__main__":
-    # Required before anything that might use multiprocessing (faster-whisper's
-    # transcription backend does) — without this, the frozen PyInstaller binary
-    # re-executes this entire script every time a worker process is spawned,
-    # which recursively re-spawns more workers. Confirmed as a real, genuine
-    # fork bomb during Step 12's development, not a theoretical risk.
-    multiprocessing.freeze_support()
-
     # stdout is a pipe to the Tauri app, so Python block-buffers it: sync's
     # "[course_sync] skipping ..." lines sat unseen in the buffer instead of
     # reaching the app's [backend] log. Line buffering delivers each line.
@@ -1458,7 +1467,18 @@ if __name__ == "__main__":
     try:
         server = ThreadingHTTPServer((HOST, PORT), Handler)
     except OSError as e:
-        if e.errno != errno.EADDRINUSE:
+        # Windows can report WSAEACCES when another listener has exclusive
+        # use of the port. Do not disguise other access-denied errors.
+        port_taken = e.errno == errno.EADDRINUSE
+        if getattr(e, "winerror", None) == 10013:
+            import socket
+
+            try:
+                with socket.create_connection((HOST, PORT), timeout=1):
+                    port_taken = True
+            except OSError:
+                pass
+        if not port_taken:
             raise
         print(
             f"sm-backend: port {PORT} is already in use, most likely by another "

@@ -4,7 +4,7 @@ import { syncCourse, type SyncEvent } from "../../sidecar";
 import LogoMark from "../LogoMark";
 
 interface CourseProgress {
-  items: { name: string; failed: boolean }[];
+  items: { name: string; failed: boolean; error?: string }[];
   error: string | null;
   done: boolean;
 }
@@ -52,7 +52,7 @@ export default function OnboardingIndexing({
                 if (event.done) {
                   return event.error ? { ...p, error: event.error, done: true } : { ...p, done: true };
                 }
-                if (event.item) return { ...p, items: [...p.items, { name: event.item, failed: event.status === "failed" }] };
+                if (event.item) return { ...p, items: [...p.items, { name: event.item, failed: event.status === "failed", error: event.error }] };
                 return p;
               })
             );
@@ -110,7 +110,7 @@ export default function OnboardingIndexing({
                   p.items.map((item, ii) => (
                     <div className={"index-row" + (item.failed ? "" : " done")} key={ii}>
                       <span className="stat">{item.failed ? "!" : "✓"}</span>
-                      <span>{item.name}</span>
+                      <span>{item.name}{item.failed && item.error ? ` — ${item.error}` : ""}</span>
                     </div>
                   ))}
               </div>
