@@ -8,6 +8,7 @@ responsible for the actual Canvas calls") — this module is that caller.
 
 import re
 import tempfile
+import threading
 from datetime import datetime, tzinfo
 from pathlib import Path
 
@@ -29,6 +30,14 @@ SECTION_EXTRACTORS = {
     ".csv": "extract_text_file",
 }
 SUPPORTED_FILE_SUFFIXES = {".pdf", ".pptx", *SECTION_EXTRACTORS}
+_course_locks: dict[int, threading.Lock] = {}
+_course_locks_guard = threading.Lock()
+
+
+def _course_lock(sm_home: Path, course_id: int):
+    del sm_home
+    with _course_locks_guard:
+        return _course_locks.setdefault(course_id, threading.Lock())
 
 
 def _course_paths(sm_home: Path, course_id: int) -> tuple[Path, Path]:
@@ -306,6 +315,19 @@ def _sync_topic(conn, db_path, table_name, topic, kind, is_changed):
 
 
 def sync_course(course_id: int, sm_home: Path):
+    """Serialize overlapping sync requests for the same course."""
+    with _course_lock(sm_home, course_id):
+        manifest_path, db_path = _course_paths(sm_home, course_id)
+        conn = sync.open_manifest(manifest_path)
+        try:
+            yield from _sync_course_items(course_id, db_path, f"course_{course_id}", conn)
+        except Exception as error:
+            yield {"done": True, "error": str(error)}
+        finally:
+            conn.close()
+
+
+def _sync_course_items(course_id: int, db_path: Path, table_name: str, conn):
     """Generator — see module docstring and the design spec for the full
     contract. Yields {"item", "status", "error"?} per processed item, then
     exactly one final {"done": True, "new", "changed", "removed", "failed"}
@@ -322,10 +344,6 @@ def sync_course(course_id: int, sm_home: Path):
     shows it, and links in the text of all the others. 18-658 lists no files
     in its Modules; all 46 of its readings are links in its pages and
     syllabus."""
-    manifest_path, db_path = _course_paths(sm_home, course_id)
-    table_name = f"course_{course_id}"
-    conn = sync.open_manifest(manifest_path)
-
     try:
         structure = canvas.get_course_structure(course_id)
         pages_list = canvas.list_pages(course_id)

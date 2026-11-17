@@ -11,15 +11,21 @@ export default function Topbar({
   courseCode: string;
   courseName: string;
   overrideTitle?: string;
-  // detail: the full per-item failure list, shown on hover — the label
-  // stays short enough for one line.
+  // detail: the full per-item failure list, opened from the status pill — the label
+  // stays short enough for the pill.
   syncStatus?: { label: string; detail?: string; error?: boolean; ok?: boolean };
   onManageMemories?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [syncDetailsOpen, setSyncDetailsOpen] = useState(false);
+  const syncDetailsRef = useRef<HTMLDivElement>(null);
 
   useDismissOnOutside(menuRef, menuOpen, () => setMenuOpen(false));
+  useDismissOnOutside(syncDetailsRef, syncDetailsOpen, () => setSyncDetailsOpen(false));
+  useEffect(() => {
+    if (!syncStatus?.error) setSyncDetailsOpen(false);
+  }, [syncStatus?.error]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -29,14 +35,22 @@ export default function Topbar({
     return () => cancelAnimationFrame(id);
   }, [menuOpen]);
 
-  const pill = syncStatus && (
+  const pill = syncStatus && (syncStatus.error && syncStatus.detail ? (
+    <div className="sync-details-anchor" ref={syncDetailsRef}>
+      <button className="sync-pill error" aria-expanded={syncDetailsOpen} onClick={() => setSyncDetailsOpen((open) => !open)}>
+        <span className="label">{syncStatus.label}</span>
+        <span className="sync-details-label">Details</span>
+      </button>
+      {syncDetailsOpen && <pre className="sync-details-panel">{syncStatus.detail}</pre>}
+    </div>
+  ) : (
     <span
       className={"sync" + (syncStatus.error ? " error" : syncStatus.ok ? " ok" : "")}
       title={syncStatus.detail || syncStatus.label}
     >
       <span className="label">{syncStatus.label}</span>
     </span>
-  );
+  ));
 
   const courseMenu =
     onManageMemories &&
