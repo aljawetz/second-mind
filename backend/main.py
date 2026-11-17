@@ -2,6 +2,7 @@
 
 import collections
 import errno
+import importlib
 import itertools
 import json
 import multiprocessing
@@ -181,9 +182,43 @@ def _run_memory_job(job: tuple[int, str | None]) -> None:
         service.sweep()
 
 
+# Modules that pull in llama_index, LanceDB or the ONNX models. They're
+# imported when first needed, so /ping answers within ~2 s of launch. But the
+# app's first requests (each course's sync, the assignments list, sessions,
+# study, and the startup memory jobs below) arrive together, each in its own
+# thread, and concurrent first imports of llama_index break: "cannot import
+# name 'BaseRetriever' from partially initialized module" and
+# "_DeadlockError". 18-658's sync failed that way before doing anything (seen
+# in the app, 2026-11-17). So they are imported once, under a lock, before
+# any request that may need them.
+HEAVY_MODULES = ("indexing", "generation", "chat", "course_sync", "courses", "explain", "memory_jobs", "sessions", "study")
+_heavy_lock = threading.Lock()
+_heavy_loaded = False
+# Routes that never touch them: startup, onboarding and the Canvas course list.
+LIGHT_PATHS = frozenset(
+    {"/ping", "/config", "/courses", "/credentials/status", "/credentials/validate", "/github/device/start", "/github/device/poll"}
+)
+
+
+def _load_heavy_modules() -> None:
+    global _heavy_loaded
+    if _heavy_loaded:
+        return
+    with _heavy_lock:
+        if not _heavy_loaded:
+            for name in HEAVY_MODULES:
+                importlib.import_module(name)
+            _heavy_loaded = True
+
+
+def _needs_heavy_modules(path: str) -> bool:
+    return path not in LIGHT_PATHS
+
+
 def queue_startup_memory_jobs() -> None:
     """At startup: turns saved but not yet read by memory when the app last
     quit, then a sweep of every selected course."""
+    _load_heavy_modules()
     import memory_jobs
 
     if not _memory_enabled():
@@ -346,6 +381,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path, _, query = self.path.partition("?")
+        if _needs_heavy_modules(path):
+            _load_heavy_modules()
         if path == "/ping":
             self._send_json(200, {"status": "ok", "source": "sm-backend", "instance": INSTANCE_TOKEN})
         elif path == "/courses":
@@ -544,6 +581,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path, _, _ = self.path.partition("?")
+        if _needs_heavy_modules(path):
+            _load_heavy_modules()
         if path == "/config":
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length)
@@ -677,6 +716,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         path, _, query = self.path.partition("?")
+        if _needs_heavy_modules(path):
+            _load_heavy_modules()
         if path == "/data":
             import privacy
 
