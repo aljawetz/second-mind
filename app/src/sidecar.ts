@@ -691,3 +691,18 @@ export async function exportStudyCsv(courseId: number, id: string): Promise<stri
   const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/study/${id}/export`, { method: "POST", body: "{}" });
   return (await studyJson<{ path: string }>(res, "saving the file")).path;
 }
+
+// A quiz for Kahoot, saved to ~/Downloads: "xlsx" in Kahoot's spreadsheet
+// template (imported as is), "pdf" for its AI "Extract questions from the PDF".
+// shortened: question numbers rewritten to fit Kahoot's 120/75-character limits.
+export async function exportQuizForKahoot(
+  courseId: number,
+  id: string,
+  format: "xlsx" | "pdf",
+): Promise<{ path: string; shortened: number[] }> {
+  const res = await fetch(`http://127.0.0.1:8756/courses/${courseId}/study/${id}/export`, {
+    method: "POST",
+    body: JSON.stringify({ format: `kahoot-${format}` }),
+  });
+  return studyJson<{ path: string; shortened: number[] }>(res, "saving the file");
+}
