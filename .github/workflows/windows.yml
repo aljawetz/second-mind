@@ -1,8 +1,21 @@
 name: Windows build and installer
 
+# Pull requests run the Windows tests only. The installer build (about 20
+# minutes) runs on pushes to main and on manual runs.
+
 on:
   workflow_call:
+    inputs:
+      installer:
+        description: Build, install and smoke test the NSIS installer
+        type: boolean
+        default: false
   workflow_dispatch:
+    inputs:
+      installer:
+        description: Build, install and smoke test the NSIS installer
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -65,12 +78,23 @@ jobs:
       - name: Test frontend on Windows
         working-directory: app
         run: node --experimental-transform-types --test tests/*.test.mjs
+      # Without the installer build, tauri-build still needs app/dist and
+      # the sidecar resource folder from tauri.windows.conf.json to exist.
+      - name: Prepare Tauri inputs for the credential test
+        if: ${{ !inputs.installer }}
+        run: |
+          npm --prefix app run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force app/src-tauri/binaries/sm-backend | Out-Null
+          Set-Content app/src-tauri/binaries/sm-backend/placeholder.txt 'credential test only'
       - name: Build and validate frozen backend and NSIS installer
+        if: ${{ inputs.installer }}
         run: python scripts/package-windows.py
       - name: Check Windows Credential Manager
         working-directory: app/src-tauri
         run: cargo test --locked --lib windows_tests::native_credentials_round_trip
       - name: Install and check packaged resources
+        if: ${{ inputs.installer }}
         run: |
           $installer = Get-ChildItem app/src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
           $installDir = Join-Path $env:RUNNER_TEMP 'Second Mind installed 日本語'
@@ -82,6 +106,7 @@ jobs:
           python scripts/smoke_app.py $app.FullName
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
+        if: ${{ inputs.installer }}
         with:
           name: windows-installer
           path: app/src-tauri/target/release/bundle/nsis/*-setup.exe
