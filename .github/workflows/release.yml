@@ -23,6 +23,12 @@ permissions:
 jobs:
   build:
     runs-on: macos-latest
+    # The runner's newest Python (3.15 since November 2026) has no
+    # onnxruntime wheel, so uv's default pick broke the v0.2.0 build at
+    # "Generate the embedding model". 3.14 is what the app is developed
+    # and tested on.
+    env:
+      UV_PYTHON: "3.14"
     steps:
       - uses: actions/checkout@v4
 
