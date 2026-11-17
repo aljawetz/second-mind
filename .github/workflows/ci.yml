@@ -7,11 +7,17 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Let main runs finish so they save the caches PRs restore from.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   windows:
+    name: windows
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.windows == 'true'
     uses: ./.github/workflows/windows.yml
+    with:
+      installer: ${{ github.event_name == 'push' }}
 
   changes:
     name: Detect changes
@@ -20,6 +26,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
       rust: ${{ steps.filter.outputs.rust }}
+      windows: ${{ steps.filter.outputs.windows }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -38,6 +45,12 @@ jobs:
             rust:
               - 'app/src-tauri/**'
               - '.github/workflows/ci.yml'
+            windows:
+              - 'backend/**'
+              - 'app/**'
+              - 'scripts/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/windows.yml'
 
   backend:
     name: Backend (pytest)
