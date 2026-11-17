@@ -59,7 +59,40 @@ ask questions. No developer changes code during the test. The tester rates answe
 Helpful / Not helpful buttons (#57), and `GET /courses/{id}/feedback` lists the thumbs-down turns
 for us to review afterwards.
 
-### Test results
+### Pre-test by an AI agent (2026-11-16)
+
+Before the outside tester's run, an AI agent (not a person, so it does not count as the
+independent test) followed only the README, on a fresh clone of main (`61547b4`), macOS 26.0. It
+used its own data folder and did not change any code. We used it to catch problems before a person
+hits them.
+
+| Step | Result |
+| --- | --- |
+| Fresh clone + `./scripts/bootstrap.sh` | Worked, 177 s; 785 backend tests passed |
+| App build and tests | Worked |
+| Connect keys, list courses | 11 courses listed |
+| Sync 18-658 | 81 items, 0 failed; first sync 290 s, repeat sync 29 s |
+| Ask 10 questions | 9 of 10 correct; follow-up date right but project name wrong |
+| Rate an answer Not helpful | Listed by `GET /courses/{id}/feedback` |
+| Restart the backend, including mid-sync | Courses, chats and feedback kept |
+
+The 10 questions covered due dates, two taught concepts, a follow-up, readings, announcements,
+something the course doesn't cover (answered "not in the course" plus labelled general knowledge),
+and a request to write a graded report (refused, with an outline and an offer to review a draft).
+Answers took 6–24 s to start.
+
+| # | Problem found | Severity | Status |
+| --- | --- | --- | --- |
+| 1 | The key check accepted any 20 characters as a Canvas token, and fake OpenAI keys | High | Fixed in #69: a real call to Canvas and the provider |
+| 2 | Asking about a course that was selected but never synced dropped the connection | High | Fixed in #69: answers "not found" |
+| 3 | A follow-up got the date right but named the wrong project | Medium | Open |
+| 4 | Near-duplicate memories, and memories unrelated to the question shown as used | Medium | Open |
+| 5 | Repeat sync shows no progress for 29 s; skipped images are only in the log | Medium | Open |
+| 6 | `backend/README` setup notes are out of date; `SM_HOME` and `SM_PORT` not documented | Medium | Open |
+| 7 | Setup docs don't mention the signing certificate or the third local model (about 357 MB) | Low | Open |
+| 8 | A harmless "max diff: nan" warning while converting the reranker; 2 `npm audit` warnings | Low | Open |
+
+### Outside tester's run
 
 **TODO after the run:** tester (role, not name), date, build, operating system, courses used,
 steps completed, time each step took, answers rated Helpful / Not helpful, and every problem seen,
