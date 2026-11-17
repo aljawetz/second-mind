@@ -10,7 +10,6 @@ degrades to an empty result rather than raising — canvas-integration.md §2/§
 A 429 means rate-limited and gets retried with backoff — §5.
 """
 
-import os
 import re
 import time
 from pathlib import Path
@@ -34,17 +33,14 @@ class CanvasError(Exception):
 
 
 def _token() -> str:
-    # The Claude Code plugin passes its own token (userConfig, stored in the
-    # system keychain by Claude Code); the app's own keychain entry is the
-    # fallback. Plan docs/plans/2026-11-13-claude-code-plugin.md, Decision 3.
-    token = os.environ.get("SM_CANVAS_TOKEN") or credentials.get("canvas-token")
+    token = credentials.get("canvas-token")
     if not token:
         raise CanvasError("no Canvas token stored — onboarding hasn't completed")
     return token
 
 
 def _api_base() -> str:
-    origin = config.normalize_canvas_base_url(os.environ.get("SM_CANVAS_URL") or "") or config.read_config(SM_HOME).get("canvas_base_url")
+    origin = config.read_config(SM_HOME).get("canvas_base_url")
     return f"{origin}/api/v1" if origin else CANVAS_API_URL
 
 
@@ -133,14 +129,6 @@ def _get_all(client: httpx.Client, path: str, params: dict | None = None) -> lis
 def list_courses() -> list[dict]:
     with _client() as client:
         return _get_all(client, "/courses", params={"per_page": 50})
-
-
-def get_profile() -> dict:
-    """The student's own profile; its time_zone (an IANA name) is the zone
-    Canvas shows their deadlines in."""
-    with _client() as client:
-        r = _get(client, "/users/self/profile")
-        return r.json() if r else {}
 
 
 def list_assignments(course_id: int) -> list[dict]:

@@ -14,7 +14,6 @@ Model files aren't in this repo (see .gitignore) — run
 scripts/convert_embedding_model.py once before using this.
 """
 
-import os
 from pathlib import Path
 from typing import Any
 
@@ -23,9 +22,7 @@ import onnxruntime as ort
 from llama_index.core.embeddings import BaseEmbedding
 from tokenizers import Tokenizer
 
-# SM_MODELS_DIR: where the plugin keeps downloaded models (the installed
-# package has no models/ next to it). Unset: the repo's models/, as before.
-MODEL_DIR = Path(os.environ.get("SM_MODELS_DIR") or Path(__file__).parent / "models") / "bge-small-en-v1.5-onnx"
+MODEL_DIR = Path(__file__).parent / "models" / "bge-small-en-v1.5-onnx"
 EMBEDDING_DIM = 384
 MAX_SEQ_LENGTH = 512  # from the model's own config.json (max_position_embeddings)
 

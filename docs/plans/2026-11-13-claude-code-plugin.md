@@ -1,5 +1,9 @@
 # Second Mind as a Claude Code plugin
 
+> **Status, 2026-11-17:** built and moved out of this repo. The plugin, its MCP server, skills, evals and
+> tests now live in their own repository under a new, unbranded name, so the plugin stands alone without the
+> app's backend. This plan and the M0 baseline stay here as the record of how it was designed.
+
 Draft, 2026-11-13. Revised the same day: the plugin is the product, not a second front end. Revised
 again after reading main as of PR #57 (follow-up rewrite, past-chat search, answer feedback,
 `gpt-5-mini` default, and the RAG gaps plan `2026-11-09-rag-course-gaps.md`). Revised 2026-11-14 after

@@ -14,10 +14,6 @@ docs/evaluations/2026-09-23-ask-modes/report.md for the write-up.
      at the default 0.5 similarity cutoff.
   F  same as E with a 0.4 cutoff, to choose main.CHAT_SIMILARITY_CUTOFF.
   G  no retrieval: the plain-chatbot baseline for Sprint 7 (same model, no course text).
-  P  the Claude Code plugin (docs/plans/2026-11-13-claude-code-plugin.md): each
-     question goes through `claude -p` with plugin/ loaded and only its tools
-     allowed. Claude decides whether and what to search. Needs Claude Code
-     logged in; its cost is Claude Code's own figure, not an OpenAI price.
 
   --retrieval-only  search only: the same HybridRetriever the shipped chat
      uses (chat.make_search), no model call and no API key. For each question
@@ -36,18 +32,12 @@ not. Run from backend/:
 """
 
 import argparse
-import atexit
 import dataclasses
 import datetime
 import json
-import os
 import re
-import shutil
-import subprocess
 import sys
-import tempfile
 import time
-import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -903,13 +893,10 @@ def run_shipped(index, question, history, course_name, cutoff):
     retrieved: list[list[str]] = []
     base_search = chat.make_search(index, cutoff)
 
-    retrieved_texts: list[list[str]] = []
-
     def search(query):
         searches.append(query)
         nodes = base_search(query)
         retrieved.append([source_label(n) for n in nodes])
-        retrieved_texts.append([n.node.get_content() for n in nodes])
         return nodes
 
     start = time.perf_counter()
@@ -922,7 +909,6 @@ def run_shipped(index, question, history, course_name, cutoff):
         "searches": searches,
         "sources": [c["label"] for c in final["citations"]],
         "retrieved": retrieved,
-        "retrieved_texts": retrieved_texts,
         "seconds": round(elapsed, 2),
         "llm_calls": None,  # round count isn't exposed by the provider interface, only token totals
         "prompt_tokens": usage["prompt_tokens"] if usage else 0,
@@ -973,148 +959,7 @@ def run_g(_index, question: str, history: list[dict], course_name: str) -> dict:
     }
 
 
-# --- mode P: the Claude Code plugin ------------------------------------------
-
-PLUGIN_DIR = Path(__file__).resolve().parent.parent.parent / "plugin"
-PLUGIN_TOOLS = "mcp__plugin_second-mind_courses__*"
-PLUGIN_MODEL: str | None = None  # --claude-model; None is Claude Code's default
-_plugin_workdir: Path | None = None
-BRACKETED = re.compile(r"\[([^\[\]]+)\]")
-
-
-def plugin_command(question: str, course_id: int, course_name: str, session_id: str | None = None,
-                   model: str | None = None, today: datetime.date = EVAL_TODAY) -> list[str]:
-    """One turn through Claude Code. It loads only the plugin: no user or
-    project settings (so no other plugins), and of the built-in tools only
-    Skill, so it cannot read files (this script holds the gold answers).
-    --allowedTools approves the plugin's MCP tools; anything else would be
-    denied, because -p cannot ask. The appended prompt plays the part of the
-    app's course picker and fixes "today" to the date the app eval uses."""
-    cmd = [
-        "claude", "-p", question,
-        "--plugin-dir", str(PLUGIN_DIR),
-        "--setting-sources", "",
-        "--tools", "Skill",
-        "--allowedTools", PLUGIN_TOOLS,
-        "--output-format", "stream-json", "--verbose",
-        "--append-system-prompt",
-        f"Today is {today:%A, %B} {today.day}, {today.year}. "
-        f"The student is asking about the course {course_name} (course_id {course_id}).",
-    ]
-    if session_id:
-        cmd += ["--resume", session_id]
-    if model:
-        cmd += ["--model", model]
-    return cmd
-
-
-def plugin_env(query_log: Path, today: datetime.date = EVAL_TODAY, base: dict | None = None) -> dict:
-    """claude.ai connectors (Gmail, Drive, ...) would add their tools to every
-    request: about 8x the tokens in a first try, and unrelated tools. The MCP
-    server reads SM_QUERY_LOG and SM_TODAY (mcp_server.py), and plugin/.mcp.json
-    reads SM_SERVER_SOURCE and SM_MODELS_DIR."""
-    return {
-        **(os.environ if base is None else base),
-        "ENABLE_CLAUDEAI_MCP_SERVERS": "false",
-        "SM_QUERY_LOG": str(query_log),
-        "SM_TODAY": today.isoformat(),
-        # This checkout's server and models, not the release on GitHub.
-        "SM_SERVER_SOURCE": str(PLUGIN_DIR / "server"),
-        "SM_MODELS_DIR": str(PLUGIN_DIR.parent / "backend" / "models"),
-    }
-
-
-def parse_plugin_run(events: list[dict], query_log: list[dict], course_id: int) -> dict:
-    """A claude -p stream-json run plus the server's query log, as one eval
-    row. Searches and what each returned come from the query log, in order;
-    cited sources are the [label]s in the answer that a search returned.
-    Only searches of course_id count: Claude can pick another course, and
-    scoring what that returned would grade the wrong material. Those queries
-    go in wrong_course_searches instead, so the row shows it happened."""
-    result = next((e for e in events if e.get("type") == "result"), None)
-    if result is None or result.get("is_error") or result.get("subtype") != "success":
-        raise RuntimeError(f"claude -p failed: {(result or {}).get('result') or (result or {}).get('subtype') or 'no result event'}")
-    tool_uses = [
-        block
-        for e in events if e.get("type") == "assistant"
-        for block in e["message"].get("content", []) if block.get("type") == "tool_use"
-    ]
-    init = next((e for e in events if e.get("type") == "system" and e.get("subtype") == "init"), {})
-    answer = result.get("result") or ""
-    on_course = [entry for entry in query_log if entry["course_id"] == course_id]
-    wrong_course = [{"course_id": e["course_id"], "query": e["query"]} for e in query_log if e["course_id"] != course_id]
-    returned = {label for entry in on_course for label in entry["sources"]}
-    cited = list(dict.fromkeys(m for m in BRACKETED.findall(answer) if m in returned))
-    usage = result.get("usage") or {}
-    return {
-        "answer": answer,
-        "searches": [entry["query"] for entry in on_course],
-        "sources": cited,
-        "retrieved": [entry["sources"] for entry in on_course],
-        "retrieved_texts": [entry["texts"] for entry in on_course],
-        "search_seconds": [entry["seconds"] for entry in on_course],
-        "wrong_course_searches": wrong_course,
-        "wrong_course_search_count": len(wrong_course),
-        "used_skill": any(b["name"] == "Skill" for b in tool_uses),
-        "session_id": result.get("session_id"),
-        "model": init.get("model"),
-        "cost": result.get("total_cost_usd"),
-        "llm_calls": result.get("num_turns"),
-        "prompt_tokens": sum(usage.get(k, 0) for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")),
-        "completion_tokens": usage.get("output_tokens", 0),
-    }
-
-
-def course_id_for(course_name: str) -> int:
-    return next(cid for cid, name in COURSE_NAMES.items() if name == course_name)
-
-
-def run_p(_index, question: str, history: list[dict], course_name: str) -> dict:
-    """A follow-up resumes the first turn's Claude Code session, so Claude
-    sees its own earlier turns, tool calls included, as a student would."""
-    global _plugin_workdir
-    if _plugin_workdir is None:
-        # An empty directory: nothing to read, and resume finds sessions by it.
-        _plugin_workdir = Path(tempfile.mkdtemp(prefix="sm-plugin-eval-"))
-        atexit.register(shutil.rmtree, _plugin_workdir, ignore_errors=True)
-    query_log = _plugin_workdir / f"queries-{uuid.uuid4().hex}.jsonl"
-    session_id = history[-1].get("session_id") if history else None
-    course_id = course_id_for(course_name)
-    cmd = plugin_command(question, course_id, course_name, session_id, PLUGIN_MODEL)
-    start = time.perf_counter()
-    proc = subprocess.run(
-        cmd, cwd=_plugin_workdir, env=plugin_env(query_log), stdin=subprocess.DEVNULL,
-        capture_output=True, text=True, timeout=600,
-    )
-    elapsed = time.perf_counter() - start
-    events = [json.loads(line) for line in proc.stdout.splitlines() if line.startswith("{")]
-    if not any(e.get("type") == "result" for e in events):
-        raise RuntimeError(f"claude -p exited {proc.returncode}: {proc.stderr[-2000:]}")
-    # The log holds course text: read it, then delete it.
-    log = [json.loads(line) for line in query_log.read_text().splitlines()] if query_log.exists() else []
-    query_log.unlink(missing_ok=True)
-    out = parse_plugin_run(events, log, course_id)
-    out["seconds"] = round(elapsed, 2)
-    return out
-
-
-def search_metrics(out: dict, gold_source: str | None, gold_facts: list[str] | None) -> dict:
-    """Retrieval-level numbers for one answered turn, which the Sprint 8 report
-    trusts more than the judge: did it search at all, did the first search
-    return the gold source, and did the first (or any) search return a chunk
-    holding a gold fact. Fact metrics need the chunk texts (modes E, F, P)."""
-    retrieved = out.get("retrieved") or []
-    texts = out.get("retrieved_texts")
-    return {
-        "searched": bool(retrieved),
-        # The plugin's search can return up to 10; recall@5 means its top 5.
-        "first_search_recall_at_5": recall_at_5(gold_source, [labels[:5] for labels in retrieved[:1]]),
-        "first_search_fact": None if texts is None else recall_by_fact(gold_facts, texts[0] if texts else []),
-        "any_search_fact": None if texts is None else recall_by_fact(gold_facts, [t for ts in texts for t in ts]),
-    }
-
-
-MODES = {"A": run_a, "B": run_b, "C": run_c, "D": run_d, "E": run_e, "F": run_f, "G": run_g, "P": run_p}
+MODES = {"A": run_a, "B": run_b, "C": run_c, "D": run_d, "E": run_e, "F": run_f, "G": run_g}
 # Modes that never retrieve: recall@5 and precision@5 are not applicable, not zero.
 MODES_WITHOUT_RETRIEVAL = {"G"}
 
@@ -2389,13 +2234,10 @@ def main():
     parser.add_argument(
         "--no-judge", action="store_true", help="skip the gpt-4o judge pass (correctness/citation/faithfulness/abstention)"
     )
-    parser.add_argument("--claude-model", default="", help="for mode P, the model Claude Code uses (default: its own)")
     parser.add_argument(
         "--model", default="", help="answer with this OpenAI model instead of the app's default (modes E and G)"
     )
     args = parser.parse_args()
-    global PLUGIN_MODEL
-    PLUGIN_MODEL = args.claude_model or None
     if args.model:
         set_answer_model(args.model)
     if args.retrieval_only:
@@ -2418,29 +2260,19 @@ def main():
             continue
         course_id = case.get("course", DEFAULT_COURSE)
         if course_id not in indexes:
-            # Mode P searches through the plugin's own server, not this index.
-            only_plugin = set(modes) == {"P"}
-            indexes[course_id] = None if only_plugin else indexing.load_index(SM_HOME / "index.lancedb", f"course_{course_id}")
+            indexes[course_id] = indexing.load_index(SM_HOME / "index.lancedb", f"course_{course_id}")
         index = indexes[course_id]
         for mode in modes:
             history: list[dict] = []
             for turn_num, question in enumerate(case["turns"], start=1):
                 out = MODES[mode](index, question, history, COURSE_NAMES[course_id])
-                # session_id: mode P resumes the same Claude Code session on a follow-up.
-                history.append({"question": question, "answer": out["answer"], "session_id": out.get("session_id")})
+                history.append({"question": question, "answer": out["answer"]})
                 if mode in MODES_WITHOUT_RETRIEVAL:
                     out["recall_at_5"] = out["precision_at_5"] = None
                 else:
-                    # Each search's top 5 only: the plugin's search can return up to
-                    # 10, and the other modes never return more than 5.
-                    top5 = [labels[:5] for labels in out["retrieved"]]
-                    out["recall_at_5"] = recall_at_5(case.get("gold_source"), top5)
-                    out["precision_at_5"] = precision_at_k(case.get("gold_source"), top5, case.get("gold_sources"))
-                    facts = case["turn_facts"][turn_num - 1] if case.get("turn_facts") else case.get("gold_facts")
-                    out.update(search_metrics(out, case.get("gold_source"), facts))
-                # Mode P reports Claude Code's own cost; the others are priced here.
-                if "cost" not in out:
-                    out["cost"] = cost(out["prompt_tokens"], out["completion_tokens"])
+                    out["recall_at_5"] = recall_at_5(case.get("gold_source"), out["retrieved"])
+                    out["precision_at_5"] = precision_at_k(case.get("gold_source"), out["retrieved"], case.get("gold_sources"))
+                out["cost"] = cost(out["prompt_tokens"], out["completion_tokens"])
                 if judge_client is not None:
                     out.update(judge(judge_client, COURSE_NAMES[course_id], case, question, out["answer"], out["sources"], turn_gold_answer(case, turn_num)))
                 results.append(
@@ -2477,8 +2309,7 @@ def main():
 GRADES_FIELDS = (
     "case", "course", "kind", "gold_confidence", "variant_of", "turn", "mode",
     "seconds", "cost", "recall_at_5", "precision_at_5", "correct", "citation_accuracy",
-    "faithful", "abstained_correctly", "searched", "first_search_recall_at_5", "first_search_fact",
-    "any_search_fact", "used_skill", "search_seconds", "model", "wrong_course_search_count",
+    "faithful", "abstained_correctly",
 )
 
 
@@ -2518,12 +2349,8 @@ def print_report(results: list[dict], modes: list[str]) -> None:
         a = avg(values)
         return f"{a * 100:.0f}%" if a is not None else "n/a"
 
-    def flag_pct(rows, key):
-        # Share of rows where a yes/no metric is true; None means not applicable.
-        return pct([1 if r.get(key) else 0 if r.get(key) is False else None for r in rows])
-
     print("\n## Summary\n")
-    header = "| mode | good | ok | bad | citation acc | faithful | correct abstention | searched | first search@5 | recall@5 | precision@5 | p50 (s) | p95 (s) | avg cost |"
+    header = "| mode | good | ok | bad | citation acc | faithful | correct abstention | recall@5 | precision@5 | p50 (s) | p95 (s) | avg cost |"
     print(header)
     print("|" + "---|" * (header.count("|") - 1))
     for mode in modes:
@@ -2536,25 +2363,11 @@ def print_report(results: list[dict], modes: list[str]) -> None:
         cost_str = f"${avg_cost:.5f}" if avg_cost is not None else "n/a"
         print(
             f"| {mode} | {good} | {ok} | {bad} | {pct([r.get('citation_accuracy') for r in rows])} | "
-            f"{flag_pct(rows, 'faithful')} | "
-            f"{flag_pct(rows, 'abstained_correctly')} | "
-            f"{flag_pct(rows, 'searched')} | "
-            f"{flag_pct(rows, 'first_search_recall_at_5')} | "
-            f"{flag_pct(rows, 'recall_at_5')} | "
+            f"{pct([1 if r.get('faithful') else 0 if r.get('faithful') is False else None for r in rows])} | "
+            f"{pct([1 if r.get('abstained_correctly') else 0 if r.get('abstained_correctly') is False else None for r in rows])} | "
+            f"{pct([1 if r.get('recall_at_5') else 0 if r.get('recall_at_5') is False else None for r in rows])} | "
             f"{pct([r.get('precision_at_5') for r in rows])} | "
             f"{_percentile(seconds, 50) or 'n/a'} | {_percentile(seconds, 95) or 'n/a'} | {cost_str} |"
-        )
-    # Mode P's search latency, from the MCP server's own timings (the plan's
-    # M0 exit: first search under 10 s, later ones under 2 s). The first
-    # search of each turn loads the model, because each turn is a new process.
-    plugin_rows = [r for r in results if r["mode"] == "P"]
-    if plugin_rows:
-        firsts = [r["search_seconds"][0] for r in plugin_rows if r.get("search_seconds")]
-        later = [t for r in plugin_rows for t in (r.get("search_seconds") or [])[1:]]
-        print(
-            f"\nP search seconds: first per turn p50 {_percentile(firsts, 50)} max {max(firsts, default=None)}; "
-            f"later p50 {_percentile(later, 50)} max {max(later, default=None)}; "
-            f"used the ask skill on {sum(bool(r.get('used_skill')) for r in plugin_rows)} of {len(plugin_rows)} turns"
         )
 
 

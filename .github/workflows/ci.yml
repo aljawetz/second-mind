@@ -71,8 +71,7 @@ jobs:
         # files with st_nlink > 1 when it loads its bundled stopwords.
         env:
           UV_LINK_MODE: copy
-        # --all-extras: the plugin's MCP server (the `mcp` extra) has tests too.
-        run: uv sync --all-groups --all-extras
+        run: uv sync --all-groups
 
       - name: Generate the embedding model
         # Public Hugging Face checkpoint, no secrets needed — gives
@@ -85,11 +84,6 @@ jobs:
           if [ ! -f models/bge-small-en-v1.5-onnx/model.onnx ]; then
             uv run python3 scripts/convert_embedding_model.py
           fi
-
-      - name: Plugin server package builds and starts
-        # The package students install with uvx: builds from plugin/server
-        # (backend modules copied in) and starts without the app's LLM stack.
-        run: uvx --from ./plugin/server sm-mcp --version
 
       - name: Run tests
         working-directory: backend

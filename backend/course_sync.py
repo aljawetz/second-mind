@@ -7,7 +7,6 @@ responsible for the actual Canvas calls") — this module is that caller.
 """
 
 import re
-import sys
 import tempfile
 import threading
 from datetime import datetime, tzinfo
@@ -497,7 +496,7 @@ def _sync_course_items(course_id: int, db_path: Path, table_name: str, conn):
                 continue
             display_name = meta.get("display_name", "")
             if Path(display_name).suffix.lower() not in SUPPORTED_FILE_SUFFIXES:
-                print(f"[course_sync] skipping unsupported file: {display_name}", file=sys.stderr)
+                print(f"[course_sync] skipping unsupported file: {display_name}")
                 continue
             file_metas[str(meta["id"])] = meta
             all_file_names[str(meta["id"])] = display_name
