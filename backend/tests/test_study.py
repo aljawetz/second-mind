@@ -688,6 +688,24 @@ def test_kahoot_pdf_never_splits_a_question_across_pages(tmp_path):
     assert sum(page.count("Answer: ") for page in pages) == 25
 
 
+def test_export_route_saves_a_kahoot_pdf_of_a_quiz(app, monkeypatch):
+    import main
+
+    monkeypatch.setattr(main, "DOWNLOADS_DIR", app.home / "Downloads")
+    app.model.replies += [{"title": "Doubles", "questions": [_q("What do stubs do?", "c1", correct=2)]}, {"supported": [1]}]
+    _, started = app.call("POST", f"/courses/{COURSE}/study", {"kind": "quiz"})
+    assert study.wait_idle(10)
+
+    status, body = app.call("POST", f"/courses/{COURSE}/study/{started['id']}/export", {"format": "kahoot-pdf"})
+
+    assert status == 200
+    assert body["path"].endswith("Doubles.pdf")
+    assert body["shortened"] == []
+    [text] = _pdf_text(body["path"])
+    assert "1. What do stubs do?" in text and "Answer: " in text
+    assert app.call("POST", f"/courses/{COURSE}/study/nope/export", {"format": "kahoot-pdf"})[0] == 404
+
+
 def test_kahoot_xlsx_fills_kahoots_template_layout(tmp_path):
     import openpyxl
 
@@ -710,6 +728,21 @@ def test_kahoot_xlsx_fills_kahoots_template_layout(tmp_path):
     ]
     assert ws["H10"].value == "1"
     assert ws["A11"].value is None
+
+
+def test_export_route_saves_a_kahoot_spreadsheet_of_a_quiz(app, monkeypatch):
+    import main
+
+    monkeypatch.setattr(main, "DOWNLOADS_DIR", app.home / "Downloads")
+    app.model.replies += [{"title": "Doubles", "questions": [_q("What do stubs do?", "c1", correct=2)]}, {"supported": [1]}]
+    _, started = app.call("POST", f"/courses/{COURSE}/study", {"kind": "quiz"})
+    assert study.wait_idle(10)
+
+    status, body = app.call("POST", f"/courses/{COURSE}/study/{started['id']}/export", {"format": "kahoot-xlsx"})
+
+    assert status == 200
+    assert body["path"].endswith("Doubles.xlsx")
+    assert body["shortened"] == []
 
 
 def _long_quiz():
@@ -754,3 +787,17 @@ def test_kahoot_fit_cuts_a_rewrite_that_still_runs_long():
     assert complete
     assert kahoot_export.over_limit(fitted) == []
     assert fitted[1]["question"].startswith("y y") and fitted[1]["question"].endswith("…")
+
+
+def test_kahoot_export_keeps_the_shortened_quiz_so_the_next_export_needs_no_llm(tmp_path, db):
+    model = ScriptedLLM({"title": "Doubles", "questions": [_q("Why " + "very " * 30 + "long?")]}, {"supported": [1]})
+    summary = _run(tmp_path, db, model, kind="quiz")
+    out = tmp_path / "Downloads"
+    rewrite = ScriptedLLM({"question": "Why so long?", "answers": ["a", "b", "c", "d"]})
+
+    _, first = study.export_kahoot(tmp_path, COURSE, summary["id"], out, "xlsx", llm=rewrite)
+    _, second = study.export_kahoot(tmp_path, COURSE, summary["id"], out, "pdf", llm=rewrite)
+
+    assert first == second == [1]
+    assert len(rewrite.calls) == 1
+    assert study.get_artifact(tmp_path, COURSE, summary["id"])["items"][0]["question"].startswith("Why very")
