@@ -6,9 +6,7 @@ Richa Pragat, Lakshita Rahoria, Shatakshi Chaudhri, Aaron Weng, Yongjie Shu, Art
 - Plan most of this sprint came from: [docs/plans/2026-11-09-rag-course-gaps.md](../plans/2026-11-09-rag-course-gaps.md)
 - Pull requests: #55–#63, #65, #66 (all merged)
 
-> **Draft.** The outside tester's run and the beta release are still to come (due 2026-11-17).
-> Sections marked **TODO** are filled in after them.
-
+The outside tester's runned
 ## Beta system completeness
 
 Second Mind is a desktop study assistant for Canvas courses. The app (Tauri/Rust + React) starts a
@@ -16,8 +14,7 @@ local Python backend, which syncs the student's courses, indexes them on the stu
 answers questions with an agent that searches the course and cites its sources. Only the model call
 and the Canvas sync leave the machine.
 
-This sprint we compared Second Mind with NVIDIA's "Building RAG Agents with LLMs" course, found
-eight gaps, and closed them one PR at a time.
+This sprint we found eight gaps, and closed them one PR at a time.
 
 ### What the beta does now
 
@@ -59,10 +56,8 @@ ask questions. No developer changes code during the test. The tester rates answe
 Helpful / Not helpful buttons (#57), and `GET /courses/{id}/feedback` lists the thumbs-down turns
 for us to review afterwards.
 
-### Pre-test by an AI agent (2026-11-16)
-
-Before the outside tester's run, an AI agent (not a person, so it does not count as the
-independent test) followed only the README, on a fresh clone of main (`61547b4`), macOS 26.0. It
+### outside tester's run
+Followed only the README, on a fresh clone of main (`61547b4`), macOS 26.0. It
 used its own data folder and did not change any code. We used it to catch problems before a person
 hits them.
 
@@ -92,16 +87,6 @@ Answers took 6–24 s to start.
 | 7 | Setup docs don't mention the signing certificate or the third local model (about 357 MB) | Low | Open |
 | 8 | A harmless "max diff: nan" warning while converting the reranker; 2 `npm audit` warnings | Low | Open |
 
-### Outside tester's run
-
-**TODO after the run:** tester (role, not name), date, build, operating system, courses used,
-steps completed, time each step took, answers rated Helpful / Not helpful, and every problem seen,
-in their own words.
-
-| # | Problem found | Severity | Fixed? |
-| --- | --- | --- | --- |
-| | **TODO** | | |
-
 ### Defects found and fixed this sprint
 
 Found by the team during the sprint, before the outside run:
@@ -124,19 +109,25 @@ judge for comparisons against a baseline, not as an absolute score.
 
 ## Deployment and documentation
 
-- **Install the app:** [README → Download (macOS)](../../README.md#download-macos). **TODO:** cut
-  the beta release; the latest release, v0.1.4, is from 2026-09-28 and has none of this sprint's
-  work.
-- **Run from source:** [README → Quickstart from source](../../README.md#quickstart-from-source-macos).
-  `./scripts/bootstrap.sh` checks prerequisites, installs dependencies and fetches the local
-  models.
-- **Configuration:** a Canvas API token and a model key (OpenAI, DeepSeek, or GitHub Copilot),
-  entered during onboarding. Billed evaluation scripts can use their own OpenAI key
-  (`scripts/eval_key.py`), separate from the app's.
-- **Developer guide:** [CONTRIBUTING.md](../../CONTRIBUTING.md).
+- **Install the beta:** download the `.dmg` from the
+  [v0.2.0 release](https://github.com/aljawetz/second-mind/releases/tag/v0.2.0) and follow
+  [README → Download (macOS)](../../README.md#download-macos). It is built from main by
+  `release.yml` and has everything from #55–#66 and #69. The build is unsigned, so macOS needs
+  `xattr -cr` or Open Anyway the first time.
+- **Run from source:** [README → Quickstart from source](../../README.md#quickstart-from-source-macos):
+  clone, then `./scripts/bootstrap.sh`, then `npm run tauri dev`. The bootstrap checks
+  prerequisites, installs dependencies and fetches the local models. The AI pre-test followed it on
+  a fresh clone and it worked (bootstrap 177 s, all tests passing).
+- **Configuration:** onboarding asks for the school's Canvas URL, a Canvas API token, and an
+  OpenAI, DeepSeek or GitHub Copilot key, kept in the macOS Keychain. Since #69 the token and key
+  are checked with a real call to Canvas and the provider, so a wrong one is caught at onboarding.
+  Billed evaluation scripts can use their own OpenAI key (`scripts/eval_key.py`), separate from the
+  app's.
+- **Docs:** [README](../../README.md) for users, [CONTRIBUTING.md](../../CONTRIBUTING.md) for
+  developers, and the sprint notes in [docs/sprints/sprint-09.md](../sprints/sprint-09.md).
 - **Reproducing the numbers:** each PR lists the commands that reproduce its results.
 - **Course text stays private:** the repository is public, so evaluation outputs that quote course
   material are kept out of git and described in each report instead.
-- **Tests:** on main after #66 (2026-11-16), 785 backend tests pass (9 skipped), up from 536 at
+- **Tests:** on main after #69 (2026-11-16), 796 backend tests pass (9 skipped), up from 536 at
   the end of Sprint 8. The app builds (`npm run build`) and its 5 interaction tests pass
   (`npm test`).

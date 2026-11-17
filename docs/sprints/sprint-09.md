@@ -85,6 +85,19 @@ comparing Second Mind with NVIDIA's "Building RAG Agents with LLMs" course. Merg
 
 ### Deployment and documentation
 
+- **Beta release v0.2.0 (#70).** The [v0.2.0 release](https://github.com/aljawetz/second-mind/releases/tag/v0.2.0)
+  is the macOS `.dmg` built by `release.yml` from main, with everything from #55–#66 and #69. The
+  install steps are in the [README](../../README.md#download-macos): the build is unsigned, so macOS
+  needs `xattr -cr` or Open Anyway the first time.
+- **Running from source.** The [README quickstart](../../README.md#quickstart-from-source-macos) is clone, then
+  `./scripts/bootstrap.sh`, then `npm run tauri dev`. The bootstrap checks prerequisites, installs
+  dependencies and fetches the local models.
+  An AI agent followed it on a fresh clone and it worked (bootstrap 177 s, all tests passing).
+- **Configuration.** Onboarding asks for the school's Canvas URL, a Canvas API token, and an OpenAI,
+  DeepSeek or GitHub Copilot key, kept in the macOS Keychain. Since #69 the token and key are
+  checked with a real call to Canvas and the provider, so a wrong one is caught at onboarding.
+- **Docs.** [README](../../README.md) for users, [CONTRIBUTING.md](../../CONTRIBUTING.md) for developers, and
+  the concise deliverable [docs/evaluations/sprint-9-deliverable.md](../evaluations/sprint-9-deliverable.md).
 - **Reproducible evaluations.** Each PR lists the commands that reproduce its numbers. Billed evaluation
   scripts can use their own OpenAI key (`scripts/eval_key.py`), separate from the app's.
 - **Course text stays local.** The repo is public, so eval outputs that quote course material are kept out
@@ -93,14 +106,12 @@ comparing Second Mind with NVIDIA's "Building RAG Agents with LLMs" course. Merg
 ### Not done yet (due 2026-11-17)
 
 - **The outside tester's run** of the core workflow, and the independent-test report.
-- **Deployment instructions and user/developer docs** for this beta.
-- **Merging #65 and #66,** then re-syncing courses, which picks up everything #63 finds.
+- **Re-syncing courses** after #63, #65 and #66, which picks up everything #63 finds.
 - **Agreed follow-ups:**
   - the rest of a faster first sync: names and outline first, then content in the background;
   - a tool that reads a whole page by name, for lists inside one long page.
 
 ### Tests
 
-The backend has 755 tests on main after #58–#63 (9 skipped), up from 536 at the end of Sprint 8; #65 brings
-766 and #66 774 on their branches. The app builds and
-its interaction tests pass.
+On main after #69, 796 backend tests pass (9 skipped), up from 536 at the end of Sprint 8. The app builds
+and its 5 interaction tests pass.
