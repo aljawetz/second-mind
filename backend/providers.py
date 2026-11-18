@@ -51,7 +51,7 @@ class Provider:
 # That was at the default (medium) effort. Chat answers run at "low": timed
 # on a real course, two runs each, a one-search answer took 3.1 s against
 # 6.3 to 7.6 s, a multi-search one 9 to 11 s against 17 to 30 s, and a
-# comparison 5 to 6 s against 12 to 19 s. Memory and study calls
+# comparison 5 to 7 s against 12 to 19 s. Memory and study calls
 # (complete_json) keep the default.
 OPENAI = Provider(
     id="openai",
