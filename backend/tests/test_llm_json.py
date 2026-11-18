@@ -28,7 +28,7 @@ def _completion(content):
 
 
 # A model that takes a temperature, as gpt-4o-mini did when it was the default.
-TUNABLE = dataclasses.replace(providers.OPENAI, model="gpt-4o-mini", fixed_temperature=False)
+TUNABLE = dataclasses.replace(providers.OPENAI, model="gpt-4o-mini", fixed_temperature=False, reasoning_effort=None)
 
 
 @respx.mock
@@ -125,3 +125,20 @@ def test_the_chat_call_leaves_temperature_out_for_such_a_model_and_sends_it_othe
     assert "temperature" not in llm.OpenAIProvider(providers.OPENAI, api_key="sk-test").chat_request([], None)
     assert llm.OpenAIProvider(TUNABLE, api_key="sk-test").chat_request([], None)["temperature"] == 0.1
 
+
+
+def test_chat_answers_ask_gpt_5_mini_for_low_reasoning_and_other_models_for_none():
+    # At the default (medium) a one-search answer took 6 to 8 s, at low 3 s.
+    assert llm.OpenAIProvider(providers.OPENAI, api_key="sk-test").chat_request([], None)["reasoning_effort"] == "low"
+    # DeepSeek and gpt-4o-mini reject the field.
+    assert "reasoning_effort" not in llm.OpenAIProvider(providers.DEEPSEEK, api_key="sk-test").chat_request([], None)
+    assert "reasoning_effort" not in llm.OpenAIProvider(TUNABLE, api_key="sk-test").chat_request([], None)
+
+
+@respx.mock
+def test_json_calls_keep_the_default_reasoning():
+    route = respx.post(COMPLETIONS).mock(return_value=httpx.Response(200, json=_completion('{"ok": true}')))
+
+    llm.OpenAIProvider(providers.OPENAI, api_key="sk-test").complete_json([{"role": "user", "content": "hi"}])
+
+    assert "reasoning_effort" not in json.loads(route.calls[0].request.content)

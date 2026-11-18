@@ -192,7 +192,7 @@ def generate(args) -> None:
     import providers
 
     eval_key.use_eval_key()
-    provider = llm.OpenAIProvider(dataclasses.replace(providers.OPENAI, model=GENERATION_MODEL, fixed_temperature=False))
+    provider = llm.OpenAIProvider(dataclasses.replace(providers.OPENAI, model=GENERATION_MODEL, fixed_temperature=False, reasoning_effort=None))
     kept = [r for r in json.loads(QUESTIONS_FILE.read_text()) if r["source"] == "generated"] if QUESTIONS_FILE.exists() else []
     generated = list(kept)
     done = {r.get("kind") for r in kept}
@@ -368,7 +368,7 @@ def chat(args) -> None:
 
     index = indexing.load_index(SM_HOME / "index.lancedb", f"course_{CHAT_COURSE}")
     course_name = COURSE_NAMES[CHAT_COURSE]
-    provider_config = dataclasses.replace(providers.OPENAI, model=CHAT_MODEL, fixed_temperature=False)
+    provider_config = dataclasses.replace(providers.OPENAI, model=CHAT_MODEL, fixed_temperature=False, reasoning_effort=None)
     judge_client = providers.openai_client(providers.OPENAI)
     search = chat_module.make_search(index, 0.5)
     search_lock = __import__("threading").Lock()

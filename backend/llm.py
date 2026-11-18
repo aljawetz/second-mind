@@ -104,6 +104,7 @@ class OpenAIProvider:
             "stream": True,
             "stream_options": {"include_usage": True},
             **self._temperature_args(self._temperature),
+            **({"reasoning_effort": self._provider.reasoning_effort} if self._provider.reasoning_effort else {}),
             **self._extra,
         }
         if tools:
