@@ -14,7 +14,17 @@ const UPLOAD_ATTEMPTS = 3;
 
 type Upload = (index: number, slice: Blob) => Promise<void>;
 
+// Prefer the original AAC format on WebKit; WebView2 can use Opus/WebM.
+export function recordingMimeType(): string | undefined {
+  return ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"]
+    .find((type) => MediaRecorder.isTypeSupported(type));
+}
+
 export class ChunkedRecorder {
+  private stream: MediaStream;
+  private mimeType: string | undefined;
+  private upload: Upload;
+  private onTick: (seconds: number) => void;
   private slice!: { recorder: MediaRecorder; parts: Blob[] };
   private seconds = 0;
   private sliceSeconds = 0;
@@ -26,11 +36,16 @@ export class ChunkedRecorder {
   private failed: { index: number; slice: Blob }[] = [];
 
   constructor(
-    private stream: MediaStream,
-    private mimeType: string,
-    private upload: Upload,
-    private onTick: (seconds: number) => void
-  ) {}
+    stream: MediaStream,
+    mimeType: string | undefined,
+    upload: Upload,
+    onTick: (seconds: number) => void
+  ) {
+    this.stream = stream;
+    this.mimeType = mimeType;
+    this.upload = upload;
+    this.onTick = onTick;
+  }
 
   start() {
     this.beginSlice();
@@ -89,7 +104,7 @@ export class ChunkedRecorder {
 
   private beginSlice() {
     const parts: Blob[] = [];
-    const recorder = new MediaRecorder(this.stream, MediaRecorder.isTypeSupported(this.mimeType) ? { mimeType: this.mimeType } : undefined);
+    const recorder = new MediaRecorder(this.stream, this.mimeType ? { mimeType: this.mimeType } : undefined);
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) parts.push(e.data);
     };
@@ -101,7 +116,7 @@ export class ChunkedRecorder {
   private finishSlice(): Promise<Blob> {
     const { recorder, parts } = this.slice;
     return new Promise((resolve) => {
-      recorder.onstop = () => resolve(new Blob(parts, { type: this.mimeType }));
+      recorder.onstop = () => resolve(new Blob(parts, { type: recorder.mimeType || parts[0]?.type || "application/octet-stream" }));
       recorder.stop();
     });
   }

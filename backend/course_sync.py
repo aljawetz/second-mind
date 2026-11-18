@@ -8,6 +8,7 @@ responsible for the actual Canvas calls") — this module is that caller.
 
 import re
 import tempfile
+import threading
 from datetime import datetime, tzinfo
 from pathlib import Path
 
@@ -29,6 +30,14 @@ SECTION_EXTRACTORS = {
     ".csv": "extract_text_file",
 }
 SUPPORTED_FILE_SUFFIXES = {".pdf", ".pptx", *SECTION_EXTRACTORS}
+_course_locks: dict[int, threading.Lock] = {}
+_course_locks_guard = threading.Lock()
+
+
+def _course_lock(sm_home: Path, course_id: int):
+    del sm_home
+    with _course_locks_guard:
+        return _course_locks.setdefault(course_id, threading.Lock())
 
 
 def _course_paths(sm_home: Path, course_id: int) -> tuple[Path, Path]:
@@ -128,9 +137,17 @@ def _sync_file(conn, db_path, table_name, file_meta, is_changed, version_suffix=
     return display_name
 
 
-def _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed):
+# The course's Home, when it's a wiki page: indexed as "Home: <title>" so
+# "what's on the Home page?" finds it. 18-658's Home is titled "Welcome to
+# Software Requirements and Interaction Design (18-658)!", and under that
+# title alone the question found nothing (seen in the app, 2026-11-17). The
+# version suffix makes a front page synced before this resync once.
+HOME_SUFFIX = "|home"
+
+
+def _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed, is_home=False):
     prefixed_id = f"page:{page_summary['url']}"
-    updated_at = page_summary.get("updated_at", "")
+    updated_at = page_summary.get("updated_at", "") + (HOME_SUFFIX if is_home else "")
 
     if is_changed:
         indexing.delete_ref_doc_nodes(db_path, table_name, prefixed_id)
@@ -146,7 +163,7 @@ def _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed):
     # generation.py's citation formatting reads item_type back as
     # source_type, so this must say "page", not "file", and carries no
     # fabricated page number.
-    nodes = indexing.sections_to_nodes(sections, title, prefixed_id, item_type="page")
+    nodes = indexing.sections_to_nodes(sections, f"Home: {title}" if is_home else title, prefixed_id, item_type="page")
 
     if nodes:
         indexing.add_nodes(nodes, db_path, table_name)
@@ -298,6 +315,19 @@ def _sync_topic(conn, db_path, table_name, topic, kind, is_changed):
 
 
 def sync_course(course_id: int, sm_home: Path):
+    """Serialize overlapping sync requests for the same course."""
+    with _course_lock(sm_home, course_id):
+        manifest_path, db_path = _course_paths(sm_home, course_id)
+        conn = sync.open_manifest(manifest_path)
+        try:
+            yield from _sync_course_items(course_id, db_path, f"course_{course_id}", conn)
+        except Exception as error:
+            yield {"done": True, "error": str(error)}
+        finally:
+            conn.close()
+
+
+def _sync_course_items(course_id: int, db_path: Path, table_name: str, conn):
     """Generator — see module docstring and the design spec for the full
     contract. Yields {"item", "status", "error"?} per processed item, then
     exactly one final {"done": True, "new", "changed", "removed", "failed"}
@@ -314,10 +344,6 @@ def sync_course(course_id: int, sm_home: Path):
     shows it, and links in the text of all the others. 18-658 lists no files
     in its Modules; all 46 of its readings are links in its pages and
     syllabus."""
-    manifest_path, db_path = _course_paths(sm_home, course_id)
-    table_name = f"course_{course_id}"
-    conn = sync.open_manifest(manifest_path)
-
     try:
         structure = canvas.get_course_structure(course_id)
         pages_list = canvas.list_pages(course_id)
@@ -386,7 +412,11 @@ def sync_course(course_id: int, sm_home: Path):
                 links_complete = False
                 continue
             pages_by_url[url] = {**page, **full, "updated_at": page.get("updated_at", full.get("updated_at", ""))}
-        page_remote = [{"id": f"page:{url}", "updated_at": p.get("updated_at", "")} for url, p in pages_by_url.items()]
+        home_url = front_page.get("url") if front_page else None
+        page_remote = [
+            {"id": f"page:{url}", "updated_at": p.get("updated_at", "") + (HOME_SUFFIX if url == home_url else "")}
+            for url, p in pages_by_url.items()
+        ]
 
         # The syllabus has no updated_at of its own: its content hash stands
         # in as the version, so an edit reads as "changed".
@@ -484,6 +514,9 @@ def sync_course(course_id: int, sm_home: Path):
         # Like the deletion guards below, an empty listing never wipes one
         # already saved: a hidden modules tab looks the same as no modules.
         outline = course_items.outline_rows(structure, page_links=page_links, file_names=all_file_names)
+        if home_url:
+            home_title = (front_page.get("title") or "").strip() or "Home"
+            outline = course_items.group_rows("Home", [home_title], "page") + outline
         # By id, not name: a module item's title often isn't its file's name.
         in_modules = {str(item.get("content_id")) for item in module_items if item.get("type") == "File"}
         in_modules |= {fid for url in module_page_urls for fid in page_links.get(url, [])}
@@ -546,7 +579,7 @@ def sync_course(course_id: int, sm_home: Path):
                 url = prefixed_id.removeprefix("page:")
                 page_summary = pages_by_url[url]
                 try:
-                    title = _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed)
+                    title = _sync_page(conn, db_path, table_name, course_id, page_summary, is_changed, url == home_url)
                     yield {"item": title, "status": "done"}
                     changed_count += is_changed
                     new_count += not is_changed

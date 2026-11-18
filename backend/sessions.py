@@ -166,6 +166,8 @@ def add_chunk(session_id: str, index: int, audio_bytes: bytes) -> None:
     chunks_dir = info["dir"] / "chunks"
     chunks_dir.mkdir(exist_ok=True)
     audio_path = chunks_dir / f"chunk-{index:04d}.m4a"
+    # This historical suffix is also used for WebView2's WebM uploads.
+    # PyAV/Whisper detect containers from their headers, not the suffix.
     # Written then renamed, so a crash mid-upload can't leave a half-written
     # slice that finalize_session would later transcribe as if it were whole.
     partial_path = audio_path.with_name(audio_path.name + ".part")

@@ -188,16 +188,20 @@ svg{flex:none}
   font-size:1.5rem;font-weight:500;letter-spacing:-.02em;line-height:1.25;
   min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
+.topbar-actions{margin-left:auto;display:flex;align-items:center;gap:6px;flex:none;min-width:0}
+.topbar-actions .icon-btn{background:var(--panel);border:1px solid var(--line)}
 .course-code{flex:none;font-size:var(--t3);color:var(--muted)}
-.topbar-actions{margin-left:auto;display:flex;align-items:center;gap:16px;flex:none;min-width:0}
-.sync{display:inline-flex;align-items:center;gap:7px;max-width:28rem;min-width:0;font-size:var(--t2);color:var(--muted)}
-.sync::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--warn);flex:none}
-.sync.ok::before{background:var(--pos)}
-.sync.error{color:var(--neg)}
-.sync.error::before{background:var(--neg)}
-.sync .label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.text-btn{background:none;border:none;padding:4px 0;cursor:pointer;font-size:var(--t2);color:var(--muted)}
-.text-btn:hover{color:var(--text)}
+.sync-pill{
+  display:flex;align-items:center;gap:6px;max-width:28rem;min-width:0;
+  font-size:var(--t1);color:var(--ink-2);background:var(--panel);border:1px solid var(--line);
+  border-radius:99px;padding:3px 10px;
+}
+.sync-pill .label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sync-pill svg{width:14px;height:14px;fill:none;stroke:var(--done);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.sync-pill.error{background:var(--late-soft);border-color:transparent;color:var(--late)}
+.sync-details-anchor{position:relative;min-width:0}
+.sync-details-label{flex-shrink:0;text-decoration:underline}
+.sync-details-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:min(40rem,calc(100vw - 32px));max-height:50vh;overflow:auto;margin:0;padding:16px;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:var(--t1);color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14);user-select:text}
 
 /* Every view except home is one panel that scrolls; home lays out its own. */
 .view{

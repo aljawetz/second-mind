@@ -18,10 +18,15 @@ Your index, your recordings, your notes, on your machine.
 
 ---
 
-## Download (macOS)
+## Download (macOS and Windows)
 
 **[Latest release](https://github.com/aljawetz/second-mind/releases/latest)** — download the `.dmg`, open
 it, drag Second Mind to Applications.
+
+Windows x64 releases use the `-setup.exe` installer. It includes the backend, local
+embedding/transcription models, and Tesseract OCR. The installer installs WebView2 if
+needed (internet required for that step). Windows builds are unsigned, so SmartScreen
+may show a warning. Windows ARM64 native builds are not currently provided.
 
 This build is **unsigned** (not notarized by Apple) — macOS Gatekeeper will block it on first
 launch. The fastest fix, open Terminal and run:
@@ -45,8 +50,8 @@ messages, each with its own bypass:
 Only needed once per download; see
 [the contribution & distribution plan](docs/architecture/contribution-and-distribution-plan.md)
 for why real notarization isn't done yet. OCR fallback for image-heavy slides needs Tesseract
-installed separately (`brew install tesseract`) — not bundled into this build yet. Windows/Linux
-aren't built yet either.
+installed separately (`brew install tesseract`) — not bundled into the macOS build yet.
+Linux installers are not built yet.
 
 ## Quickstart from source (macOS)
 
@@ -63,11 +68,12 @@ school uses) and a key for your model provider: an OpenAI or DeepSeek API key, o
 Copilot plan (a fine-grained token with the Copilot Requests permission works too). See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev
 workflow.
 
-### Windows (from source, experimental)
+### Windows (from source)
 
 Install the [Rust MSVC toolchain](https://rustup.rs) with the Visual Studio C++ Build Tools,
 [uv](https://docs.astral.sh/uv/getting-started/installation/), Node, Python 3.13, and
-[Tesseract](https://github.com/UB-Mannheim/tesseract/wiki) (on `PATH`). WebView2 ships with
+[Tesseract](https://github.com/UB-Mannheim/tesseract/wiki) (the standard installation
+directory is detected automatically). WebView2 ships with
 Windows 11. Then, from PowerShell:
 
 ```powershell
@@ -77,8 +83,18 @@ python scripts\bootstrap.py
 cd app; npm run tauri dev
 ```
 
-No Windows installer is built yet. If `uv sync --frozen` complains about the lockfile, run
-`uv lock` in `backend/` on Windows.
+To build the Windows installer after setup, run from the repository root:
+
+```powershell
+python scripts\package-windows.py
+```
+
+This rebuilds the backend, checks real model inference, OCR, MP4/WebM audio decoding,
+and HTTP startup/shutdown, then builds the NSIS installer and checks the staged
+backend resources. Output: `app/src-tauri/target/release/bundle/nsis/*-setup.exe`.
+CI also installs the resulting installer and checks its installed backend. Tagged
+releases attach the Windows installer alongside the macOS download. These assets
+appear after a tag containing the Windows pipeline has successfully built.
 
 ---
 

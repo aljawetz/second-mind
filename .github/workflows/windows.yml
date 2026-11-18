@@ -1,0 +1,118 @@
+name: Windows build and installer
+
+# Pull requests run the Windows tests only. The installer build (about 20
+# minutes) runs on pushes to main and on manual runs.
+
+on:
+  workflow_call:
+    inputs:
+      installer:
+        description: Build, install and smoke test the NSIS installer
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      installer:
+        description: Build, install and smoke test the NSIS installer
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
+      UV_LINK_MODE: copy
+      # package-windows.py defaults to 2 jobs to spare laptop RAM. The
+      # runner has 4 vCPUs and 16 GB, so use them all.
+      CARGO_BUILD_JOBS: "4"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          architecture: x64
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.9.28"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+          # Saving takes about 2 minutes, and other PRs can't read a PR's
+          # cache anyway. main saves it; PRs restore from main.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Install OCR runtime for bundling
+        run: choco install tesseract --no-progress -y
+      - name: Cache local models
+        uses: actions/cache@v4
+        with:
+          path: backend/models
+          key: windows-models-${{ hashFiles('backend/scripts/convert_embedding_model.py', 'backend/scripts/convert_reranker_model.py', 'backend/scripts/fetch_whisper_model.py', 'backend/uv.lock') }}
+      - name: Install locked dependencies
+        working-directory: backend
+        run: uv sync --all-groups --frozen
+      - name: Prepare offline models
+        working-directory: backend
+        run: |
+          if (!(Test-Path models/bge-small-en-v1.5-onnx/model.onnx)) {
+            uv run --no-sync python scripts/convert_embedding_model.py
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          if (!(Test-Path models/ms-marco-MiniLM-L-6-v2-onnx/model.onnx)) {
+            uv run --no-sync python scripts/convert_reranker_model.py
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          uv run --no-sync python scripts/fetch_whisper_model.py
+      - name: Test backend on Windows
+        working-directory: backend
+        run: uv run --no-sync pytest tests/ -q
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+      - name: Test frontend on Windows
+        working-directory: app
+        run: node --experimental-transform-types --test tests/*.test.mjs
+      # Without the installer build, tauri-build still needs app/dist and
+      # the sidecar resource folder from tauri.windows.conf.json to exist.
+      - name: Prepare Tauri inputs for the credential test
+        if: ${{ !inputs.installer }}
+        run: |
+          npm --prefix app run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force app/src-tauri/binaries/sm-backend | Out-Null
+          Set-Content app/src-tauri/binaries/sm-backend/placeholder.txt 'credential test only'
+      - name: Build and validate frozen backend and NSIS installer
+        if: ${{ inputs.installer }}
+        run: python scripts/package-windows.py
+      - name: Check Windows Credential Manager
+        working-directory: app/src-tauri
+        run: cargo test --locked --lib windows_tests::native_credentials_round_trip
+      - name: Install and check packaged resources
+        if: ${{ inputs.installer }}
+        run: |
+          $installer = Get-ChildItem app/src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          $installDir = Join-Path $env:RUNNER_TEMP 'Second Mind installed 日本語'
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList "/S /D=$installDir" -Wait -PassThru -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+          python scripts/smoke_backend.py "$installDir/sm-backend/sm-backend.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $app = Get-ChildItem $installDir -Filter *.exe | Where-Object Name -NotMatch 'uninstall' | Select-Object -First 1
+          python scripts/smoke_app.py $app.FullName
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.installer }}
+        with:
+          name: windows-installer
+          path: app/src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error

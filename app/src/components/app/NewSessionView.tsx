@@ -1,15 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { ChunkedRecorder } from "../../chunkedRecorder";
+import { ChunkedRecorder, recordingMimeType } from "../../chunkedRecorder";
 import { getSessionDetail, saveSessionNotes, startSession, stopSession, uploadChunk, type SessionDetail } from "../../sidecar";
 import SessionContent from "./SessionContent";
 
 type Phase = "idle" | "starting" | "recording" | "processing" | "done" | "error";
-
-// WebKit's MediaRecorder reliably produces audio/mp4 (AAC) — verified
-// against current WebKit docs (implementation-plan.md Step 12), which
-// conveniently already matches data-model.md's audio.m4a naming. No
-// transcoding needed before it reaches the backend.
-const MIME_TYPE = "audio/mp4";
 
 // How often to ask the backend for the slices transcribed so far.
 const LIVE_POLL_MS = 4000;
@@ -72,15 +66,17 @@ export default function NewSessionView({
       onSessionCreated();
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new ChunkedRecorder(stream, MIME_TYPE, (index, slice) => uploadChunk(session_id, index, slice), setElapsed);
-      recorder.start();
+      const recorder = new ChunkedRecorder(stream, recordingMimeType(), (index, slice) => uploadChunk(session_id, index, slice), setElapsed);
       recorderRef.current = recorder;
+      recorder.start();
 
       setElapsed(0);
       setPaused(false);
       setPhase("recording");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't start recording. Check microphone permission.");
+      recorderRef.current?.dispose();
+      recorderRef.current = null;
+      setError(err instanceof Error ? err.message : "Couldn't start recording — check microphone permission.");
       setPhase("error");
     }
   }
