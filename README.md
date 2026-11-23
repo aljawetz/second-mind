@@ -11,6 +11,8 @@ build by hand — mock tests, mindmaps, slides, flashcards.
 
 Your index, your recordings, your notes, on your machine.
 
+![Second Mind answering a question about a course, with numbered citations to the lecture slides, a Canvas page, and a class recording](docs/screenshots/chat.png)
+
 > **Status: early development.** Grounded Q&A, Canvas sync, lecture capture + transcription, and
 > assignment explanations all work end-to-end against real data. Study artifact generation (mock
 > tests, mindmaps, flashcards, slides) hasn't started yet; see
@@ -124,6 +126,16 @@ actually in your courses — each traceable to its source.
 lecture and reading material it draws on — never drafts the answer itself. See
 [§7.1 of the design spec](docs/specs/2026-09-14-second-mind-design.md) for exactly where that
 line sits.
+
+### Screenshots
+
+<sub>Demo course and made-up data.</sub>
+
+| Explain an assignment | Recorded class |
+| --- | --- |
+| ![Assignment view with a grounded explanation of what the prompt asks and where to start](docs/screenshots/assignment.png) | ![Recorded class with enhanced notes, the transcript, and the student's own notes](docs/screenshots/session.png) |
+| **Quiz** | **Flashcards** |
+| ![Quiz question with the right answer, its rationale, and a source](docs/screenshots/quiz.png) | ![Flashcard practice with got it, missed it, and explain](docs/screenshots/flashcards.png) |
 
 ## Architecture
 
