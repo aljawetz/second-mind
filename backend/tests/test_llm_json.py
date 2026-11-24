@@ -104,11 +104,10 @@ def test_deepseek_stream_with_a_required_tool_call():
     assert sent["thinking"] == {"type": "disabled"}
 
 
-def test_the_default_openai_model_is_gpt_5_mini_which_takes_no_temperature():
-    # Chosen from the memory evaluation (PR #56): it answered 7 to 9 more of
-    # 58 questions than gpt-4o-mini in every run. A reasoning model: it
-    # rejects any temperature but its default.
-    assert providers.OPENAI.model == "gpt-5-mini"
+def test_the_default_openai_model_is_gpt_6_1_terra_which_takes_no_temperature():
+    # OpenAI's replacement for gpt-5-mini, which shuts down 2026-12-11. A
+    # reasoning model: it rejects any temperature but its default.
+    assert providers.OPENAI.model == "gpt-6.1-terra"
     assert providers.OPENAI.fixed_temperature is True
 
 
@@ -127,9 +126,10 @@ def test_the_chat_call_leaves_temperature_out_for_such_a_model_and_sends_it_othe
 
 
 
-def test_chat_answers_ask_gpt_5_mini_for_low_reasoning_and_other_models_for_none():
-    # At the default (medium) a one-search answer took 6 to 8 s, at low 3 s.
-    assert llm.OpenAIProvider(providers.OPENAI, api_key="sk-test").chat_request([], None)["reasoning_effort"] == "low"
+def test_chat_answers_ask_the_openai_model_for_no_reasoning_and_leave_others_alone():
+    # gpt-6.1-terra on chat completions refuses function tools with any other
+    # setting, and every chat turn offers tools.
+    assert llm.OpenAIProvider(providers.OPENAI, api_key="sk-test").chat_request([], None)["reasoning_effort"] == "none"
     # DeepSeek and gpt-4o-mini reject the field.
     assert "reasoning_effort" not in llm.OpenAIProvider(providers.DEEPSEEK, api_key="sk-test").chat_request([], None)
     assert "reasoning_effort" not in llm.OpenAIProvider(TUNABLE, api_key="sk-test").chat_request([], None)

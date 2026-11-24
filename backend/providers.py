@@ -43,24 +43,27 @@ class Provider:
     reasoning_effort: str | None = None
 
 
-# gpt-5-mini since the memory evaluation (PR #56): with the same memories it
-# answered 7 to 9 more of 58 questions than gpt-4o-mini in every one of four
-# runs, and 43 against 35 of 54 on questions that combine several chats. It
-# reasons before answering, which is where the gain comes from and why an
-# answer takes about 8 seconds where gpt-4o-mini took about 3.
-# That was at the default (medium) effort. Chat answers run at "low": timed
-# on a real course, two runs each, a one-search answer took 3.1 s against
-# 6.3 to 7.6 s, a multi-search one 9 to 11 s against 17 to 30 s, and a
-# comparison 5 to 7 s against 12 to 19 s. Memory and study calls
-# (complete_json) keep the default.
+# gpt-6.1-terra since 2026-11-24: gpt-5-mini, the model before it, shuts
+# down 2026-12-11 and this is OpenAI's named replacement
+# (developers.openai.com/api/docs/deprecations). gpt-5-mini was picked by the
+# memory evaluation (PR #56), where reasoning before answering is what beat
+# gpt-4o-mini; docs/evaluations/2026-11-agent-memory/report.md §9 has this
+# model on the same questions.
+# On chat completions this model refuses function tools with any reasoning
+# but "none" (a 400 otherwise), and every chat turn offers tools, so chat
+# answers run at "none". Memory and study calls (complete_json) send no
+# tools and keep the default reasoning (medium).
+# LlamaIndex doesn't know the name yet (llama-index-llms-openai 0.9.0), so
+# the context window is given here and llama_llm takes the compatible path.
 OPENAI = Provider(
     id="openai",
     name="OpenAI",
     kind="openai",
     credential="openai-key",
-    model="gpt-5-mini",
+    model="gpt-6.1-terra",
+    context_window=1_050_000,
     fixed_temperature=True,
-    reasoning_effort="low",
+    reasoning_effort="none",
 )
 
 # Thinking mode is DeepSeek's default. It ignores temperature, and on any
@@ -129,8 +132,13 @@ def llama_llm(provider: Provider | None = None):
     from llama_index.llms.openai import OpenAI
 
     extra = {"extra_body": provider.extra_body} if provider.extra_body else {}
+    settings = dict(model=provider.model, api_key=api_key(provider), api_base=provider.base_url, additional_kwargs=extra)
+    # LlamaIndex sends a temperature of 0.1 unless it knows the model as a
+    # reasoning model. 1.0 is the default, the one such a model accepts.
+    if provider.fixed_temperature:
+        settings["temperature"] = 1.0
     if provider.context_window is None:
-        return OpenAI(model=provider.model, api_key=api_key(provider), api_base=provider.base_url, additional_kwargs=extra)
+        return OpenAI(**settings)
 
     # What llama-index-llms-openai-like does, without that package: its
     # releases pin llama-index-llms-openai below the version used here.
@@ -153,4 +161,4 @@ def llama_llm(provider: Provider | None = None):
         def _tokenizer(self):
             return None
 
-    return CompatibleOpenAI(model=provider.model, api_key=api_key(provider), api_base=provider.base_url, additional_kwargs=extra)
+    return CompatibleOpenAI(**settings)

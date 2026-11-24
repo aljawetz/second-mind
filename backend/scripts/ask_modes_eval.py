@@ -70,14 +70,15 @@ ANSWER_PROVIDER = providers.OPENAI
 def set_answer_model(model: str) -> None:
     """Answer with `model` instead of the app's default, e.g. a cheaper
     gpt-4o-mini for runs where the answering model isn't what's measured.
-    Reasoning models (gpt-5 family) take only their default temperature."""
+    Reasoning models (gpt-5 and later) take only their default temperature."""
     global MODEL, ANSWER_PROVIDER
     MODEL = model
-    reasoning = model.startswith("gpt-5")
-    # Only gpt-5 models take reasoning_effort; the others reject it.
-    ANSWER_PROVIDER = dataclasses.replace(
-        providers.OPENAI, model=model, fixed_temperature=reasoning, reasoning_effort="low" if reasoning else None
-    )
+    reasoning = model.startswith(("gpt-5", "gpt-6"))
+    # Only reasoning models take reasoning_effort; the others reject it.
+    # gpt-5-mini was run at "low". The later ones refuse tools on chat
+    # completions with anything but "none" (providers.OPENAI).
+    effort = ("low" if model.startswith("gpt-5-") else "none") if reasoning else None
+    ANSWER_PROVIDER = dataclasses.replace(providers.OPENAI, model=model, fixed_temperature=reasoning, reasoning_effort=effort)
 TEMPERATURE = 0.1  # llama_index's OpenAI default, which mode A already uses
 MAX_TOOL_ROUNDS = 4
 
@@ -947,7 +948,7 @@ def run_g(_index, question: str, history: list[dict], course_name: str) -> dict:
         messages.append({"role": "assistant", "content": turn["answer"]})
     messages.append({"role": "user", "content": question})
     start = time.perf_counter()
-    # gpt-5-mini takes only its default temperature (providers.Provider.fixed_temperature).
+    # Reasoning models take only their default temperature (providers.Provider.fixed_temperature).
     temperature = {} if ANSWER_PROVIDER.fixed_temperature else {"temperature": TEMPERATURE}
     response = client.chat.completions.create(model=MODEL, messages=messages, **temperature)
     elapsed = time.perf_counter() - start

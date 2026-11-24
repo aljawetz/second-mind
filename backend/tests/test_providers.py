@@ -12,6 +12,7 @@ import credentials
 import providers
 
 DEEPSEEK_COMPLETIONS = "https://api.deepseek.com/chat/completions"
+OPENAI_COMPLETIONS = "https://api.openai.com/v1/chat/completions"
 
 
 @pytest.fixture
@@ -75,3 +76,19 @@ def test_llama_llm_for_deepseek_calls_deepseek_with_thinking_off(sm_home, monkey
     sent = json.loads(route.calls[0].request.content)
     assert sent["model"] == "deepseek-flash"
     assert sent["thinking"] == {"type": "disabled"}
+
+
+@respx.mock
+def test_llama_llm_for_openai_takes_a_model_llama_index_doesnt_know_at_its_default_temperature(sm_home, monkeypatch):
+    # llama-index-llms-openai 0.9.0 raises on "gpt-6.1-terra", and would send
+    # temperature 0.1, which the model refuses with a 400.
+    monkeypatch.setattr(credentials, "get", lambda key: "sk-openai")
+    route = respx.post(OPENAI_COMPLETIONS).mock(return_value=httpx.Response(200, json=_completion("hello")))
+
+    llm = providers.llama_llm()
+
+    assert llm.metadata.is_chat_model
+    assert str(llm.complete("hi")) == "hello"
+    sent = json.loads(route.calls[0].request.content)
+    assert sent["model"] == "gpt-6.1-terra"
+    assert sent["temperature"] == 1.0

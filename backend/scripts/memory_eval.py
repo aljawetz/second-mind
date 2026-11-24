@@ -76,10 +76,17 @@ RECALL_K = 5  # memories per recall, the app's (MemoryService.recall); --recall-
 # $ per 1M tokens (input, output), the same figures as ask_modes_eval.py.
 # gpt-5.4-mini from OpenAI's model page (developers.openai.com/docs/models/gpt-5.4-mini), read 2026-11-10.
 # gpt-5-mini: OpenAI's list price as of its August 2025 release; check before budgeting.
-PRICES = {"gpt-4o-mini": (0.15, 0.60), "gpt-4o": (2.50, 10.00), "gpt-5.4-mini": (0.75, 4.50), "gpt-5-mini": (0.25, 2.00)}
+# gpt-6.1-terra from developers.openai.com/api/docs/models/gpt-6.1-terra, read 2026-11-24.
+PRICES = {
+    "gpt-4o-mini": (0.15, 0.60), "gpt-4o": (2.50, 10.00), "gpt-5.4-mini": (0.75, 4.50), "gpt-5-mini": (0.25, 2.00),
+    "gpt-6.1-terra": (1.00, 5.00),
+}
 # Reasoning models that only accept the default temperature. They reason
 # before answering by default (hidden tokens, billed as output).
-NO_TEMPERATURE = {"gpt-5", "gpt-5-mini", "gpt-5-nano"}
+NO_TEMPERATURE = {"gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-6.1-terra"}
+# Models that refuse function tools on chat completions unless reasoning is
+# "none", as the app sends them (providers.OPENAI).
+NO_REASONING_WITH_TOOLS = {"gpt-6.1-terra"}
 
 PAST_CHATS_NOTE = (
     "\n\nsearch_past_chats looks through what you and the user said in those conversations, word for word. "
@@ -333,6 +340,8 @@ class CountingLLM:
     def chat(self, messages: list[dict], tools: list[dict] | None = None, model: str | None = None, temperature: float = ANSWER_TEMPERATURE):
         model = model or self.answer_model
         kwargs = {"tools": tools} if tools else {}
+        if tools and model in NO_REASONING_WITH_TOOLS:
+            kwargs["reasoning_effort"] = "none"
         if model not in NO_TEMPERATURE:
             kwargs["temperature"] = temperature
         response = self.client.chat.completions.create(model=model, messages=messages, **kwargs)
