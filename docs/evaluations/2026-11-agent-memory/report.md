@@ -128,3 +128,31 @@ uv run python3 scripts/memory_eval.py --per-type 60 --types multi-session --syst
 ```
 
 These make billed OpenAI calls: about $0.25 the first time a sample's memories are written, about $0.04 to $0.13 a run after that. `--answer-model`, `--recall-k` and `--write-model` set what §4 and §5 vary. The header of `scripts/eval_key.py` says how to store a key for evaluations only.
+
+## 9. Replacing `gpt-5-mini` with `gpt-6.1-terra` (2026-11-24)
+
+OpenAI shuts `gpt-5-mini` down on 2026-12-11 and names `gpt-6.1-terra` as its replacement ([deprecations](https://developers.openai.com/api/docs/deprecations)). On chat completions, `gpt-6.1-terra` refuses function tools unless reasoning is `"none"` (a 400 otherwise; `gpt-5.4-mini` and `gpt-6-luna` behave the same). Every chat turn offers tools, so the app's chat answers with no reasoning. Memory and study calls send no tools and keep the default reasoning. In this eval, `gpt-5-mini` answers at its default reasoning (as in §5). `gpt-6.1-terra` answers at `"none"` whenever tools are offered, as in the app.
+
+S4, recall limit 10, memories written by `gpt-4o-mini` and shared by every run. The dataset was downloaded again and the memories rewritten, so `gpt-5-mini` was run again on them. These scores, not §5's, are the baseline. Two runs of each.
+
+| Answering model | Mixed, of 58 | Multi-chat, of 54 | Median seconds (mixed, multi) |
+| --- | --- | --- | --- |
+| `gpt-5-mini` | 51, 51 | 41, 41 | 6.9 and 6.7, 6.8 and 7.4 |
+| `gpt-6.1-terra` | 51, 51 | 47, 44 | 2.5 and 7.4, 2.9 and 8.9 |
+
+- **Mixed set: no change.** All four runs got 51 of 58.
+- **Multi-chat: `gpt-6.1-terra` ahead in both runs,** by 3 and 6 questions. §6's run-to-run spread is up to four, so this shows direction, not size.
+- **Speed.** Without hidden reasoning, run 1 answered in under half the time. Run 2's medians were measured while OpenAI was returning 503 "server is overloaded" errors. One multi-chat question failed that way and was answered on a resumed run, so those medians are not comparable.
+- **Cost.** About $0.13 to $0.15 a run after the writes, with the judge, close to `gpt-5-mini`. The higher token price ($1 and $5 per million, against $0.25 and $2) is offset by no reasoning tokens.
+
+Course chat, `ask_modes_eval.py --set sprint9-chat --only E` (the shipped chat), one run each, run one after the other:
+
+| Answering model | Good | Ok | Bad | Citation accuracy | Faithful | p50 s | p95 s |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `gpt-5-mini` | 32 | 3 | 5 | 75% | 88% | 7.3 | 11.5 |
+| `gpt-6.1-terra` | 31 | 2 | 7 | 56% | 82% | 3.5 | 5.8 |
+
+- **Answers about the same, twice as fast.** One single run each, so a difference of two "bad" grades is within noise.
+- **The citation score is lower, and weak evidence.** The judge sees only source titles, not their text. The scores differ on 16 turns, and on every one the two models cited the same sources or one cited a subset of the other's. On 5 turns the sources were identical, yet the judge gave `gpt-6.1-terra` 0 and `gpt-5-mini` 1. `gpt-6.1-terra` writes shorter answers with citations at the end. Not checked by hand.
+
+Reproduce from `backend/` with `--answer-model gpt-6.1-terra` (or `gpt-5-mini`) on §8's S4 commands, and `uv run python3 scripts/ask_modes_eval.py --set sprint9-chat --only E --model <model> --out <path>`.
