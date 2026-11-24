@@ -405,3 +405,7 @@ def test_the_answering_model_can_be_swapped_for_a_cheaper_one():
     assert (module.MODEL, module.ANSWER_PROVIDER.model, module.ANSWER_PROVIDER.fixed_temperature) == ("gpt-4o-mini", "gpt-4o-mini", False)
     module.set_answer_model("gpt-5-mini")
     assert module.ANSWER_PROVIDER.fixed_temperature is True  # takes only its default temperature
+    assert module.ANSWER_PROVIDER.reasoning_effort == "low"
+    module.set_answer_model("gpt-6.1-terra")
+    assert module.ANSWER_PROVIDER.fixed_temperature is True
+    assert module.ANSWER_PROVIDER.reasoning_effort == "none"  # the only setting it takes with tools
