@@ -38,6 +38,9 @@ class Provider:
     # A reasoning model that rejects any temperature but its default (a 400
     # otherwise), so none is sent.
     fixed_temperature: bool = False
+    # A reasoning model's effort for chat answers (stream_chat). None sends
+    # nothing: a model without the setting (DeepSeek, gpt-4o-mini) rejects it.
+    reasoning_effort: str | None = None
 
 
 # gpt-5-mini since the memory evaluation (PR #56): with the same memories it
@@ -45,8 +48,19 @@ class Provider:
 # runs, and 43 against 35 of 54 on questions that combine several chats. It
 # reasons before answering, which is where the gain comes from and why an
 # answer takes about 8 seconds where gpt-4o-mini took about 3.
+# That was at the default (medium) effort. Chat answers run at "low": timed
+# on a real course, two runs each, a one-search answer took 3.1 s against
+# 6.3 to 7.6 s, a multi-search one 9 to 11 s against 17 to 30 s, and a
+# comparison 5 to 7 s against 12 to 19 s. Memory and study calls
+# (complete_json) keep the default.
 OPENAI = Provider(
-    id="openai", name="OpenAI", kind="openai", credential="openai-key", model="gpt-5-mini", fixed_temperature=True
+    id="openai",
+    name="OpenAI",
+    kind="openai",
+    credential="openai-key",
+    model="gpt-5-mini",
+    fixed_temperature=True,
+    reasoning_effort="low",
 )
 
 # Thinking mode is DeepSeek's default. It ignores temperature, and on any
